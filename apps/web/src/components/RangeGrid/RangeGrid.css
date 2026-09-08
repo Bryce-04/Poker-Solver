@@ -1,0 +1,32 @@
+/* Functional baseline only — sizing/layout so the grid is usable, nothing
+   more. The Stage 2 "real visual pass" (palette, hover/focus states, weight
+   shading) is part of this component's ticket, not done here. */
+
+.range-grid {
+  display: inline-flex;
+  flex-direction: column;
+  border: 1px solid #999;
+}
+
+.range-grid__row {
+  display: flex;
+}
+
+.range-grid__cell {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.range-grid__cell[data-selected="true"] {
+  background: #6ba368;
+  color: #fff;
+}
+
+.range-grid__cell:disabled {
+  cursor: default;
+}
