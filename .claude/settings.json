@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-generated-schema.sh",
+            "statusMessage": "Checking generated-schema guard..."
+          }
+        ]
+      }
+    ]
+  }
+}
