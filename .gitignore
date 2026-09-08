@@ -1,0 +1,35 @@
+# env
+.env
+.env.local
+
+# node / pnpm
+node_modules/
+dist/
+dist-ssr/
+*.local
+.pnpm-store/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# generated (regenerate with `pnpm generate` in packages/schema)
+packages/schema/generated/*.schema.json
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

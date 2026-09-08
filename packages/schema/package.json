@@ -1,0 +1,15 @@
+{
+  "name": "@poker-solver/schema",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Generated TypeScript types for the Spot model. Do not hand-edit generated/ — it's produced from the Python models, see README.md.",
+  "type": "module",
+  "main": "generated/index.ts",
+  "scripts": {
+    "generate": "python scripts/export_json_schema.py && json2ts -i \"generated/*.schema.json\" -o generated/ --unreachableDefinitions"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "^5.7.0"
+  }
+}
