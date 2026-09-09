@@ -41,58 +41,6 @@
   color: #b3261e;
 }
 
-.spot-builder__actions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.spot-builder__action-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.spot-builder__action-street {
-  font-size: 0.8rem;
-  align-self: center;
-  opacity: 0.7;
-}
-
-.spot-builder__action-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.8rem;
-}
-
-.spot-builder__action-field select,
-.spot-builder__action-field input {
-  min-width: 5rem;
-}
-
-.spot-builder__row-controls {
-  display: flex;
-  gap: 0.25rem;
-  margin-inline-start: auto;
-}
-
-.spot-builder__icon-button {
-  min-width: 1.75rem;
-  padding: 0.15rem 0.35rem;
-}
-
-.spot-builder__add-row {
-  align-self: start;
-}
-
 .spot-builder__status {
   margin-top: 0.75rem;
 }

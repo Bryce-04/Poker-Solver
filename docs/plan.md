@@ -8,9 +8,11 @@ channel for the artifact link if you want the formatted read.)
 **Status (2026-09-09):** Stage 1 complete. Stage 2 in progress — spot
 builder and 13×13 range grid scaffolded in `apps/web`, reference-chart
 lookup live in `apps/api` (coverage:
-[reference-chart-coverage.md](reference-chart-coverage.md)). Remaining:
-weighted/drag/keyboard range-grid selection, the spot builder's
-action-sequence input, and the visual pass.
+[reference-chart-coverage.md](reference-chart-coverage.md)). The spot
+builder's freeform action-list editor was cut for a two-option situation
+picker (unopened / facing one raise) — the only shapes the reference
+charts answer. Remaining: weighted/drag/keyboard range-grid selection and
+the visual pass.
 
 ## The pitch
 

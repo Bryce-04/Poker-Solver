@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import type { BettingAction, Position, Spot } from "@poker-solver/schema";
-import { POSITIONS } from "../../lib/positions";
+import { OPENABLE_POSITIONS, SIX_MAX_POSITIONS } from "../../lib/positions";
 import {
   fetchReferenceStrategy,
   type ReferenceStrategyResponse,
@@ -24,6 +24,11 @@ import "./SpotBuilder.css";
  * those: an unopened pot (open charts), or hero facing a single preflop
  * raise from one other seat (defend charts). Arbitrary action sequences
  * wait for Stage 5's live solver -- see apps/api/app/reference_charts.py.
+ *
+ * Seat lists are 6-max (no UTG1/LJ -- full-ring, no chart), and the hero
+ * seat drops BB in an unopened pot (BB is never first to act). Picking a
+ * covered seat with no chart yet (e.g. HJ defending) still just shows the
+ * endpoint's 404 message -- see docs/reference-chart-coverage.md.
  *
  * Not here: board card picker (out of scope until Stage 5). Visual polish
  * is a separate shared ticket; this file is functional baseline styling.
@@ -48,6 +53,20 @@ export function SpotBuilder() {
   const [situation, setSituation] = useState<Situation>("unopened");
   const [raiser, setRaiser] = useState<Position>("CO");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+
+  // BB is never first to act, so it's not a valid hero seat in an unopened
+  // pot. The seat list narrows with the situation, and switching to
+  // "unopened" while BB is selected snaps the seat back to BTN (handled in
+  // selectSituation) so the form never submits a spot the schema rejects.
+  const heroPositions =
+    situation === "unopened" ? OPENABLE_POSITIONS : SIX_MAX_POSITIONS;
+
+  function selectSituation(next: Situation) {
+    setSituation(next);
+    if (next === "unopened" && !OPENABLE_POSITIONS.includes(position)) {
+      setPosition("BTN");
+    }
+  }
 
   const stackIsValid = Number.isFinite(effectiveStackBb) && effectiveStackBb > 0;
 
@@ -104,7 +123,7 @@ export function SpotBuilder() {
               value={position}
               onChange={(e) => setPosition(e.target.value as Position)}
             >
-              {POSITIONS.map((p) => (
+              {heroPositions.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
@@ -139,7 +158,7 @@ export function SpotBuilder() {
               type="radio"
               name="situation"
               checked={situation === "unopened"}
-              onChange={() => setSituation("unopened")}
+              onChange={() => selectSituation("unopened")}
             />
             First to act &mdash; unopened pot (opening range)
           </label>
@@ -149,7 +168,7 @@ export function SpotBuilder() {
               type="radio"
               name="situation"
               checked={situation === "vs-raise"}
-              onChange={() => setSituation("vs-raise")}
+              onChange={() => selectSituation("vs-raise")}
             />
             Facing a single raise (defending range)
           </label>
@@ -161,7 +180,7 @@ export function SpotBuilder() {
                 value={raiser}
                 onChange={(e) => setRaiser(e.target.value as Position)}
               >
-                {POSITIONS.map((p) => (
+                {OPENABLE_POSITIONS.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>
