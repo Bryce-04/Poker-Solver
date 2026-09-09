@@ -1,11 +1,25 @@
-/* Functional baseline only -- the Stage 2 "real visual pass" is part of
-   this component's ticket, not done here. */
+/* Functional baseline only -- the Stage 2 "real visual pass" is a separate
+   shared ticket, not done here. Borders/text lean on the index.css tokens;
+   no palette or theming work. */
 
 .spot-builder__form {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-width: 20rem;
+  max-width: 32rem;
+}
+
+.spot-builder__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.spot-builder__legend {
+  font-size: 1rem;
+  margin: 0;
 }
 
 .spot-builder__field {
@@ -15,12 +29,107 @@
   font-size: 0.85rem;
 }
 
+.spot-builder__hint {
+  font-size: 0.8rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.spot-builder__field-error {
+  font-size: 0.8rem;
+  margin: 0;
+  color: #b3261e;
+}
+
+.spot-builder__actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.spot-builder__action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.spot-builder__action-street {
+  font-size: 0.8rem;
+  align-self: center;
+  opacity: 0.7;
+}
+
+.spot-builder__action-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.spot-builder__action-field select,
+.spot-builder__action-field input {
+  min-width: 5rem;
+}
+
+.spot-builder__row-controls {
+  display: flex;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+}
+
+.spot-builder__icon-button {
+  min-width: 1.75rem;
+  padding: 0.15rem 0.35rem;
+}
+
+.spot-builder__add-row {
+  align-self: start;
+}
+
 .spot-builder__status {
   margin-top: 0.75rem;
 }
 
 .spot-builder__status--error {
   color: #b3261e;
+}
+
+.spot-builder__status-block {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-inline-start: 3px solid var(--border);
+}
+
+.spot-builder__status-block--info {
+  border-inline-start-color: var(--accent-border);
+}
+
+.spot-builder__status-block--error {
+  border-inline-start-color: #b3261e;
+}
+
+.spot-builder__status-block ul {
+  margin: 0.25rem 0 0;
+  padding-inline-start: 1.1rem;
+  font-size: 0.85rem;
+}
+
+.spot-builder__status-title {
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 0.25rem;
+}
+
+.spot-builder__issue-loc {
+  font-family: var(--mono);
+  font-size: 0.8rem;
 }
 
 .spot-builder__result {
