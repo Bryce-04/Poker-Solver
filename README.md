@@ -5,7 +5,11 @@ strategic recommendation, tag how opponents play, save what you study, and
 drill it in practice mode. See [`docs/plan.md`](docs/plan.md) for the full
 roadmap, what's been revised from the original plan, and why.
 
-**Status:** Stage 1 — foundations. No user-facing features yet.
+**Status:** Stage 2 — manual hand builder, in progress. Stage 1 (Spot
+schema, user model, throwaway CFR spike) is complete. The spot builder and
+13×13 range grid are scaffolded in `apps/web` and wired to a reference-chart
+lookup in `apps/api`; polished builder controls, range-grid interactions,
+and the visual pass are still open.
 
 ## Layout
 

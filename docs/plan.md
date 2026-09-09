@@ -5,6 +5,13 @@ original seven-stage pitch, the two decisions locked in before scaffolding,
 and what ships in each stage. (Full designed version: ask in the team
 channel for the artifact link if you want the formatted read.)
 
+**Status (2026-09-09):** Stage 1 complete. Stage 2 in progress — spot
+builder and 13×13 range grid scaffolded in `apps/web`, reference-chart
+lookup live in `apps/api` (coverage:
+[reference-chart-coverage.md](reference-chart-coverage.md)). Remaining:
+weighted/drag/keyboard range-grid selection, the spot builder's
+action-sequence input, and the visual pass.
+
 ## The pitch
 
 A web-based poker solver built around ease of use, lowering the barrier
