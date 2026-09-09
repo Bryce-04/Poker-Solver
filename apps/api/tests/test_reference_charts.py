@@ -8,19 +8,6 @@ def _spot(**overrides) -> Spot:
     return Spot(**{**defaults, **overrides})
 
 
-def test_matches_each_opener_position():
-    expected = {
-        Position.UTG: "utg_open_100bb",
-        Position.CO: "co_open_100bb",
-        Position.BTN: "btn_open_100bb",
-        Position.SB: "sb_open_100bb",
-    }
-    for position, chart_key in expected.items():
-        chart = find_matching_chart(_spot(positions_in_hand=[position]))
-        assert chart is not None
-        assert chart.key == chart_key
-
-
 def _facing_open_from(position: Position) -> list[BettingAction]:
     return [
         BettingAction(
@@ -29,18 +16,57 @@ def _facing_open_from(position: Position) -> list[BettingAction]:
     ]
 
 
-def test_matches_every_known_defend_pair():
+def test_matches_each_opener_position_at_100bb():
     expected = {
-        (Position.BTN, Position.BB): "bb_defend_vs_btn_open_100bb",
-        (Position.CO, Position.BTN): "btn_defend_vs_co_open_100bb",
-        (Position.BTN, Position.SB): "sb_defend_vs_btn_open_100bb",
-        (Position.CO, Position.BB): "bb_defend_vs_co_open_100bb",
+        Position.UTG: "utg_open_100bb",
+        Position.CO: "co_open_100bb",
+        Position.BTN: "btn_open_100bb",
+        Position.SB: "sb_open_100bb",
     }
-    for (opener, defender), chart_key in expected.items():
-        spot = _spot(positions_in_hand=[defender], actions=_facing_open_from(opener))
-        chart = find_matching_chart(spot)
-        assert chart is not None, f"{opener} -> {defender} should have matched"
+    for position, chart_key in expected.items():
+        chart = find_matching_chart(_spot(positions_in_hand=[position], effective_stack_bb=100))
+        assert chart is not None
         assert chart.key == chart_key
+
+
+def test_matches_each_opener_position_at_40bb():
+    expected = {
+        Position.UTG: "utg_open_40bb",
+        Position.CO: "co_open_40bb",
+        Position.BTN: "btn_open_40bb",
+        Position.SB: "sb_open_40bb",
+    }
+    for position, chart_key in expected.items():
+        chart = find_matching_chart(_spot(positions_in_hand=[position], effective_stack_bb=40))
+        assert chart is not None
+        assert chart.key == chart_key
+
+
+def test_matches_every_known_defend_pair_at_both_buckets():
+    pairs = {
+        (Position.BTN, Position.BB): "bb_defend_vs_btn_open",
+        (Position.CO, Position.BTN): "btn_defend_vs_co_open",
+        (Position.BTN, Position.SB): "sb_defend_vs_btn_open",
+        (Position.CO, Position.BB): "bb_defend_vs_co_open",
+    }
+    for bucket, stack in (("100bb", 100), ("40bb", 40)):
+        for (opener, defender), chart_key_prefix in pairs.items():
+            spot = _spot(
+                positions_in_hand=[defender],
+                effective_stack_bb=stack,
+                actions=_facing_open_from(opener),
+            )
+            chart = find_matching_chart(spot)
+            assert chart is not None, f"{opener} -> {defender} at {bucket} should have matched"
+            assert chart.key == f"{chart_key_prefix}_{bucket}"
+
+
+def test_40bb_and_100bb_charts_are_actually_different():
+    # Sanity check that the two buckets aren't accidentally sharing content
+    # (e.g. a copy-paste that didn't get trimmed).
+    open_100 = find_matching_chart(_spot(effective_stack_bb=100))
+    open_40 = find_matching_chart(_spot(effective_stack_bb=40))
+    assert open_100.ranges != open_40.ranges
 
 
 def test_no_chart_for_a_defend_pair_with_no_entry_yet():
@@ -68,8 +94,15 @@ def test_no_chart_for_position_facing_a_call_instead_of_a_raise():
     assert find_matching_chart(spot) is None
 
 
-def test_no_chart_outside_the_stack_depth_bucket():
-    assert find_matching_chart(_spot(effective_stack_bb=40)) is None
+def test_no_chart_between_stack_buckets():
+    # 65bb falls between the 40bb (30-50) and 100bb (80-120) buckets --
+    # should match nothing rather than snapping to the nearest one.
+    assert find_matching_chart(_spot(effective_stack_bb=65)) is None
+
+
+def test_no_chart_far_outside_any_bucket():
+    assert find_matching_chart(_spot(effective_stack_bb=10)) is None
+    assert find_matching_chart(_spot(effective_stack_bb=250)) is None
 
 
 def test_no_chart_postflop():
