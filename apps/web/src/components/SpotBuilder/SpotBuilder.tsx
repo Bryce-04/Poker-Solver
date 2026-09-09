@@ -30,8 +30,7 @@ import "./SpotBuilder.css";
  * covered seat with no chart yet (e.g. HJ defending) still just shows the
  * endpoint's 404 message -- see docs/reference-chart-coverage.md.
  *
- * Not here: board card picker (out of scope until Stage 5). Visual polish
- * is a separate shared ticket; this file is functional baseline styling.
+ * Not here: board card picker (out of scope until Stage 5).
  */
 
 type Situation = "unopened" | "vs-raise";
