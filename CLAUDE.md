@@ -8,13 +8,15 @@ A web-based poker solver focused on ease of use versus tools like PioSolver
 or GTO Wizard. Full roadmap, what's been revised from the original plan and
 why, and the architecture rationale live in [docs/plan.md](docs/plan.md) —
 read that before making structural decisions. **Current status: Stage 1
-(foundations) is complete. Stage 2 (manual hand builder) is in progress —
-a scaffolded spot builder and 13×13 range grid in `apps/web`, wired to a
+(foundations) is complete. Stage 2 (manual hand builder) is nearly done —
+a spot builder and 13×13 range grid in `apps/web`, wired to a
 reference-chart lookup (`POST /spots/reference-strategy`) in `apps/api`
 (coverage in [docs/reference-chart-coverage.md](docs/reference-chart-coverage.md)).
 The range-grid interactions (weighted brush, drag-paint, keyboard) and a
 design-token visual pass (light + dark) are done. Still open: multi-page
-routing and a mobile packaging path.**
+routing and a mobile packaging path. The editable range grid isn't mounted
+in a screen yet — SpotBuilder uses it read-only; Stage 3 is its first
+editing consumer.**
 
 ## Commands
 
