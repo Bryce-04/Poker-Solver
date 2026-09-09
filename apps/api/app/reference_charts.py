@@ -163,6 +163,66 @@ REFERENCE_CHARTS: dict[str, ChartEntry] = {
             ),
         },
     ),
+    "btn_defend_vs_co_open_100bb": ChartEntry(
+        key="btn_defend_vs_co_open_100bb",
+        description="BTN continuing range (call or 3bet) facing a CO open, "
+        "~100bb effective",
+        ranges={
+            Position.BTN: expand_range(
+                [
+                    "22+",
+                    "A2s+",
+                    "K7s+",
+                    "Q9s+",
+                    "J9s+",
+                    "T9s",
+                    "98s",
+                    "87s",
+                    "76s",
+                    "A9o+",
+                    "KTo+",
+                    "QJo",
+                ]
+            ),
+        },
+    ),
+    "sb_defend_vs_btn_open_100bb": ChartEntry(
+        key="sb_defend_vs_btn_open_100bb",
+        description="SB continuing range (call or 3bet) facing a BTN open, "
+        "~100bb effective -- tighter than BB's defend range since SB still "
+        "has BB left to act behind and plays OOP for the rest of the hand",
+        ranges={
+            Position.SB: expand_range(
+                ["55+", "A5s+", "K9s+", "Q9s+", "JTs", "T9s", "98s", "AJo+", "KQo"]
+            ),
+        },
+    ),
+    "bb_defend_vs_co_open_100bb": ChartEntry(
+        key="bb_defend_vs_co_open_100bb",
+        description="BB continuing range (call or 3bet) facing a CO open, "
+        "~100bb effective -- tighter than vs a BTN open since CO's own "
+        "opening range is tighter",
+        ranges={
+            Position.BB: expand_range(
+                [
+                    "22+",
+                    "A2s+",
+                    "K5s+",
+                    "Q8s+",
+                    "J8s+",
+                    "T8s+",
+                    "97s+",
+                    "87s",
+                    "76s",
+                    "65s",
+                    "A7o+",
+                    "K9o+",
+                    "QTo+",
+                    "JTo",
+                ]
+            ),
+        },
+    ),
 }
 
 _OPENER_CHARTS = {
@@ -172,16 +232,27 @@ _OPENER_CHARTS = {
     Position.SB: "sb_open_100bb",
 }
 
+# (opener's position, defender's position) -> chart key. Each entry here
+# needs the opener to have raised uncontested (no one else has acted) and
+# the defender to be the one deciding what to do about it -- see
+# _is_single_open_raise_from below.
+_DEFEND_CHARTS = {
+    (Position.BTN, Position.BB): "bb_defend_vs_btn_open_100bb",
+    (Position.CO, Position.BTN): "btn_defend_vs_co_open_100bb",
+    (Position.BTN, Position.SB): "sb_defend_vs_btn_open_100bb",
+    (Position.CO, Position.BB): "bb_defend_vs_co_open_100bb",
+}
 
-def _is_single_btn_open(actions: list[BettingAction]) -> bool:
+
+def _is_single_open_raise(actions: list[BettingAction]) -> BettingAction | None:
+    """If `actions` is exactly one preflop raise (an uncontested open --
+    nobody's called or 3bet yet), returns that action. Otherwise None."""
     if len(actions) != 1:
-        return False
+        return None
     action = actions[0]
-    return (
-        action.position == Position.BTN
-        and action.street == Street.PREFLOP
-        and action.action == ActionType.RAISE
-    )
+    if action.street == Street.PREFLOP and action.action == ActionType.RAISE:
+        return action
+    return None
 
 
 def find_matching_chart(spot: Spot) -> ChartEntry | None:
@@ -190,28 +261,30 @@ def find_matching_chart(spot: Spot) -> ChartEntry | None:
     Two categories so far:
       - Unopened pot: positions_in_hand is a single position with an entry
         in _OPENER_CHARTS and no action yet.
-      - BB facing a single BTN open (the one "facing a raise" case handled
-        so far -- see the module docstring's known limitation, and
-        reference_charts.py's own TODO below for widening this further).
+      - A single position facing an uncontested open from another position,
+        with an entry in _DEFEND_CHARTS for that (opener, defender) pair --
+        see the module docstring's known limitation (this represents a
+        combined call-or-3bet continuing range, not a split between them).
 
     Returns None (no match) for anything else rather than guessing.
 
     TODO(reference-charts): widen this as more chart entries are added --
-    e.g. BB/SB/CO/etc. facing other positions' opens, 3bet-pot charts,
-    other stack-depth buckets.
+    e.g. more (opener, defender) pairs in _DEFEND_CHARTS, 3bet-pot charts
+    (defender's raise gets 4bet/folded/called), other stack-depth buckets.
     """
     if spot.current_street != Street.PREFLOP:
         return None
     if not (80 <= spot.effective_stack_bb <= 120):
         return None
+    if len(spot.positions_in_hand) != 1:
+        return None
 
     if not spot.actions:
-        if len(spot.positions_in_hand) != 1:
-            return None
         chart_key = _OPENER_CHARTS.get(spot.positions_in_hand[0])
         return REFERENCE_CHARTS[chart_key] if chart_key else None
 
-    if spot.positions_in_hand == [Position.BB] and _is_single_btn_open(spot.actions):
-        return REFERENCE_CHARTS["bb_defend_vs_btn_open_100bb"]
-
-    return None
+    opener_action = _is_single_open_raise(spot.actions)
+    if opener_action is None:
+        return None
+    chart_key = _DEFEND_CHARTS.get((opener_action.position, spot.positions_in_hand[0]))
+    return REFERENCE_CHARTS[chart_key] if chart_key else None

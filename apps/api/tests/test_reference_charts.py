@@ -21,21 +21,33 @@ def test_matches_each_opener_position():
         assert chart.key == chart_key
 
 
-def test_matches_bb_defend_vs_single_btn_open():
-    spot = _spot(
-        positions_in_hand=[Position.BB],
-        actions=[
-            BettingAction(
-                position=Position.BTN,
-                street=Street.PREFLOP,
-                action=ActionType.RAISE,
-                size_bb=2.5,
-            )
-        ],
-    )
-    chart = find_matching_chart(spot)
-    assert chart is not None
-    assert chart.key == "bb_defend_vs_btn_open_100bb"
+def _facing_open_from(position: Position) -> list[BettingAction]:
+    return [
+        BettingAction(
+            position=position, street=Street.PREFLOP, action=ActionType.RAISE, size_bb=2.5
+        )
+    ]
+
+
+def test_matches_every_known_defend_pair():
+    expected = {
+        (Position.BTN, Position.BB): "bb_defend_vs_btn_open_100bb",
+        (Position.CO, Position.BTN): "btn_defend_vs_co_open_100bb",
+        (Position.BTN, Position.SB): "sb_defend_vs_btn_open_100bb",
+        (Position.CO, Position.BB): "bb_defend_vs_co_open_100bb",
+    }
+    for (opener, defender), chart_key in expected.items():
+        spot = _spot(positions_in_hand=[defender], actions=_facing_open_from(opener))
+        chart = find_matching_chart(spot)
+        assert chart is not None, f"{opener} -> {defender} should have matched"
+        assert chart.key == chart_key
+
+
+def test_no_chart_for_a_defend_pair_with_no_entry_yet():
+    # UTG facing a BTN open (a 3bet-or-fold-ish spot, not in the table yet)
+    # shouldn't fall back to some other chart -- it should be no match.
+    spot = _spot(positions_in_hand=[Position.UTG], actions=_facing_open_from(Position.BTN))
+    assert find_matching_chart(spot) is None
 
 
 def test_no_chart_for_bb_with_no_action_yet():
