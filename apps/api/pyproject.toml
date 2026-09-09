@@ -12,6 +12,12 @@ dependencies = [
     "poker-solver-schema",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",
+]
+
 [tool.uv.sources]
 poker-solver-schema = { path = "../../packages/schema", editable = true }
 
@@ -21,3 +27,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

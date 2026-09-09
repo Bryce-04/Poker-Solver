@@ -18,7 +18,11 @@ the frontend.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 from enum import Enum
 from uuid import UUID, uuid4
 
@@ -87,7 +91,7 @@ class Spot(BaseModel):
     created_by: UUID | None = Field(
         default=None, description="Owning user's id. Null until Stage 6 auth exists."
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     positions_in_hand: list[Position]
     effective_stack_bb: float = Field(gt=0)
@@ -112,4 +116,4 @@ class User(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     email: EmailStr
     display_name: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)

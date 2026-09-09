@@ -1,71 +1,217 @@
 """Stage 2 reference-chart data: a small, hand-curated table of canonical
-single-raised-pot spots, sourced from widely-published, non-proprietary
-poker theory -- NOT scraped or eyeballed from any commercial solver (see
-docs/plan.md, "What has to change" #3). This is a stand-in for real
-solving, and every response using it must say so explicitly -- Stage 5
-replaces this with a live MCCFR solve.
+single-raised-pot spots. This is a stand-in for real solving -- Stage 5
+replaces it with a live MCCFR solve -- and every response using it must
+say so explicitly (see routes/spots.py).
 
-TODO(reference-charts): only one entry is filled in so far, as a pattern
-to copy. Good next spots to add, roughly in order of how often they come
-up: CO open (100bb), BTN open (100bb), SB open (100bb), BB defend vs a
-BTN open (100bb). For each: pick a stack-depth bucket, write down the
-range as a HandRange-shaped dict, and cite where it came from in `source`
--- a range that's been independently published by several free
-communities/sites is fine, a single paid tool's chart is not.
+Sourcing (see docs/plan.md, "What has to change" #3): these ranges are
+constructed from general, widely-taught opening-range principles for
+100bb 6-max cash -- progressively tighter first-in ranges from earlier
+position, progressively wider from later position, standard suited-ace
+and broadway inclusion logic. They are NOT copied from, or intended to
+match, any single commercial solver's output. Treat them as a reasonable
+approximate placeholder, not ground truth -- validate/replace against
+Stage 5's live solve once it exists.
+
+Known limitation: HandRange only has room for one weight per hand, so the
+BB-defend chart below represents BB's whole *continuing* range (call or
+3bet combined), not a split between the two -- distinguishing them needs
+either a schema change or Stage 5's real solve.
 """
 
-from dataclasses import dataclass
+from poker_solver_schema import ActionType, BettingAction, Position, Spot, Street
 
-from poker_solver_schema import Position, Spot, Street
+from .range_notation import expand_range
+
+_METHODOLOGY = (
+    "Approximate range built from general, widely-taught 100bb 6-max "
+    "opening-range principles (not from any single commercial solver). "
+    "See reference_charts.py module docstring."
+)
 
 
-@dataclass(frozen=True)
 class ChartEntry:
-    key: str
-    description: str
-    source: str
-    ranges: dict[Position, dict[str, float]]  # position -> HandRange-shaped dict
+    def __init__(
+        self,
+        key: str,
+        description: str,
+        ranges: dict[Position, dict[str, float]],
+        source: str = _METHODOLOGY,
+    ) -> None:
+        self.key = key
+        self.description = description
+        self.source = source
+        self.ranges = ranges
 
 
 REFERENCE_CHARTS: dict[str, ChartEntry] = {
     "utg_open_100bb": ChartEntry(
         key="utg_open_100bb",
         description="UTG opening range, ~100bb effective, 6-max, unopened pot",
-        source="TODO: cite the published source(s) this range comes from",
         ranges={
-            Position.UTG: {
-                # PLACEHOLDER -- this is not a real opening range, it's just
-                # enough entries to prove the endpoint works end to end.
-                # Replace with an actual ~15% UTG opening range.
-                "AA": 1.0,
-                "KK": 1.0,
-                "QQ": 1.0,
-                "JJ": 1.0,
-                "AKs": 1.0,
-                "AKo": 1.0,
-            },
+            Position.UTG: expand_range(
+                [
+                    "77+",
+                    "A9s+",
+                    "K9s+",
+                    "Q9s+",
+                    "JTs",
+                    "T9s",
+                    "98s",
+                    "AJo+",
+                    "KQo",
+                ]
+            ),
         },
     ),
-    # TODO(reference-charts): add more entries here, following the shape above.
+    "co_open_100bb": ChartEntry(
+        key="co_open_100bb",
+        description="CO opening range, ~100bb effective, 6-max, unopened pot",
+        ranges={
+            Position.CO: expand_range(
+                [
+                    "22+",
+                    "A2s+",
+                    "K7s+",
+                    "Q9s+",
+                    "J9s+",
+                    "T9s",
+                    "98s",
+                    "87s",
+                    "76s",
+                    "A8o+",
+                    "K9o+",
+                    "QTo+",
+                    "JTo",
+                ]
+            ),
+        },
+    ),
+    "btn_open_100bb": ChartEntry(
+        key="btn_open_100bb",
+        description="BTN opening range, ~100bb effective, 6-max, unopened pot",
+        ranges={
+            Position.BTN: expand_range(
+                [
+                    "22+",
+                    "A2s+",
+                    "K2s+",
+                    "Q5s+",
+                    "J7s+",
+                    "T6s+",
+                    "96s+",
+                    "86s+",
+                    "75s+",
+                    "65s",
+                    "54s",
+                    "A2o+",
+                    "K7o+",
+                    "Q9o+",
+                    "JTo",
+                ]
+            ),
+        },
+    ),
+    "sb_open_100bb": ChartEntry(
+        key="sb_open_100bb",
+        description="SB opening range, ~100bb effective, 6-max, unopened pot "
+        "(open-raise, not limp)",
+        ranges={
+            Position.SB: expand_range(
+                [
+                    "22+",
+                    "A2s+",
+                    "K5s+",
+                    "Q8s+",
+                    "J8s+",
+                    "T8s+",
+                    "97s+",
+                    "87s",
+                    "76s",
+                    "65s",
+                    "A5o+",
+                    "K9o+",
+                    "QTo+",
+                    "JTo",
+                ]
+            ),
+        },
+    ),
+    "bb_defend_vs_btn_open_100bb": ChartEntry(
+        key="bb_defend_vs_btn_open_100bb",
+        description="BB continuing range (call or 3bet) facing a BTN open, "
+        "~100bb effective",
+        ranges={
+            Position.BB: expand_range(
+                [
+                    "22+",
+                    "A2s+",
+                    "K2s+",
+                    "Q4s+",
+                    "J6s+",
+                    "T6s+",
+                    "96s+",
+                    "86s+",
+                    "75s+",
+                    "65s",
+                    "54s",
+                    "A2o+",
+                    "K8o+",
+                    "Q9o+",
+                    "J9o+",
+                    "T9o",
+                ]
+            ),
+        },
+    ),
 }
+
+_OPENER_CHARTS = {
+    Position.UTG: "utg_open_100bb",
+    Position.CO: "co_open_100bb",
+    Position.BTN: "btn_open_100bb",
+    Position.SB: "sb_open_100bb",
+}
+
+
+def _is_single_btn_open(actions: list[BettingAction]) -> bool:
+    if len(actions) != 1:
+        return False
+    action = actions[0]
+    return (
+        action.position == Position.BTN
+        and action.street == Street.PREFLOP
+        and action.action == ActionType.RAISE
+    )
 
 
 def find_matching_chart(spot: Spot) -> ChartEntry | None:
     """Decide which (if any) REFERENCE_CHARTS entry applies to `spot`.
 
-    Only handles "first to act preflop, no action yet" spots so far --
-    returns None (no match) for anything else rather than guessing, so a
-    caller can tell "no chart for this yet" apart from "here's the chart".
+    Two categories so far:
+      - Unopened pot: positions_in_hand is a single position with an entry
+        in _OPENER_CHARTS and no action yet.
+      - BB facing a single BTN open (the one "facing a raise" case handled
+        so far -- see the module docstring's known limitation, and
+        reference_charts.py's own TODO below for widening this further).
 
-    TODO(reference-charts): as more entries are added above, extend this
-    to match them -- e.g. dispatch on spot.positions_in_hand[0] once more
-    than one position has a chart, and widen beyond "no action yet" once
-    charts exist for facing-a-raise spots.
+    Returns None (no match) for anything else rather than guessing.
+
+    TODO(reference-charts): widen this as more chart entries are added --
+    e.g. BB/SB/CO/etc. facing other positions' opens, 3bet-pot charts,
+    other stack-depth buckets.
     """
-    if spot.current_street != Street.PREFLOP or spot.actions:
-        return None
-    if spot.positions_in_hand != [Position.UTG]:
+    if spot.current_street != Street.PREFLOP:
         return None
     if not (80 <= spot.effective_stack_bb <= 120):
         return None
-    return REFERENCE_CHARTS["utg_open_100bb"]
+
+    if not spot.actions:
+        if len(spot.positions_in_hand) != 1:
+            return None
+        chart_key = _OPENER_CHARTS.get(spot.positions_in_hand[0])
+        return REFERENCE_CHARTS[chart_key] if chart_key else None
+
+    if spot.positions_in_hand == [Position.BB] and _is_single_btn_open(spot.actions):
+        return REFERENCE_CHARTS["bb_defend_vs_btn_open_100bb"]
+
+    return None
