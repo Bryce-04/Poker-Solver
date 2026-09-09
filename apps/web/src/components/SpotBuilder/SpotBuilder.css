@@ -1,77 +1,116 @@
-/* Functional baseline only -- the Stage 2 "real visual pass" is a separate
-   shared ticket, not done here. Borders/text lean on the index.css tokens;
-   no palette or theming work. */
+.spot-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
 
 .spot-builder__form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.25rem;
   max-width: 32rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .spot-builder__section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding-top: 0.75rem;
+  gap: 0.6rem;
+}
+
+.spot-builder__section + .spot-builder__section {
+  padding-top: 1.1rem;
   border-top: 1px solid var(--border);
 }
 
 .spot-builder__legend {
-  font-size: 1rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
   margin: 0;
 }
 
 .spot-builder__field {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.85rem;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.spot-builder__field select,
+.spot-builder__field input[type="number"] {
+  max-width: 12rem;
+}
+
+.spot-builder__field--radio {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spot-builder__field--radio input {
+  accent-color: var(--accent);
+  width: 1rem;
+  height: 1rem;
 }
 
 .spot-builder__hint {
   font-size: 0.8rem;
   margin: 0;
-  opacity: 0.8;
+  color: var(--text-muted);
 }
 
 .spot-builder__field-error {
   font-size: 0.8rem;
   margin: 0;
-  color: #b3261e;
+  color: var(--danger);
 }
+
+/* --- Status / result --- */
 
 .spot-builder__status {
-  margin-top: 0.75rem;
-}
-
-.spot-builder__status--error {
-  color: #b3261e;
+  font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 .spot-builder__status-block {
-  margin-top: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-inline-start: 3px solid var(--border);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-inline-start-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .spot-builder__status-block--info {
-  border-inline-start-color: var(--accent-border);
+  border-inline-start-color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 .spot-builder__status-block--error {
-  border-inline-start-color: #b3261e;
+  border-inline-start-color: var(--danger);
+  background: var(--danger-subtle);
 }
 
 .spot-builder__status-block ul {
-  margin: 0.25rem 0 0;
+  margin: 0.4rem 0 0;
   padding-inline-start: 1.1rem;
   font-size: 0.85rem;
 }
 
+.spot-builder__status-block li + li {
+  margin-top: 0.15rem;
+}
+
 .spot-builder__status-title {
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text-strong);
   margin: 0 0 0.25rem;
 }
 
@@ -81,11 +120,17 @@
 }
 
 .spot-builder__result {
-  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
 }
 
 .spot-builder__source-label {
-  font-size: 0.8rem;
-  font-style: italic;
-  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }

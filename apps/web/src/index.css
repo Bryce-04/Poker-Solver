@@ -1,22 +1,58 @@
+/* Design tokens + base element styling for the whole app. Components lean
+   on these variables rather than hardcoding colours, so light/dark and any
+   future palette change happen in one place. */
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  /* Surfaces */
+  --bg: #fbfbfd;
+  --surface: #ffffff;
+  --surface-2: #f3f3f7;
+  --border: #e5e4ea;
+  --border-strong: #cecdd6;
+
+  /* Text */
+  --text: #46434f;
+  --text-strong: #141319;
+  --text-muted: #726f7e;
+
+  /* Accent -- violet, matching the favicon mark */
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-contrast: #ffffff;
+  --accent-subtle: rgba(124, 58, 237, 0.1);
+  --accent-border: rgba(124, 58, 237, 0.45);
+
+  /* Semantic */
+  --danger: #c0362c;
+  --danger-subtle: rgba(192, 54, 44, 0.1);
+  --focus: var(--accent);
+
+  /* Range grid: an empty cell, and the full-weight "in range" fill. Cells
+     between the two are a color-mix of these by weight (see RangeGrid.css),
+     so both endpoints are theme-specific and the ramp stays readable. */
+  --range-empty: #ededf1;
+  --range-in: #3f9d5a;
+  --range-in-contrast: #ffffff;
+  --range-line: #ffffff;
+
+  /* Back-compat aliases for names older CSS still references. */
+  --text-h: var(--text-strong);
+  --code-bg: var(--surface-2);
+  --accent-bg: var(--accent-subtle);
+
+  --radius: 9px;
+  --radius-sm: 5px;
+  --shadow-sm:
+    0 1px 2px rgba(18, 16, 28, 0.06), 0 1px 3px rgba(18, 16, 28, 0.09);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    0 10px 24px -6px rgba(18, 16, 28, 0.14),
+    0 4px 10px -4px rgba(18, 16, 28, 0.1);
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  font: 16px/1.5 var(--sans);
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -24,88 +60,144 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+    --bg: #131318;
+    --surface: #1b1b23;
+    --surface-2: #24242e;
+    --border: #2f2f3a;
+    --border-strong: #43424f;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+    --text: #b7b5c3;
+    --text-strong: #f4f3f8;
+    --text-muted: #8a8899;
+
+    --accent: #a78bfa;
+    --accent-hover: #c4b5fd;
+    --accent-contrast: #1a1030;
+    --accent-subtle: rgba(167, 139, 250, 0.16);
+    --accent-border: rgba(167, 139, 250, 0.5);
+
+    --danger: #f0857a;
+    --danger-subtle: rgba(240, 133, 122, 0.14);
+
+    --range-empty: #2b2b34;
+    --range-in: #46b06a;
+    --range-in-contrast: #0f1a12;
+    --range-line: #1b1b23;
+
+    --shadow-sm:
+      0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow:
+      0 10px 24px -6px rgba(0, 0, 0, 0.5), 0 4px 10px -4px rgba(0, 0, 0, 0.4);
   }
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
+  min-height: 100svh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
 }
 
 h1,
-h2 {
+h2,
+h3 {
   font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+  color: var(--text-strong);
+  line-height: 1.2;
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.35rem;
 }
+
 h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
 }
+
 p {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+a {
+  color: var(--accent);
 }
 
 code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+/* --- Form controls: styled once here so components don't each re-do it --- */
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+label {
+  color: var(--text-strong);
+}
+
+select,
+input[type='number'],
+input[type='text'] {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+select:focus-visible,
+input:focus-visible,
+button:focus-visible,
+[role='gridcell']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+button {
+  padding: 0.55rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
