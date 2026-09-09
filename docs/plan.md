@@ -5,14 +5,17 @@ original seven-stage pitch, the two decisions locked in before scaffolding,
 and what ships in each stage. (Full designed version: ask in the team
 channel for the artifact link if you want the formatted read.)
 
-**Status (2026-09-09):** Stage 1 complete. Stage 2 in progress — spot
-builder and 13×13 range grid scaffolded in `apps/web`, reference-chart
-lookup live in `apps/api` (coverage:
+**Status (2026-09-09):** Stage 1 complete. Stage 2 nearly done — spot
+builder and 13×13 range grid built in `apps/web`, reference-chart lookup
+live in `apps/api` (coverage:
 [reference-chart-coverage.md](reference-chart-coverage.md)). The spot
 builder's freeform action-list editor was cut for a two-option situation
 picker (unopened / facing one raise) — the only shapes the reference
-charts answer. Remaining: weighted/drag/keyboard range-grid selection and
-the visual pass.
+charts answer. The range grid now has weighted-brush / drag-paint /
+keyboard selection with weight shading, and the app has a real design-
+token pass (light + dark). Still open: multi-page routing, and a mobile
+packaging path (Android/Capacitor) for the "mobile app + backend" project
+requirement — deferred until the rest of Stage 2 settles.
 
 ## The pitch
 

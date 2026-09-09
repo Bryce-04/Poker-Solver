@@ -12,8 +12,9 @@ read that before making structural decisions. **Current status: Stage 1
 a scaffolded spot builder and 13×13 range grid in `apps/web`, wired to a
 reference-chart lookup (`POST /spots/reference-strategy`) in `apps/api`
 (coverage in [docs/reference-chart-coverage.md](docs/reference-chart-coverage.md)).
-The polished builder controls, range-grid interactions (weighting, drag,
-keyboard), and the visual pass are still open.**
+The range-grid interactions (weighted brush, drag-paint, keyboard) and a
+design-token visual pass (light + dark) are done. Still open: multi-page
+routing and a mobile packaging path.**
 
 ## Commands
 
