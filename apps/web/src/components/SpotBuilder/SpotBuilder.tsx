@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { ActionType, BettingAction, Position, Spot } from "@poker-solver/schema";
-import { ACTION_TYPES, POSITIONS } from "../../lib/positions";
+import type { BettingAction, Position, Spot } from "@poker-solver/schema";
+import { POSITIONS } from "../../lib/positions";
 import {
   fetchReferenceStrategy,
   type ReferenceStrategyResponse,
@@ -14,39 +14,22 @@ import "./SpotBuilder.css";
  * The button/dropdown spot builder -- Stage 2's other headline deliverable
  * alongside the range grid. See docs/plan.md.
  *
- * Position + effective stack + an ordered action-sequence editor assemble a
- * Spot client-side; it's POSTed to apps/api's /spots/reference-strategy and
- * the matched range is shown read-only via RangeGrid. Every outcome the
+ * Position + effective stack + a "situation" choice assemble a Spot
+ * client-side; it's POSTed to apps/api's /spots/reference-strategy and the
+ * matched range is shown read-only via RangeGrid. Every outcome the
  * endpoint can produce (match / 404 no-match / 422 invalid / unreachable)
  * gets its own message.
  *
- * The action editor is deliberately general (any position, any ActionType,
- * optional size). Only a few shapes actually resolve to a reference chart
- * today -- see apps/api/app/reference_charts.py; the "no reference chart"
- * block enumerates the current coverage. Everything else is a plain 404.
+ * Stage 2's reference charts only answer two shapes, so the UI only offers
+ * those: an unopened pot (open charts), or hero facing a single preflop
+ * raise from one other seat (defend charts). Arbitrary action sequences
+ * wait for Stage 5's live solver -- see apps/api/app/reference_charts.py.
  *
- * Not here: board card picker (out of scope until Stage 5 -- postflop
- * reference charts / live solving). Visual polish is a separate shared
- * ticket; this file is functional baseline styling only.
+ * Not here: board card picker (out of scope until Stage 5). Visual polish
+ * is a separate shared ticket; this file is functional baseline styling.
  */
 
-// BettingAction has no id of its own; each editor row carries a stable key
-// for React that buildSpot() strips before the Spot leaves the component.
-type ActionRow = { _key: string } & BettingAction;
-
-let rowSeq = 0;
-const nextKey = () => `a${rowSeq++}`;
-
-function newActionRow(): ActionRow {
-  return {
-    _key: nextKey(),
-    position: "BTN",
-    street: "preflop",
-    // Defend charts want exactly one preflop raise, so it's the useful default.
-    action: "raise",
-    size_bb: null,
-  };
-}
+type Situation = "unopened" | "vs-raise";
 
 // UI state machine: the api result tags plus idle/loading.
 type Outcome =
@@ -59,45 +42,22 @@ type Outcome =
   | { kind: "error"; status: number };
 
 export function SpotBuilder() {
-  // "BTN" is a supported open hero, so a first submit from defaults is a 200.
+  // "BTN" + "unopened" is a supported spot, so a first submit is a 200.
   const [position, setPosition] = useState<Position>("BTN");
   const [effectiveStackBb, setEffectiveStackBb] = useState(100);
-  const [actionRows, setActionRows] = useState<ActionRow[]>([]);
+  const [situation, setSituation] = useState<Situation>("unopened");
+  const [raiser, setRaiser] = useState<Position>("CO");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   const stackIsValid = Number.isFinite(effectiveStackBb) && effectiveStackBb > 0;
 
-  function updateRow(key: string, patch: Partial<BettingAction>) {
-    setActionRows((rows) => rows.map((r) => (r._key === key ? { ...r, ...patch } : r)));
-  }
-  function addRow() {
-    setActionRows((rows) => [...rows, newActionRow()]);
-  }
-  function removeRow(key: string) {
-    setActionRows((rows) => rows.filter((r) => r._key !== key));
-  }
-  function moveRow(index: number, dir: -1 | 1) {
-    setActionRows((rows) => {
-      const next = index + dir;
-      if (next < 0 || next >= rows.length) return rows;
-      const copy = rows.slice();
-      [copy[index], copy[next]] = [copy[next], copy[index]];
-      return copy;
-    });
-  }
-
   function buildSpot(): Spot {
-    const actions: BettingAction[] = actionRows.map((row) => {
-      const entry: BettingAction = {
-        position: row.position,
-        street: "preflop", // fixed for Stage 2; the UI renders it as static text
-        action: row.action,
-      };
-      if (row.size_bb != null && Number.isFinite(row.size_bb)) {
-        entry.size_bb = row.size_bb;
-      }
-      return entry;
-    });
+    // Stage 2 charts key off position + one optional preflop raise. Raise
+    // size doesn't affect the match, so the UI doesn't ask for it.
+    const actions: BettingAction[] =
+      situation === "vs-raise"
+        ? [{ position: raiser, street: "preflop", action: "raise" }]
+        : [];
 
     return {
       positions_in_hand: [position],
@@ -139,7 +99,7 @@ export function SpotBuilder() {
           <h2 className="spot-builder__legend">Spot</h2>
 
           <label className="spot-builder__field">
-            Position
+            Your position
             <select
               value={position}
               onChange={(e) => setPosition(e.target.value as Position)}
@@ -172,105 +132,43 @@ export function SpotBuilder() {
         </section>
 
         <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">Action sequence</h2>
+          <h2 className="spot-builder__legend">Situation</h2>
 
-          {actionRows.length === 0 && (
-            <p className="spot-builder__hint">
-              No prior action &mdash; this is an unopened pot (open charts).
-            </p>
+          <label className="spot-builder__field spot-builder__field--radio">
+            <input
+              type="radio"
+              name="situation"
+              checked={situation === "unopened"}
+              onChange={() => setSituation("unopened")}
+            />
+            First to act &mdash; unopened pot (opening range)
+          </label>
+
+          <label className="spot-builder__field spot-builder__field--radio">
+            <input
+              type="radio"
+              name="situation"
+              checked={situation === "vs-raise"}
+              onChange={() => setSituation("vs-raise")}
+            />
+            Facing a single raise (defending range)
+          </label>
+
+          {situation === "vs-raise" && (
+            <label className="spot-builder__field">
+              Raise came from
+              <select
+                value={raiser}
+                onChange={(e) => setRaiser(e.target.value as Position)}
+              >
+                {POSITIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-
-          <ol className="spot-builder__actions">
-            {actionRows.map((row, i) => (
-              <li key={row._key} className="spot-builder__action-row">
-                <span className="spot-builder__action-street">Preflop</span>
-
-                <label className="spot-builder__action-field">
-                  Position
-                  <select
-                    value={row.position}
-                    onChange={(e) =>
-                      updateRow(row._key, { position: e.target.value as Position })
-                    }
-                  >
-                    {POSITIONS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="spot-builder__action-field">
-                  Action
-                  <select
-                    value={row.action}
-                    onChange={(e) =>
-                      updateRow(row._key, { action: e.target.value as ActionType })
-                    }
-                  >
-                    {ACTION_TYPES.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="spot-builder__action-field">
-                  Size (bb)
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={row.size_bb ?? ""}
-                    onChange={(e) =>
-                      updateRow(row._key, {
-                        size_bb: e.target.value === "" ? null : Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-
-                <div className="spot-builder__row-controls">
-                  <button
-                    type="button"
-                    className="spot-builder__icon-button"
-                    onClick={() => moveRow(i, -1)}
-                    disabled={i === 0}
-                    aria-label="Move action earlier"
-                  >
-                    &uarr;
-                  </button>
-                  <button
-                    type="button"
-                    className="spot-builder__icon-button"
-                    onClick={() => moveRow(i, 1)}
-                    disabled={i === actionRows.length - 1}
-                    aria-label="Move action later"
-                  >
-                    &darr;
-                  </button>
-                  <button
-                    type="button"
-                    className="spot-builder__icon-button"
-                    onClick={() => removeRow(row._key)}
-                    aria-label="Remove action"
-                  >
-                    &times;
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ol>
-
-          <button
-            type="button"
-            className="spot-builder__add-row"
-            onClick={addRow}
-          >
-            Add action
-          </button>
         </section>
 
         <button type="submit" disabled={outcome.kind === "loading" || !stackIsValid}>
@@ -289,14 +187,15 @@ export function SpotBuilder() {
             <p className="spot-builder__status-title">
               No reference chart for this spot yet.
             </p>
-            <p>The built-in reference charts currently cover:</p>
+            <p>The built-in reference charts (6-max) currently cover:</p>
             <ul>
-              <li>Unopened-pot opens from UTG, CO, BTN, or SB (no prior action).</li>
+              <li>Opening ranges (unopened pot): UTG, HJ, CO, BTN, SB.</li>
               <li>
-                Defending a single raise: BB vs BTN, BTN vs CO, SB vs BTN, BB vs CO.
+                Defending a single raise: BB vs any of UTG/HJ/CO/BTN/SB; BTN vs
+                HJ or CO; SB vs CO or BTN.
               </li>
               <li>Effective stack ~40bb (30&ndash;50) or ~100bb (80&ndash;120).</li>
-              <li>Preflop only.</li>
+              <li>Preflop only &mdash; single raised pot, no 3-bet pots yet.</li>
             </ul>
           </div>
         )}
