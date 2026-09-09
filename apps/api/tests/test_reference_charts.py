@@ -19,6 +19,7 @@ def _facing_open_from(position: Position) -> list[BettingAction]:
 def test_matches_each_opener_position_at_100bb():
     expected = {
         Position.UTG: "utg_open_100bb",
+        Position.HJ: "hj_open_100bb",
         Position.CO: "co_open_100bb",
         Position.BTN: "btn_open_100bb",
         Position.SB: "sb_open_100bb",
@@ -32,6 +33,7 @@ def test_matches_each_opener_position_at_100bb():
 def test_matches_each_opener_position_at_40bb():
     expected = {
         Position.UTG: "utg_open_40bb",
+        Position.HJ: "hj_open_40bb",
         Position.CO: "co_open_40bb",
         Position.BTN: "btn_open_40bb",
         Position.SB: "sb_open_40bb",
@@ -44,10 +46,15 @@ def test_matches_each_opener_position_at_40bb():
 
 def test_matches_every_known_defend_pair_at_both_buckets():
     pairs = {
-        (Position.BTN, Position.BB): "bb_defend_vs_btn_open",
+        (Position.UTG, Position.BB): "bb_defend_vs_utg_open",
+        (Position.HJ, Position.BTN): "btn_defend_vs_hj_open",
+        (Position.HJ, Position.BB): "bb_defend_vs_hj_open",
         (Position.CO, Position.BTN): "btn_defend_vs_co_open",
-        (Position.BTN, Position.SB): "sb_defend_vs_btn_open",
+        (Position.CO, Position.SB): "sb_defend_vs_co_open",
         (Position.CO, Position.BB): "bb_defend_vs_co_open",
+        (Position.BTN, Position.SB): "sb_defend_vs_btn_open",
+        (Position.BTN, Position.BB): "bb_defend_vs_btn_open",
+        (Position.SB, Position.BB): "bb_defend_vs_sb_open",
     }
     for bucket, stack in (("100bb", 100), ("40bb", 40)):
         for (opener, defender), chart_key_prefix in pairs.items():
@@ -59,6 +66,22 @@ def test_matches_every_known_defend_pair_at_both_buckets():
             chart = find_matching_chart(spot)
             assert chart is not None, f"{opener} -> {defender} at {bucket} should have matched"
             assert chart.key == f"{chart_key_prefix}_{bucket}"
+
+
+def test_bb_can_defend_against_every_6max_opener_at_both_buckets():
+    # BB is the one seat that closes the action against any opener, so it
+    # should have a defend chart versus all five 6-max opening positions.
+    for bucket, stack in (("100bb", 100), ("40bb", 40)):
+        for opener in (Position.UTG, Position.HJ, Position.CO, Position.BTN, Position.SB):
+            chart = find_matching_chart(
+                _spot(
+                    positions_in_hand=[Position.BB],
+                    effective_stack_bb=stack,
+                    actions=_facing_open_from(opener),
+                )
+            )
+            assert chart is not None, f"BB should defend vs {opener} open at {bucket}"
+            assert chart.key == f"bb_defend_vs_{opener.value.lower()}_open_{bucket}"
 
 
 def test_40bb_and_100bb_charts_are_actually_different():
@@ -109,5 +132,10 @@ def test_no_chart_postflop():
     assert find_matching_chart(_spot(current_street=Street.FLOP)) is None
 
 
-def test_no_chart_for_a_position_with_no_entry_yet():
-    assert find_matching_chart(_spot(positions_in_hand=[Position.HJ])) is None
+def test_no_chart_for_full_ring_only_seats():
+    # UTG1 and LJ are full-ring positions -- deliberately out of Stage 2's
+    # 6-max scope (see reference_charts.py module docstring). They must not
+    # match, nor fall back to a neighbouring seat's chart.
+    for seat in (Position.UTG1, Position.LJ):
+        assert find_matching_chart(_spot(positions_in_hand=[seat], effective_stack_bb=100)) is None
+        assert find_matching_chart(_spot(positions_in_hand=[seat], effective_stack_bb=40)) is None

@@ -16,6 +16,13 @@ copied from, or intended to match, any single commercial solver's output.
 Treat it as a reasonable approximate placeholder, not ground truth --
 validate/replace against Stage 5's live solve once it exists.
 
+Scope (Stage 2): 6-max only. Opener charts cover UTG, HJ, CO, BTN and SB;
+UTG1 and LJ are full-ring seats and are deliberately out of Stage 2 --
+find_matching_chart returns None for them, and apps/web gates them in the
+builder. Defend charts cover BB facing an open from any of those five
+seats, plus the common in-position / blind flats (BTN vs HJ and CO, SB vs
+CO and BTN). Full grid in docs/reference-chart-coverage.md.
+
 Known limitation: HandRange only has room for one weight per hand, so
 every "defend" chart below represents the whole *continuing* range (call
 or 3bet combined), not a split between the two -- distinguishing them
@@ -73,6 +80,11 @@ REFERENCE_CHARTS: dict[str, ChartEntry] = {
         Position.UTG, "utg_open_100bb", "100bb",
         ["77+", "A9s+", "K9s+", "Q9s+", "JTs", "T9s", "98s", "AJo+", "KQo"],
     ),
+    "hj_open_100bb": _open_entry(
+        Position.HJ, "hj_open_100bb", "100bb",
+        ["22+", "A5s+", "K9s+", "Q9s+", "J9s+", "T9s", "98s", "87s", "76s",
+         "ATo+", "KJo+", "QJo"],
+    ),
     "co_open_100bb": _open_entry(
         Position.CO, "co_open_100bb", "100bb",
         ["22+", "A2s+", "K7s+", "Q9s+", "J9s+", "T9s", "98s", "87s", "76s",
@@ -107,11 +119,39 @@ REFERENCE_CHARTS: dict[str, ChartEntry] = {
         ["22+", "A2s+", "K5s+", "Q8s+", "J8s+", "T8s+", "97s+", "87s", "76s",
          "65s", "A7o+", "K9o+", "QTo+", "JTo"],
     ),
+    "bb_defend_vs_hj_open_100bb": _defend_entry(
+        Position.BB, Position.HJ, "bb_defend_vs_hj_open_100bb", "100bb",
+        ["22+", "A2s+", "K6s+", "Q8s+", "J8s+", "T8s+", "97s+", "87s", "76s",
+         "65s", "A8o+", "KTo+", "QTo+", "JTo"],
+    ),
+    "bb_defend_vs_utg_open_100bb": _defend_entry(
+        Position.BB, Position.UTG, "bb_defend_vs_utg_open_100bb", "100bb",
+        ["22+", "A4s+", "K9s+", "Q9s+", "J9s+", "T9s", "98s", "87s", "76s",
+         "ATo+", "KJo+", "QJo"],
+    ),
+    "bb_defend_vs_sb_open_100bb": _defend_entry(
+        Position.BB, Position.SB, "bb_defend_vs_sb_open_100bb", "100bb",
+        ["22+", "A2s+", "K2s+", "Q4s+", "J6s+", "T6s+", "96s+", "85s+", "75s+",
+         "64s+", "54s", "A2o+", "K5o+", "Q7o+", "J8o+", "T8o+", "97o+", "87o"],
+    ),
+    "sb_defend_vs_co_open_100bb": _defend_entry(
+        Position.SB, Position.CO, "sb_defend_vs_co_open_100bb", "100bb",
+        ["77+", "A7s+", "KTs+", "QTs+", "JTs", "T9s", "AJo+", "KQo"],
+    ),
+    "btn_defend_vs_hj_open_100bb": _defend_entry(
+        Position.BTN, Position.HJ, "btn_defend_vs_hj_open_100bb", "100bb",
+        ["22+", "A2s+", "K8s+", "Q9s+", "J9s+", "T9s", "98s", "87s", "76s",
+         "A9o+", "KTo+", "QJo"],
+    ),
     # ---- 40bb (short stack -- trimmed toward raw high-card strength,
     # away from implied-odds-dependent hands; see module docstring) ----
     "utg_open_40bb": _open_entry(
         Position.UTG, "utg_open_40bb", "40bb",
         ["88+", "ATs+", "KTs+", "QTs+", "JTs", "AJo+", "KQo"],
+    ),
+    "hj_open_40bb": _open_entry(
+        Position.HJ, "hj_open_40bb", "40bb",
+        ["55+", "A9s+", "KTs+", "QTs+", "JTs", "T9s", "ATo+", "KJo+", "QJo"],
     ),
     "co_open_40bb": _open_entry(
         Position.CO, "co_open_40bb", "40bb",
@@ -143,6 +183,27 @@ REFERENCE_CHARTS: dict[str, ChartEntry] = {
         Position.BB, Position.CO, "bb_defend_vs_co_open_40bb", "40bb",
         ["22+", "A2s+", "K8s+", "Q9s+", "J9s+", "T9s", "98s", "A8o+", "K9o+", "QJo"],
     ),
+    "bb_defend_vs_hj_open_40bb": _defend_entry(
+        Position.BB, Position.HJ, "bb_defend_vs_hj_open_40bb", "40bb",
+        ["22+", "A2s+", "K9s+", "Q9s+", "J9s+", "T9s", "98s", "A9o+", "KTo+", "QJo"],
+    ),
+    "bb_defend_vs_utg_open_40bb": _defend_entry(
+        Position.BB, Position.UTG, "bb_defend_vs_utg_open_40bb", "40bb",
+        ["22+", "A8s+", "KTs+", "QTs+", "JTs", "T9s", "AJo+", "KQo"],
+    ),
+    "bb_defend_vs_sb_open_40bb": _defend_entry(
+        Position.BB, Position.SB, "bb_defend_vs_sb_open_40bb", "40bb",
+        ["22+", "A2s+", "K5s+", "Q7s+", "J8s+", "T8s+", "97s+", "86s+", "75s+",
+         "65s", "A2o+", "K8o+", "Q9o+", "J9o+", "T9o", "98o"],
+    ),
+    "sb_defend_vs_co_open_40bb": _defend_entry(
+        Position.SB, Position.CO, "sb_defend_vs_co_open_40bb", "40bb",
+        ["88+", "A9s+", "KTs+", "QJs", "AJo+", "KQo"],
+    ),
+    "btn_defend_vs_hj_open_40bb": _defend_entry(
+        Position.BTN, Position.HJ, "btn_defend_vs_hj_open_40bb", "40bb",
+        ["22+", "A4s+", "K9s+", "QTs+", "JTs", "T9s", "ATo+", "KJo+"],
+    ),
 }
 
 _STACK_BUCKETS: dict[str, tuple[float, float]] = {
@@ -153,12 +214,14 @@ _STACK_BUCKETS: dict[str, tuple[float, float]] = {
 _OPENER_CHARTS: dict[str, dict[Position, str]] = {
     "100bb": {
         Position.UTG: "utg_open_100bb",
+        Position.HJ: "hj_open_100bb",
         Position.CO: "co_open_100bb",
         Position.BTN: "btn_open_100bb",
         Position.SB: "sb_open_100bb",
     },
     "40bb": {
         Position.UTG: "utg_open_40bb",
+        Position.HJ: "hj_open_40bb",
         Position.CO: "co_open_40bb",
         Position.BTN: "btn_open_40bb",
         Position.SB: "sb_open_40bb",
@@ -171,16 +234,26 @@ _OPENER_CHARTS: dict[str, dict[Position, str]] = {
 # _is_single_open_raise below.
 _DEFEND_CHARTS: dict[str, dict[tuple[Position, Position], str]] = {
     "100bb": {
-        (Position.BTN, Position.BB): "bb_defend_vs_btn_open_100bb",
+        (Position.UTG, Position.BB): "bb_defend_vs_utg_open_100bb",
+        (Position.HJ, Position.BTN): "btn_defend_vs_hj_open_100bb",
+        (Position.HJ, Position.BB): "bb_defend_vs_hj_open_100bb",
         (Position.CO, Position.BTN): "btn_defend_vs_co_open_100bb",
-        (Position.BTN, Position.SB): "sb_defend_vs_btn_open_100bb",
+        (Position.CO, Position.SB): "sb_defend_vs_co_open_100bb",
         (Position.CO, Position.BB): "bb_defend_vs_co_open_100bb",
+        (Position.BTN, Position.SB): "sb_defend_vs_btn_open_100bb",
+        (Position.BTN, Position.BB): "bb_defend_vs_btn_open_100bb",
+        (Position.SB, Position.BB): "bb_defend_vs_sb_open_100bb",
     },
     "40bb": {
-        (Position.BTN, Position.BB): "bb_defend_vs_btn_open_40bb",
+        (Position.UTG, Position.BB): "bb_defend_vs_utg_open_40bb",
+        (Position.HJ, Position.BTN): "btn_defend_vs_hj_open_40bb",
+        (Position.HJ, Position.BB): "bb_defend_vs_hj_open_40bb",
         (Position.CO, Position.BTN): "btn_defend_vs_co_open_40bb",
-        (Position.BTN, Position.SB): "sb_defend_vs_btn_open_40bb",
+        (Position.CO, Position.SB): "sb_defend_vs_co_open_40bb",
         (Position.CO, Position.BB): "bb_defend_vs_co_open_40bb",
+        (Position.BTN, Position.SB): "sb_defend_vs_btn_open_40bb",
+        (Position.BTN, Position.BB): "bb_defend_vs_btn_open_40bb",
+        (Position.SB, Position.BB): "bb_defend_vs_sb_open_40bb",
     },
 }
 
@@ -222,10 +295,9 @@ def find_matching_chart(spot: Spot) -> ChartEntry | None:
 
     Returns None (no match) for anything else rather than guessing.
 
-    TODO(reference-charts): widen this as more chart entries are added --
-    e.g. more (opener, defender) pairs per bucket, 3bet-pot charts
+    TODO(reference-charts): still out of Stage 2 scope -- 3bet-pot charts
     (defender's raise gets 4bet/folded/called), more stack-depth buckets
-    (e.g. 200bb deep, or sub-25bb push/fold).
+    (200bb deep, sub-25bb push/fold), and full-ring seats (UTG1, LJ).
     """
     if spot.current_street != Street.PREFLOP:
         return None

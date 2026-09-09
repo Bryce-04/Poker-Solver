@@ -18,9 +18,10 @@ def test_reference_strategy_matches_and_labels_the_response():
 
 
 def test_reference_strategy_404s_with_a_clear_message_when_unmatched():
+    # LJ is a full-ring seat, deliberately outside Stage 2's 6-max scope.
     res = client.post(
         "/spots/reference-strategy",
-        json={"positions_in_hand": ["HJ"], "effective_stack_bb": 100},
+        json={"positions_in_hand": ["LJ"], "effective_stack_bb": 100},
     )
     assert res.status_code == 404
     assert "reference_charts.py" in res.json()["detail"]
