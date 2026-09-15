@@ -5,11 +5,14 @@ strategic recommendation, tag how opponents play, save what you study, and
 drill it in practice mode. See [`docs/plan.md`](docs/plan.md) for the full
 roadmap, what's been revised from the original plan, and why.
 
-**Status:** Stage 2 — manual hand builder, in progress. Stage 1 (Spot
-schema, user model, throwaway CFR spike) is complete. The spot builder and
-13×13 range grid are scaffolded in `apps/web` and wired to a reference-chart
-lookup in `apps/api`; polished builder controls, range-grid interactions,
-and the visual pass are still open.
+**Status:** Stage 2 — manual hand builder, demo-polished and split into its
+own screen. Stage 1 (Spot schema, user model, throwaway CFR spike) is
+complete. `apps/web` now has three screens (Builder / Saved / Type in); the
+spot builder and 13×13 range grid are wired to a reference-chart lookup in
+`apps/api`. Stage 3's plain-language entry has a small, rule-based start
+(two supported phrasings only, not freeform). Saved spots is UI-only for
+now, waiting on `apps/api`'s save/list endpoints. Range-grid weighted/drag/
+keyboard selection is still open.
 
 ## Layout
 

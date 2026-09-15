@@ -8,6 +8,12 @@
   --accent-bg: rgba(170, 59, 255, 0.1);
   --accent-border: rgba(170, 59, 255, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);
+  --error: #b3261e;
+  --error-bg: rgba(179, 38, 30, 0.08);
+  --error-border: rgba(179, 38, 30, 0.4);
+  --success: #2e7d4f;
+  --success-bg: rgba(46, 125, 79, 0.1);
+  --success-border: rgba(46, 125, 79, 0.4);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
@@ -41,6 +47,12 @@
     --accent-bg: rgba(192, 132, 252, 0.15);
     --accent-border: rgba(192, 132, 252, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
+    --error: #f2938c;
+    --error-bg: rgba(242, 147, 140, 0.12);
+    --error-border: rgba(242, 147, 140, 0.4);
+    --success: #6fcf97;
+    --success-bg: rgba(111, 207, 151, 0.12);
+    --success-border: rgba(111, 207, 151, 0.4);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }

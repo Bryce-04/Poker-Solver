@@ -1,6 +1,6 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { fetchReferenceStrategy } from './api'
+import { fetchReferenceStrategy, listSpots, saveSpot } from './api'
 
 // Minimal Spot -- fetchReferenceStrategy only JSON-serialises it, so the
 // exact shape doesn't matter here, only that a Spot goes in.
@@ -85,5 +85,68 @@ describe('fetchReferenceStrategy', () => {
   it('classifies a fetch() rejection as { kind: "network-error" } and never throws', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     await expect(fetchReferenceStrategy(spot)).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('saveSpot', () => {
+  it('POSTs the spot to /spots', async () => {
+    const fetchMock = mockResponse(200, spot)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await saveSpot(spot)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/spots$/)
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual(spot)
+  })
+
+  it('classifies a 2xx as { kind: "saved" } carrying the saved spot', async () => {
+    vi.stubGlobal('fetch', mockResponse(200, spot))
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'saved', spot })
+  })
+
+  it('classifies a 404 (route not shipped yet) as { kind: "error", status: 404 }', async () => {
+    vi.stubGlobal('fetch', mockResponse(404, { detail: 'not found' }))
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'error', status: 404 })
+  })
+
+  it('classifies a 422 as { kind: "invalid" } with the parsed validation issues', async () => {
+    const detail = [{ loc: ['body', 'effective_stack_bb'], msg: 'field required', type: 'missing' }]
+    vi.stubGlobal('fetch', mockResponse(422, { detail }))
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'invalid', issues: detail })
+  })
+
+  it('classifies a fetch() rejection as { kind: "network-error" } and never throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('listSpots', () => {
+  it('GETs /spots', async () => {
+    const fetchMock = mockResponse(200, [spot])
+    vi.stubGlobal('fetch', fetchMock)
+
+    await listSpots()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0][0])).toMatch(/\/spots$/)
+  })
+
+  it('classifies a 2xx as { kind: "ok" } carrying the spot list', async () => {
+    vi.stubGlobal('fetch', mockResponse(200, [spot]))
+    await expect(listSpots()).resolves.toEqual({ kind: 'ok', spots: [spot] })
+  })
+
+  it('classifies a 404 (route not shipped yet) as { kind: "error", status: 404 }', async () => {
+    vi.stubGlobal('fetch', mockResponse(404, { detail: 'not found' }))
+    await expect(listSpots()).resolves.toEqual({ kind: 'error', status: 404 })
+  })
+
+  it('classifies a fetch() rejection as { kind: "network-error" } and never throws', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    await expect(listSpots()).resolves.toEqual({ kind: 'network-error' })
   })
 })

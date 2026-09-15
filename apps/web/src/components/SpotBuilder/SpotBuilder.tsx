@@ -1,12 +1,14 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { BettingAction, Position, Spot } from "@poker-solver/schema";
+import type { Position, Spot } from "@poker-solver/schema";
 import { POSITIONS } from "../../lib/positions";
 import {
   fetchReferenceStrategy,
+  saveSpot,
   type ReferenceStrategyResponse,
   type SpotValidationIssue,
 } from "../../lib/api";
+import { buildOpenSpot, buildVsRaiseSpot } from "../../lib/spot";
 import { RangeGrid } from "../RangeGrid/RangeGrid";
 import "./SpotBuilder.css";
 
@@ -31,15 +33,20 @@ import "./SpotBuilder.css";
 
 type Situation = "unopened" | "vs-raise";
 
-// UI state machine: the api result tags plus idle/loading.
+// UI state machine: the api result tags plus idle/loading. `match` carries
+// the exact Spot that produced it (not just the current form state) so
+// "Save this spot" saves what was actually matched, even if the form's
+// been tweaked since.
 type Outcome =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "match"; data: ReferenceStrategyResponse }
+  | { kind: "match"; data: ReferenceStrategyResponse; spot: Spot }
   | { kind: "no-match" }
   | { kind: "invalid"; issues: SpotValidationIssue[] }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
+
+type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error" };
 
 export function SpotBuilder() {
   // "BTN" + "unopened" is a supported spot, so a first submit is a 200.
@@ -48,34 +55,29 @@ export function SpotBuilder() {
   const [situation, setSituation] = useState<Situation>("unopened");
   const [raiser, setRaiser] = useState<Position>("CO");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
 
   const stackIsValid = Number.isFinite(effectiveStackBb) && effectiveStackBb > 0;
 
   function buildSpot(): Spot {
-    // Stage 2 charts key off position + one optional preflop raise. Raise
-    // size doesn't affect the match, so the UI doesn't ask for it.
-    const actions: BettingAction[] =
-      situation === "vs-raise"
-        ? [{ position: raiser, street: "preflop", action: "raise" }]
-        : [];
-
-    return {
-      positions_in_hand: [position],
-      effective_stack_bb: effectiveStackBb,
-      current_street: "preflop",
-      actions,
-    };
+    // Shared with the Stage 3 text parser (lib/spot.ts) -- both entry paths
+    // converge on the same two Spot shapes rather than each assembling one.
+    return situation === "vs-raise"
+      ? buildVsRaiseSpot(position, raiser, effectiveStackBb)
+      : buildOpenSpot(position, effectiveStackBb);
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!stackIsValid) return;
     setOutcome({ kind: "loading" });
+    setSaveState({ kind: "idle" });
 
-    const result = await fetchReferenceStrategy(buildSpot());
+    const spot = buildSpot();
+    const result = await fetchReferenceStrategy(spot);
     switch (result.kind) {
       case "match":
-        setOutcome({ kind: "match", data: result.data });
+        setOutcome({ kind: "match", data: result.data, spot });
         return;
       case "no-match":
         setOutcome({ kind: "no-match" });
@@ -90,6 +92,12 @@ export function SpotBuilder() {
         setOutcome({ kind: "error", status: result.status });
         return;
     }
+  }
+
+  async function handleSave(spot: Spot) {
+    setSaveState({ kind: "saving" });
+    const result = await saveSpot(spot);
+    setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
   }
 
   return (
@@ -180,7 +188,12 @@ export function SpotBuilder() {
         {outcome.kind === "idle" && (
           <p>Build a spot and submit to see its reference range.</p>
         )}
-        {outcome.kind === "loading" && <p>Loading reference strategy&hellip;</p>}
+        {outcome.kind === "loading" && (
+          <p>
+            <span className="spot-builder__spinner" aria-hidden="true" />
+            Loading reference strategy&hellip;
+          </p>
+        )}
 
         {outcome.kind === "no-match" && (
           <div className="spot-builder__status-block spot-builder__status-block--info">
@@ -249,6 +262,25 @@ export function SpotBuilder() {
             onChange={() => {}}
             readOnly
           />
+          <div className="spot-builder__save">
+            <button
+              type="button"
+              onClick={() => handleSave(outcome.spot)}
+              disabled={saveState.kind === "saving"}
+            >
+              {saveState.kind === "saving" ? "Saving…" : "Save this spot"}
+            </button>
+            {saveState.kind === "saved" && (
+              <span className="spot-builder__save-status spot-builder__save-status--ok">
+                Saved.
+              </span>
+            )}
+            {saveState.kind === "error" && (
+              <span className="spot-builder__save-status spot-builder__save-status--error">
+                Couldn&rsquo;t save &mdash; saved spots aren&rsquo;t live yet.
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>

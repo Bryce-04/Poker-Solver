@@ -1,6 +1,6 @@
-/* Functional baseline only -- the Stage 2 "real visual pass" is a separate
-   shared ticket, not done here. Borders/text lean on the index.css tokens;
-   no palette or theming work. */
+/* Stage 2 demo-polish pass: every outcome state below is deliberately
+   token-driven (see index.css's --error/--success additions) so light and
+   dark mode both look intentional, not just "didn't crash." */
 
 .spot-builder__form {
   display: flex;
@@ -29,6 +29,17 @@
   font-size: 0.85rem;
 }
 
+.spot-builder__field--radio {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.spot-builder__field--radio:hover {
+  color: var(--text-h);
+}
+
 .spot-builder__hint {
   font-size: 0.8rem;
   margin: 0;
@@ -38,7 +49,40 @@
 .spot-builder__field-error {
   font-size: 0.8rem;
   margin: 0;
-  color: #b3261e;
+  color: var(--error);
+}
+
+.spot-builder__form select,
+.spot-builder__form input,
+.spot-builder__form button {
+  font: inherit;
+}
+
+.spot-builder__form select:focus-visible,
+.spot-builder__form input:focus-visible,
+.spot-builder__form button:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.spot-builder__form button[type="submit"] {
+  align-self: start;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.spot-builder__form button[type="submit"]:hover:not(:disabled) {
+  background: var(--accent-border);
+}
+
+.spot-builder__form button[type="submit"]:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .spot-builder__actions {
@@ -98,21 +142,48 @@
 }
 
 .spot-builder__status--error {
-  color: #b3261e;
+  color: var(--error);
+}
+
+.spot-builder__spinner {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-inline-end: 0.5rem;
+  vertical-align: -0.15rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spot-builder-spin 0.7s linear infinite;
+}
+
+@keyframes spot-builder-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spot-builder__status-block {
   margin-top: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.6rem 0.85rem;
   border-inline-start: 3px solid var(--border);
+  border-radius: 4px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .spot-builder__status-block--info {
   border-inline-start-color: var(--accent-border);
+  background: var(--accent-bg);
 }
 
 .spot-builder__status-block--error {
-  border-inline-start-color: #b3261e;
+  border-inline-start-color: var(--error);
+  background: var(--error-bg);
+}
+
+.spot-builder__status-block--success {
+  border-inline-start-color: var(--success);
+  background: var(--success-bg);
 }
 
 .spot-builder__status-block ul {
@@ -140,4 +211,48 @@
   font-size: 0.8rem;
   font-style: italic;
   margin-bottom: 0.5rem;
+}
+
+.spot-builder__save {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.spot-builder__save button {
+  font: inherit;
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.spot-builder__save button:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.spot-builder__save button:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.spot-builder__save button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.spot-builder__save-status {
+  font-size: 0.85rem;
+}
+
+.spot-builder__save-status--ok {
+  color: var(--success);
+}
+
+.spot-builder__save-status--error {
+  color: var(--error);
 }

@@ -5,7 +5,7 @@
 .range-grid {
   display: inline-flex;
   flex-direction: column;
-  border: 1px solid #999;
+  border: 1px solid var(--border);
 }
 
 .range-grid__row {
@@ -15,15 +15,28 @@
 .range-grid__cell {
   width: 2.5rem;
   height: 2.5rem;
-  border: 1px solid #ccc;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
   font-size: 0.7rem;
   cursor: pointer;
   padding: 0;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.range-grid__cell:hover:not(:disabled) {
+  border-color: var(--accent-border);
+}
+
+.range-grid__cell:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: -2px;
 }
 
 .range-grid__cell[data-selected="true"] {
-  background: #6ba368;
+  background: var(--success);
+  border-color: var(--success-border);
   color: #fff;
 }
 

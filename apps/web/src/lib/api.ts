@@ -77,3 +77,67 @@ async function parseValidationIssues(res: Response): Promise<SpotValidationIssue
   }
   return [];
 }
+
+// Every reachable outcome of POST /spots, mirroring fetchReferenceStrategy's
+// shape. Until the backend lane ships this route, real calls resolve to
+// { kind: "error", status: 404 } -- a legitimate, already-styled outcome,
+// not a broken build.
+export type SaveSpotResult =
+  | { kind: "saved"; spot: Spot }
+  | { kind: "invalid"; issues: SpotValidationIssue[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * POSTs a Spot to /spots to persist it. Never throws, same convention as
+ * fetchReferenceStrategy. Assumes the endpoint echoes back the saved Spot
+ * (server-assigned id/created_at) -- confirm against the backend lane's
+ * actual response shape once it ships.
+ */
+export async function saveSpot(spot: Spot): Promise<SaveSpotResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/spots`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(spot),
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.ok) {
+    const saved = (await res.json()) as Spot;
+    return { kind: "saved", spot: saved };
+  }
+  if (res.status === 422) {
+    return { kind: "invalid", issues: await parseValidationIssues(res) };
+  }
+  return { kind: "error", status: res.status };
+}
+
+// Every reachable outcome of GET /spots.
+export type ListSpotsResult =
+  | { kind: "ok"; spots: Spot[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * GETs the current user's saved spots. Never throws, same convention as
+ * the rest of this module. Assumes a bare JSON array response -- confirm
+ * against the backend lane's actual response shape once it ships.
+ */
+export async function listSpots(): Promise<ListSpotsResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/spots`);
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.ok) {
+    const spots = (await res.json()) as Spot[];
+    return { kind: "ok", spots };
+  }
+  return { kind: "error", status: res.status };
+}
