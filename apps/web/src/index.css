@@ -25,6 +25,11 @@
   /* Semantic */
   --danger: #c0362c;
   --danger-subtle: rgba(192, 54, 44, 0.1);
+  /* Success/confirmation -- aliased to the range grid's "in range" green
+     rather than a new hex, so it stays consistent with the one other place
+     this palette already uses a positive color. */
+  --success: var(--range-in);
+  --success-subtle: rgba(63, 157, 90, 0.1);
   --focus: var(--accent);
 
   /* Range grid: an empty cell, and the full-weight "in range" fill. Cells
@@ -82,6 +87,8 @@
 
     --danger: #f0857a;
     --danger-subtle: rgba(240, 133, 122, 0.14);
+    --success: var(--range-in);
+    --success-subtle: rgba(70, 176, 106, 0.14);
 
     --range-empty: #2b2b34;
     --range-in: #46b06a;
