@@ -1,17 +1,35 @@
-/* Stage 2 app-shell layout only. The real visual pass is still a ticket. */
-
 .app {
-  max-width: 48rem;
+  width: 100%;
+  max-width: 44rem;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
-  text-align: left;
+  padding: 2rem 1.5rem 4rem;
 }
 
 .app__header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.app__title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.app__logo {
+  width: 1.6rem;
+  height: 1.6rem;
 }
 
 .app__tagline {
-  color: var(--text);
-  font-size: 0.95rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.15rem;
+}
+
+@media (max-width: 480px) {
+  .app {
+    padding: 1.25rem 1rem 3rem;
+  }
 }

@@ -1,3 +1,4 @@
+import { CapacitorHttp } from "@capacitor/core";
 import type { Position, Spot } from "@poker-solver/schema";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -25,7 +26,7 @@ export interface SpotValidationIssue {
 //   match         -> 2xx, body is a ReferenceStrategyResponse
 //   no-match      -> 404, no reference chart covers this spot yet
 //   invalid       -> 422, the posted Spot failed schema validation
-//   network-error -> fetch() itself rejected (API down / DNS / CORS / offline)
+//   network-error -> the request itself failed (API down / DNS / offline)
 //   error         -> some other non-2xx with no specific handling
 export type ReferenceStrategyResult =
   | { kind: "match"; data: ReferenceStrategyResponse }
@@ -37,43 +38,61 @@ export type ReferenceStrategyResult =
 /**
  * POSTs a Spot to /spots/reference-strategy and classifies the response.
  * Never throws: transport failures come back as { kind: "network-error" }.
+ *
+ * Uses CapacitorHttp (built into @capacitor/core since v4) instead of
+ * fetch(). On web it transparently falls back to the browser's fetch; on
+ * Android/iOS it routes the request through native networking instead of
+ * the WebView's fetch, which sidesteps the browser's CORS enforcement
+ * entirely -- native requests never have to clear apps/api's CORS
+ * allowlist the way a hosted web build's browser tab does.
  */
 export async function fetchReferenceStrategy(
   spot: Spot,
 ): Promise<ReferenceStrategyResult> {
-  let res: Response;
+  let res: { status: number; data: unknown };
   try {
-    res = await fetch(`${API_BASE_URL}/spots/reference-strategy`, {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots/reference-strategy`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(spot),
+      data: spot,
     });
   } catch {
     return { kind: "network-error" };
   }
 
-  if (res.ok) {
-    const data = (await res.json()) as ReferenceStrategyResponse;
-    return { kind: "match", data };
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "match", data: asJson(res.data) as ReferenceStrategyResponse };
   }
   if (res.status === 404) return { kind: "no-match" };
   if (res.status === 422) {
-    return { kind: "invalid", issues: await parseValidationIssues(res) };
+    return { kind: "invalid", issues: parseValidationIssues(asJson(res.data)) };
   }
   return { kind: "error", status: res.status };
 }
 
-async function parseValidationIssues(res: Response): Promise<SpotValidationIssue[]> {
+// CapacitorHttp's default responseType ("json") hands back an already-parsed
+// body, but the web fallback and some edge cases can hand back a raw string
+// instead -- normalize both rather than assuming one shape.
+function asJson(data: unknown): unknown {
+  if (typeof data !== "string") return data;
   try {
-    const body = (await res.json()) as { detail?: unknown };
-    if (Array.isArray(body.detail)) {
-      return body.detail.filter(
-        (d): d is SpotValidationIssue =>
-          !!d && typeof d === "object" && "msg" in d && "loc" in d,
-      );
-    }
+    return JSON.parse(data);
   } catch {
-    // 422 with a non-JSON / unexpected body -- fall through to [].
+    return data;
+  }
+}
+
+function parseValidationIssues(body: unknown): SpotValidationIssue[] {
+  if (
+    body &&
+    typeof body === "object" &&
+    Array.isArray((body as { detail?: unknown }).detail)
+  ) {
+    return (body as { detail: unknown[] }).detail.filter(
+      (d): d is SpotValidationIssue =>
+        !!d && typeof d === "object" && "msg" in d && "loc" in d,
+    );
   }
   return [];
 }
