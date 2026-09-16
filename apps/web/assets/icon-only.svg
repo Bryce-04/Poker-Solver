@@ -1,0 +1,12 @@
+<!-- Combined flat icon (background plus foreground merged) for contexts
+     that don't apply their own adaptive mask. Same spade as
+     icon-foreground.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="180" fill="#7c3aed"/>
+  <g transform="translate(238.76,151.66) scale(22.77)">
+    <g transform="rotate(180,12,12)">
+      <path fill="#ffffff" d="M12,21.35 L10.55,20.03 C5.4,15.36 2,12.28 2,8.5 C2,5.42 4.42,3 7.5,3 C9.24,3 10.91,3.81 12,5.09 C13.09,3.81 14.76,3 16.5,3 C19.58,3 22,5.42 22,8.5 C22,12.28 18.6,15.36 13.45,20.03 L12,21.35 Z"/>
+    </g>
+    <polygon fill="#ffffff" points="7,17 17,17 12,29"/>
+  </g>
+</svg>
