@@ -18,10 +18,13 @@ first editing consumer); the whole app has a design-token visual pass
 (light + dark, `index.css`) and is routed into three screens (Builder /
 Saved / Type in). Stage 3 (text entry) has a small, rule-based start —
 `parseSpotText.ts` recognizes only the same two phrasings the builder
-itself supports, not freeform text. Saved spots is UI-only pending
-`apps/api`'s save/list endpoints. `apps/api` is deployed on Render; an
-Android build (Capacitor, `apps/web/android/`) is scaffolded and in
-progress.**
+itself supports, not freeform text. Saved spots is wired end-to-end:
+`apps/api` persists Spots as JSONB (`app/db.py`'s `SpotRow`, no migration
+tool yet -- the schema can still move) behind `POST`/`GET /spots`,
+matching the contract `apps/web/src/lib/api.ts` was built against (see
+`docs/decisions.md`). `apps/api` is deployed on Render, `DATABASE_URL`
+points at Supabase; an Android build (Capacitor, `apps/web/android/`) is
+scaffolded and in progress.**
 
 ## Commands
 
@@ -60,6 +63,13 @@ cd services/solver && python -m poker_solver.kuhn_spike  # runs the CFR spike de
 pytest services/solver                                    # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_kuhn_spike.py::test_cfr_converges_to_known_game_value   # single test
 ```
+`apps/api` requires a reachable `DATABASE_URL` even to run `pytest
+apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
+every test module) creates the engine at import time. Either run the
+local Postgres below, or point `.env`'s `DATABASE_URL` at Supabase (see
+`.env.example`). `db.py` loads `.env` itself via `python-dotenv` for bare
+`uvicorn --reload` runs; docker-compose and Render set the real env var
+directly, so that's a no-op there.
 
 ### Local Postgres
 ```

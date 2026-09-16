@@ -34,6 +34,22 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: poker_solver
+          POSTGRES_PASSWORD: poker_solver_dev
+          POSTGRES_DB: poker_solver
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U poker_solver"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://poker_solver:poker_solver_dev@localhost:5432/poker_solver
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

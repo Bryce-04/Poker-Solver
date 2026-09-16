@@ -16,5 +16,8 @@ services:
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
-    # DATABASE_URL (Supabase) gets added here once that's set up --
-    # apps/api doesn't read it yet, so it's not required for this deploy.
+      # Set manually in the Render dashboard (Environment tab) -- sync:
+      # false means Render won't try to manage or overwrite it from this
+      # file, so the Supabase connection string never touches the repo.
+      - key: DATABASE_URL
+        sync: false
