@@ -60,6 +60,13 @@ cd services/solver && python -m poker_solver.kuhn_spike  # runs the CFR spike de
 pytest services/solver                                    # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_kuhn_spike.py::test_cfr_converges_to_known_game_value   # single test
 ```
+`apps/api` requires a reachable `DATABASE_URL` even to run `pytest
+apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
+every test module) creates the engine at import time. Either run the
+local Postgres below, or point `.env`'s `DATABASE_URL` at Supabase (see
+`.env.example`). `db.py` loads `.env` itself via `python-dotenv` for bare
+`uvicorn --reload` runs; docker-compose and Render set the real env var
+directly, so that's a no-op there.
 
 ### Local Postgres
 ```

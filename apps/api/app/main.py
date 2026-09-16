@@ -8,9 +8,11 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from poker_solver_schema import __version__ as schema_version
 
+from .db import engine
 from .routes.spots import router as spots_router
 
 app = FastAPI(title="Poker Solver API", version="0.1.0")
@@ -37,4 +39,6 @@ app.include_router(spots_router)
 
 @app.get("/health")
 def health() -> dict:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
     return {"status": "ok", "schema_version": schema_version}
