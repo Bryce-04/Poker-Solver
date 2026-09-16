@@ -13,19 +13,22 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
 /**
  * Stage 2 app shell -- now the router shell too. BrowserRouter lives here
  * (not in main.tsx) so App.test.tsx's `render(<App />)` keeps working with
- * no extra wrapper. Nav, routing, and the real visual pass were Stage 2
- * tickets; this makes the three lane deliverables (builder / saved /
- * type-in) reachable as separate screens. See docs/plan.md.
+ * no extra wrapper. Multi-page routing (builder / saved / type-in) and the
+ * design-token visual pass were both open Stage 2 tickets; this is both of
+ * them landed together. See docs/plan.md.
  */
 function App() {
   return (
     <BrowserRouter>
       <div className="app">
         <header className="app__header">
-          <h1>Poker Solver</h1>
+          <div className="app__title">
+            <img className="app__logo" src="/favicon.svg" alt="" />
+            <h1>Poker Solver</h1>
+          </div>
           <p className="app__tagline">
-            Stage 2 &mdash; manual hand builder. Output is a reference chart, not a
-            live solve.
+            Manual hand builder &mdash; output is a reference chart, not a live
+            solve.
           </p>
           <nav className="app__nav">
             <NavLink to="/" end className={navLinkClassName}>

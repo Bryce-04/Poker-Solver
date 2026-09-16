@@ -1,0 +1,20 @@
+# Render Blueprint for apps/api. Deploy: Render dashboard -> New -> Blueprint
+# -> pick this repo. Render reads this file from the repo root.
+#
+# The Dockerfile expects the repo root as build context (see
+# apps/api/Dockerfile) so it can COPY packages/schema alongside apps/api --
+# dockerContext is set to "." (repo root), not apps/api, to match.
+services:
+  - type: web
+    name: poker-solver-api
+    runtime: docker
+    plan: free
+    branch: main
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    # DATABASE_URL (Supabase) gets added here once that's set up --
+    # apps/api doesn't read it yet, so it's not required for this deploy.

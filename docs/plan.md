@@ -5,16 +5,21 @@ original seven-stage pitch, the two decisions locked in before scaffolding,
 and what ships in each stage. (Full designed version: ask in the team
 channel for the artifact link if you want the formatted read.)
 
-**Status (2026-09-15):** Stage 1 complete. Stage 2 — spot builder and
-13×13 range grid are demo-polished (token-driven colors in both light and
-dark mode) and split into their own routed screen in `apps/web`;
-reference-chart lookup live in `apps/api` (coverage:
+**Status (2026-09-16):** Stage 1 complete. Stage 2 done — the spot
+builder's freeform action-list editor was cut for a two-option situation
+picker (unopened / facing one raise), the only shapes the reference charts
+answer; the range grid has weighted-brush / drag-paint / keyboard selection
+with weight shading; the app has a real design-token pass (light + dark);
+and it's routed into three screens (Builder / Saved / Type in) in
+`apps/web`. Reference-chart lookup live in `apps/api` (coverage:
 [reference-chart-coverage.md](reference-chart-coverage.md)). Stage 3 has a
 small, rule-based start: `parseSpotText.ts` recognizes the same two
 phrasings the button builder supports, not freeform text. A saved-spots
 screen exists in the frontend but is UI-only pending `apps/api`'s save/list
-endpoints. Remaining: weighted/drag/keyboard range-grid selection, and
-widening Stage 3 past its two-phrasing MVP.
+endpoints. `apps/api` is deployed (Render); a mobile packaging path
+(Android/Capacitor) for the "mobile app + backend" project requirement is
+scaffolded and in progress. Remaining: widening Stage 3 past its
+two-phrasing MVP, and the saved-spots backend.
 
 ## The pitch
 

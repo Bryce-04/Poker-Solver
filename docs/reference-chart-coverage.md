@@ -14,8 +14,9 @@ strategy.
 
 - **6-max only.** Opening seats: **UTG, HJ, CO, BTN, SB**.
 - **UTG1 and LJ are out of Stage 2** (full-ring seats). The matcher returns
-  no match; the builder should not offer them, or should show them disabled
-  with a "full-ring — not in Stage 2" note.
+  no match, and the builder's seat lists are 6-max so they can't be picked
+  (`SIX_MAX_POSITIONS` in `apps/web/src/lib/positions.ts`). The hero seat
+  also drops BB in an unopened pot (BB is never first to act).
 - **Preflop only.** Any `current_street` other than `preflop` → no match.
 - **Two stack buckets**, by `effective_stack_bb`:
   - `100bb` bucket: **80–120bb**
