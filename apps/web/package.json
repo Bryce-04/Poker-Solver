@@ -15,7 +15,8 @@
     "@capacitor/core": "^8.5.2",
     "@poker-solver/schema": "workspace:*",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",

@@ -1,6 +1,6 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { fetchReferenceStrategy } from './api'
+import { fetchReferenceStrategy, listSpots, saveSpot } from './api'
 
 // Minimal Spot -- fetchReferenceStrategy only JSON-serialises it, so the
 // exact shape doesn't matter here, only that a Spot goes in.
@@ -97,5 +97,68 @@ describe('fetchReferenceStrategy', () => {
       kind: 'match',
       data: matchBody,
     })
+  })
+})
+
+describe('saveSpot', () => {
+  it('POSTs the spot to /spots', async () => {
+    mockResponse(200, spot)
+
+    await saveSpot(spot)
+
+    expect(requestMock).toHaveBeenCalledTimes(1)
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url).toMatch(/\/spots$/)
+    expect(options.method).toBe('POST')
+    expect(options.data).toEqual(spot)
+  })
+
+  it('classifies a 2xx as { kind: "saved" } carrying the saved spot', async () => {
+    mockResponse(200, spot)
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'saved', spot })
+  })
+
+  it('classifies a 404 (route not shipped yet) as { kind: "error", status: 404 }', async () => {
+    mockResponse(404, { detail: 'not found' })
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'error', status: 404 })
+  })
+
+  it('classifies a 422 as { kind: "invalid" } with the parsed validation issues', async () => {
+    const detail = [{ loc: ['body', 'effective_stack_bb'], msg: 'field required', type: 'missing' }]
+    mockResponse(422, { detail })
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'invalid', issues: detail })
+  })
+
+  it('classifies a request rejection as { kind: "network-error" } and never throws', async () => {
+    requestMock.mockRejectedValue(new Error('network unreachable'))
+    await expect(saveSpot(spot)).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('listSpots', () => {
+  it('GETs /spots', async () => {
+    mockResponse(200, [spot])
+
+    await listSpots()
+
+    expect(requestMock).toHaveBeenCalledTimes(1)
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url).toMatch(/\/spots$/)
+    expect(options.method).toBe('GET')
+  })
+
+  it('classifies a 2xx as { kind: "ok" } carrying the spot list', async () => {
+    mockResponse(200, [spot])
+    await expect(listSpots()).resolves.toEqual({ kind: 'ok', spots: [spot] })
+  })
+
+  it('classifies a 404 (route not shipped yet) as { kind: "error", status: 404 }', async () => {
+    mockResponse(404, { detail: 'not found' })
+    await expect(listSpots()).resolves.toEqual({ kind: 'error', status: 404 })
+  })
+
+  it('classifies a request rejection as { kind: "network-error" } and never throws', async () => {
+    requestMock.mockRejectedValue(new Error('network unreachable'))
+    await expect(listSpots()).resolves.toEqual({ kind: 'network-error' })
   })
 })

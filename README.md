@@ -5,13 +5,16 @@ strategic recommendation, tag how opponents play, save what you study, and
 drill it in practice mode. See [`docs/plan.md`](docs/plan.md) for the full
 roadmap, what's been revised from the original plan, and why.
 
-**Status:** Stage 2 — manual hand builder, nearly done. Stage 1 (Spot
-schema, user model, throwaway CFR spike) is complete. The spot builder and
-13×13 range grid are built in `apps/web` and wired to a reference-chart
-lookup in `apps/api`; the range grid has weighted-brush / drag-paint /
-keyboard selection with weight shading, and the app has a design-token
-visual pass (light + dark). Still open: multi-page routing and a mobile
-packaging path.
+**Status:** Stage 2 — manual hand builder, done. Stage 1 (Spot schema, user
+model, throwaway CFR spike) is complete. The spot builder and 13×13 range
+grid are built in `apps/web` and wired to a reference-chart lookup in
+`apps/api`: the range grid has weighted-brush / drag-paint / keyboard
+selection with weight shading, the app has a design-token visual pass
+(light + dark), and it's routed into three screens (Builder / Saved / Type
+in). Stage 3's plain-language entry has a small, rule-based start (two
+supported phrasings only, not freeform). Saved spots is UI-only for now,
+waiting on `apps/api`'s save/list endpoints. `apps/api` is deployed
+(Render); an Android build (Capacitor) is scaffolded and in progress.
 
 ## Layout
 

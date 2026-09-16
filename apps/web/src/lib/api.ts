@@ -96,3 +96,67 @@ function parseValidationIssues(body: unknown): SpotValidationIssue[] {
   }
   return [];
 }
+
+// Every reachable outcome of POST /spots, mirroring fetchReferenceStrategy's
+// shape. Until the backend lane ships this route, real calls resolve to
+// { kind: "error", status: 404 } -- a legitimate, already-styled outcome,
+// not a broken build.
+export type SaveSpotResult =
+  | { kind: "saved"; spot: Spot }
+  | { kind: "invalid"; issues: SpotValidationIssue[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * POSTs a Spot to /spots to persist it. Same CapacitorHttp-based convention
+ * as fetchReferenceStrategy -- never throws, transport failures come back
+ * as { kind: "network-error" }. Assumes the endpoint echoes back the saved
+ * Spot (server-assigned id/created_at) -- confirm against the backend
+ * lane's actual response shape once it ships.
+ */
+export async function saveSpot(spot: Spot): Promise<SaveSpotResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: spot,
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "saved", spot: asJson(res.data) as Spot };
+  }
+  if (res.status === 422) {
+    return { kind: "invalid", issues: parseValidationIssues(asJson(res.data)) };
+  }
+  return { kind: "error", status: res.status };
+}
+
+// Every reachable outcome of GET /spots.
+export type ListSpotsResult =
+  | { kind: "ok"; spots: Spot[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * GETs the current user's saved spots. Same CapacitorHttp-based convention
+ * as the rest of this module. Assumes a bare JSON array response -- confirm
+ * against the backend lane's actual response shape once it ships.
+ */
+export async function listSpots(): Promise<ListSpotsResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({ url: `${API_BASE_URL}/spots`, method: "GET" });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "ok", spots: asJson(res.data) as Spot[] };
+  }
+  return { kind: "error", status: res.status };
+}

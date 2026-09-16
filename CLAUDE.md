@@ -8,15 +8,20 @@ A web-based poker solver focused on ease of use versus tools like PioSolver
 or GTO Wizard. Full roadmap, what's been revised from the original plan and
 why, and the architecture rationale live in [docs/plan.md](docs/plan.md) —
 read that before making structural decisions. **Current status: Stage 1
-(foundations) is complete. Stage 2 (manual hand builder) is nearly done —
-a spot builder and 13×13 range grid in `apps/web`, wired to a
-reference-chart lookup (`POST /spots/reference-strategy`) in `apps/api`
-(coverage in [docs/reference-chart-coverage.md](docs/reference-chart-coverage.md)).
-The range-grid interactions (weighted brush, drag-paint, keyboard) and a
-design-token visual pass (light + dark) are done. Still open: multi-page
-routing and a mobile packaging path. The editable range grid isn't mounted
-in a screen yet — SpotBuilder uses it read-only; Stage 3 is its first
-editing consumer.**
+(foundations) is complete. Stage 2 (manual hand builder) is done: the spot
+builder and 13×13 range grid in `apps/web` are wired to a reference-chart
+lookup (`POST /spots/reference-strategy`) in `apps/api` (coverage in
+[docs/reference-chart-coverage.md](docs/reference-chart-coverage.md)). The
+range grid has weighted-brush/drag-paint/keyboard selection with weight
+shading (still read-only where `SpotBuilder` mounts it — Stage 3 is its
+first editing consumer); the whole app has a design-token visual pass
+(light + dark, `index.css`) and is routed into three screens (Builder /
+Saved / Type in). Stage 3 (text entry) has a small, rule-based start —
+`parseSpotText.ts` recognizes only the same two phrasings the builder
+itself supports, not freeform text. Saved spots is UI-only pending
+`apps/api`'s save/list endpoints. `apps/api` is deployed on Render; an
+Android build (Capacitor, `apps/web/android/`) is scaffolded and in
+progress.**
 
 ## Commands
 
@@ -79,8 +84,12 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   `User`. Every entry path — button builder (Stage 2), text parser (Stage
   3), hand history import (Stage 4) — must converge on the same `Spot`
   shape from here; don't let any of those define their own parallel
-  representation. `apps/api` and `services/solver` both `pip install -e`
-  this package rather than depending on copies.
+  representation. `apps/web/src/lib/spot.ts` is where that convergence
+  actually lives on the frontend: `buildOpenSpot`/`buildVsRaiseSpot` are
+  shared by `SpotBuilder` and `parseSpotText.ts` — a new entry path adds a
+  call into `lib/spot.ts`, not its own inline `Spot` construction. `apps/api`
+  and `services/solver` both `pip install -e` this package rather than
+  depending on copies.
 - **`apps/api`** (FastAPI) owns spot CRUD, auth glue, and orchestrating
   calls to the solver — it's the only thing that talks to Postgres and to
   `services/solver` directly. The frontend never calls the solver service
@@ -99,7 +108,15 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   on in tests; what's invariant is that the best hand always continues
   facing a bet (see `test_kuhn_spike.py`).
 - **`apps/web`** (React + TypeScript + Vite) is the only consumer of the
-  generated TS types in `packages/schema/generated`.
+  generated TS types in `packages/schema/generated`. Routed via
+  `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not
+  `main.tsx`) so `App.test.tsx`'s `render(<App />)` needs no extra wrapper.
+  Screens live in `apps/web/src/pages/`; `apps/web/src/lib/api.ts` is the
+  single fetch chokepoint (never throws — callers switch on a result's
+  `kind` instead of try/catch), currently backing the reference-strategy
+  lookup plus `saveSpot`/`listSpots`, the latter two built against an
+  assumed `apps/api` contract ahead of that endpoint shipping — see
+  `docs/decisions.md`.
 - Effective stack is modeled as a single symmetric number
   (`Spot.effective_stack_bb`) rather than per-seat, matching the
   heads-up scope locked in for Stage 5. Widening to per-seat stacks is a

@@ -33,3 +33,28 @@
     padding: 1.25rem 1rem 3rem;
   }
 }
+
+.app__nav {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.app__nav a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid transparent;
+}
+
+.app__nav a:hover {
+  color: var(--text-h);
+}
+
+.app__nav a.active {
+  color: var(--text-h);
+  border-bottom-color: var(--accent-border);
+}
