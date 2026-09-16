@@ -1,25 +1,27 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, vi } from 'vitest'
+import { beforeEach, vi } from 'vitest'
 import App from './App'
+import { listSpots } from './lib/api'
+
+// SavedSpotsPage calls listSpots() on mount -- mock the api module directly
+// (same convention as SpotBuilder.test.tsx) rather than the transport
+// underneath it, so this test doesn't care whether that's fetch or
+// CapacitorHttp. Stubs the real current state: a 404 until the backend
+// lane ships POST/GET /spots.
+vi.mock('./lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./lib/api')>()),
+  listSpots: vi.fn(),
+}))
+const mockListSpots = vi.mocked(listSpots)
 
 // Shell-level smoke test only. Behavioural tests for SpotBuilder and
 // RangeGrid belong with those components (their owners) -- this just proves
 // the app mounts and wires the builder in without throwing.
 describe('<App />', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
-    // SavedSpotsPage calls listSpots() on mount -- stub a 404 (the real
-    // state until the backend lane ships POST/GET /spots) so this test
-    // doesn't depend on a running apps/api.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response),
-    )
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
+    mockListSpots.mockReset()
+    mockListSpots.mockResolvedValue({ kind: 'error', status: 404 })
   })
 
   it('renders the shell heading', () => {
