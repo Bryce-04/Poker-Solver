@@ -1,15 +1,19 @@
 """Stage 2 endpoint: match a submitted Spot against the reference-chart
-table (see ../reference_charts.py) and return it.
-
-No persistence yet -- that's Stage 6 (saved history). This is deliberately
-a single stateless lookup: submit a Spot, get back whatever reference
-chart matches it, or a 404 if nothing does yet.
+table (see ../reference_charts.py) and return it. Also POST/GET /spots for
+saving and listing spots (Stage 6 groundwork, pulled forward for this
+sprint's demo) -- see docs/decisions.md for the response-shape contract
+apps/web's api.ts was already built against.
 """
 
-from fastapi import APIRouter, HTTPException
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 from poker_solver_schema import Spot
 
+from ..db import SpotRow, get_db
 from ..reference_charts import find_matching_chart
 
 router = APIRouter(prefix="/spots", tags=["spots"])
@@ -34,3 +38,20 @@ def reference_strategy(spot: Spot) -> dict:
         "chart_source": chart.source,
         "ranges": chart.ranges,
     }
+
+
+@router.post("")
+def save_spot(spot: Spot, db: Session = Depends(get_db)) -> Spot:
+    # id/created_at are server-assigned, not trusted from the client --
+    # see the "server-assigned id/created_at" note on SaveSpotResult in
+    # apps/web/src/lib/api.ts.
+    saved = spot.model_copy(update={"id": uuid4(), "created_at": datetime.now(UTC)})
+    db.add(SpotRow(id=saved.id, created_at=saved.created_at, data=saved.model_dump(mode="json")))
+    db.commit()
+    return saved
+
+
+@router.get("")
+def list_spots(db: Session = Depends(get_db)) -> list[Spot]:
+    rows = db.query(SpotRow).order_by(SpotRow.created_at.desc()).all()
+    return [Spot.model_validate(row.data) for row in rows]

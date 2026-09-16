@@ -8,7 +8,10 @@ or a review approval is enough); flip to **accepted** then.
 
 ## 2026-09-15 — Saved spots built against a guessed apps/api contract
 
-**Status:** proposed
+**Status:** accepted — confirmed 2026-09-16, `apps/api`'s `POST`/`GET
+/spots` (see `app/routes/spots.py`) match this contract exactly: `POST`
+echoes the full saved `Spot` with server-assigned `id`/`created_at`, `GET`
+returns a bare array. `api.ts` needs no changes.
 
 **Context.** The frontend's saved-spots screen (`SavedSpotsPage`, and
 `SpotBuilder`'s "Save this spot" button) was built before `apps/api`

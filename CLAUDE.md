@@ -18,10 +18,13 @@ first editing consumer); the whole app has a design-token visual pass
 (light + dark, `index.css`) and is routed into three screens (Builder /
 Saved / Type in). Stage 3 (text entry) has a small, rule-based start —
 `parseSpotText.ts` recognizes only the same two phrasings the builder
-itself supports, not freeform text. Saved spots is UI-only pending
-`apps/api`'s save/list endpoints. `apps/api` is deployed on Render; an
-Android build (Capacitor, `apps/web/android/`) is scaffolded and in
-progress.**
+itself supports, not freeform text. Saved spots is wired end-to-end:
+`apps/api` persists Spots as JSONB (`app/db.py`'s `SpotRow`, no migration
+tool yet -- the schema can still move) behind `POST`/`GET /spots`,
+matching the contract `apps/web/src/lib/api.ts` was built against (see
+`docs/decisions.md`). `apps/api` is deployed on Render, `DATABASE_URL`
+points at Supabase; an Android build (Capacitor, `apps/web/android/`) is
+scaffolded and in progress.**
 
 ## Commands
 
