@@ -12,9 +12,10 @@ grid are built in `apps/web` and wired to a reference-chart lookup in
 selection with weight shading, the app has a design-token visual pass
 (light + dark), and it's routed into three screens (Builder / Saved / Type
 in). Stage 3's plain-language entry has a small, rule-based start (two
-supported phrasings only, not freeform). Saved spots is UI-only for now,
-waiting on `apps/api`'s save/list endpoints. `apps/api` is deployed
-(Render); an Android build (Capacitor) is scaffolded and in progress.
+supported phrasings only, not freeform). Saved spots is wired end-to-end
+to `apps/api`'s `POST`/`GET /spots` (Postgres via Supabase). `apps/api` is
+deployed (Render); an Android build (Capacitor) has a real icon/splash and
+runs end-to-end against the live API on a physical device.
 
 ## Layout
 

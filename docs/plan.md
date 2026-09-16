@@ -14,12 +14,14 @@ and it's routed into three screens (Builder / Saved / Type in) in
 `apps/web`. Reference-chart lookup live in `apps/api` (coverage:
 [reference-chart-coverage.md](reference-chart-coverage.md)). Stage 3 has a
 small, rule-based start: `parseSpotText.ts` recognizes the same two
-phrasings the button builder supports, not freeform text. A saved-spots
-screen exists in the frontend but is UI-only pending `apps/api`'s save/list
-endpoints. `apps/api` is deployed (Render); a mobile packaging path
-(Android/Capacitor) for the "mobile app + backend" project requirement is
-scaffolded and in progress. Remaining: widening Stage 3 past its
-two-phrasing MVP, and the saved-spots backend.
+phrasings the button builder supports, not freeform text. Saved spots is wired end-to-end: `apps/api` persists
+`Spot`s (Postgres via Supabase) behind `POST`/`GET /spots`, confirmed
+against the contract `apps/web` was already built against (see
+`docs/decisions.md`). `apps/api` is deployed (Render); an Android build
+(Capacitor) has a real app icon/splash and is verified running end-to-end
+against the live API on a physical device — the range grid's touch
+ergonomics and a rehearsed demo are what's left there. Remaining:
+widening Stage 3 past its two-phrasing MVP.
 
 ## The pitch
 

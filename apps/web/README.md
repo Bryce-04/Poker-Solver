@@ -4,13 +4,18 @@ The React + TypeScript + Vite frontend. Stage 2's manual hand builder lives
 here: the button/dropdown **spot builder** and the **13×13 range grid**. See
 [`../../docs/plan.md`](../../docs/plan.md) for the roadmap and where this fits.
 
-**Status:** the spot builder and range grid are wired end to end to
-`apps/api`'s reference-chart lookup. The range grid's weighted-brush /
-drag-paint / keyboard selection and weight shading are done, and the app
-has a design-token visual pass (light + dark). Still open (tracked in
-`docs/plan.md`): multi-page routing, and a mobile packaging path. The
-editable range grid isn't mounted in a screen yet — SpotBuilder uses it
-read-only; Stage 3 is its first editing consumer.
+**Status:** routed into three screens — Builder, Saved, Type in
+(`react-router-dom`, `BrowserRouter` in `App.tsx`; see
+`docs/decisions.md`). The spot builder and range grid are wired end to
+end to `apps/api`'s reference-chart lookup; the range grid's
+weighted-brush / drag-paint / keyboard selection and weight shading are
+done, and the app has a design-token visual pass (light + dark). Stage 3
+has a small, rule-based start (`lib/parseSpotText.ts`, two phrasings
+only) on the Type-in screen. Saved spots (the Saved screen, and the "Save
+this spot" button on Builder/Type-in) is wired to `apps/api`'s
+`POST`/`GET /spots`. The editable range grid still isn't mounted
+anywhere — both screens that show a matched chart render `RangeGrid`
+read-only.
 
 ## Commands
 
@@ -28,20 +33,27 @@ pnpm --filter web lint       # oxlint
 ```
 src/
   main.tsx                    entry — mounts <App> in StrictMode
-  App.tsx                     app shell: header + <SpotBuilder />
+  App.tsx                     router shell: header + nav + <Routes> (BrowserRouter
+                              lives here, not main.tsx — see docs/decisions.md)
   index.css                   design tokens (--*), light/dark via
                               prefers-color-scheme, base element styling
-  App.css                     shell styling
+  App.css                     shell + nav styling
+  pages/
+    BuilderPage.tsx            "/" — wraps SpotBuilder (Stage 2's button/dropdown builder)
+    TypeInPage.tsx              "/type-in" — Stage 3's plain-language entry
+    SavedSpotsPage.tsx          "/saved" — lists spots saved via apps/api
   components/
-    SpotBuilder/              the spot builder form (this is Stage 2's
-                              button/dropdown builder)
+    SpotBuilder/              the spot builder form, reused by BuilderPage
     RangeGrid/                the 13×13 starting-hand grid
   lib/
-    api.ts                    fetch wrapper for POST /spots/reference-strategy
-    positions.ts              POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
+    api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot, listSpots
+    spot.ts                   buildOpenSpot/buildVsRaiseSpot — the shared Spot-assembly
+                              helpers every entry path converges on
+    parseSpotText.ts           Stage 3's rule-based parser (two phrasings only)
+    positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions
-    hands.ts                  the 169 hand labels in chart order (RangeGrid)
+    hands.ts                   the 169 hand labels in chart order (RangeGrid)
 ```
 
 ## Types come from `packages/schema`
@@ -56,31 +68,54 @@ and nowhere else. Don't hand-write a parallel type; regenerate the package
 
 ## Talking to the API
 
-`lib/api.ts` exposes `fetchReferenceStrategy(spot: Spot)`. It **never throws** —
-every outcome of `POST /spots/reference-strategy` comes back as a tagged
-`ReferenceStrategyResult`:
+`lib/api.ts` is the single fetch chokepoint, built on `CapacitorHttp` (not
+`fetch` — see the Android section below) with three functions, none of
+which ever throw: every outcome comes back as a tagged result and callers
+switch on `.kind` instead of try/catch.
 
-| `kind`          | when                                             |
-|-----------------|--------------------------------------------------|
-| `match`         | 2xx — `.data` is a `ReferenceStrategyResponse`   |
-| `no-match`      | 404 — no reference chart covers this spot yet    |
-| `invalid`       | 422 — `.issues` are the FastAPI validation errors|
-| `network-error` | `fetch()` itself rejected (API down / CORS / offline) |
-| `error`         | any other non-2xx — `.status` is the code        |
+| Function | Backs | `kind`s |
+|---|---|---|
+| `fetchReferenceStrategy(spot)` | `POST /spots/reference-strategy` | `match` (2xx, `.data` is a `ReferenceStrategyResponse`) / `no-match` (404) / `invalid` (422, `.issues`) / `network-error` / `error` (`.status`) |
+| `saveSpot(spot)` | `POST /spots` | `saved` (2xx, `.spot` echoes the server-assigned `id`/`created_at`) / `invalid` / `network-error` / `error` |
+| `listSpots()` | `GET /spots` | `ok` (`.spots: Spot[]`) / `network-error` / `error` |
 
-`ReferenceStrategyResponse` mirrors the API's response dict (see
-`apps/api/app/routes/spots.py`) and is the one shared seam — coordinate with
-whoever owns `apps/api` before changing its shape.
+`ReferenceStrategyResponse` mirrors `apps/api/app/routes/spots.py`'s response
+dict and is the one shared seam — coordinate with whoever owns `apps/api`
+before changing its shape. `saveSpot`/`listSpots` were built against an
+*assumed* contract ahead of the backend lane shipping those routes; now
+confirmed to match exactly (see `docs/decisions.md`) — no changes needed.
 
 Base URL: `VITE_API_BASE_URL`, defaulting to `http://localhost:8000` (the
-local `apps/api` port), so no env setup is needed for the default local
-workflow. Override it (e.g. `VITE_API_BASE_URL=http://localhost:9 pnpm dev:web`
-to force `network-error`) via the shell or a `.env` / `.env.local` file that
-Vite picks up.
+local `apps/api` port) in dev, and to the deployed Render URL for
+production builds (`apps/web/.env.production` — loaded automatically by
+`vite build`, which is also what the Android build's `cap sync` runs
+against). Override it (e.g. `VITE_API_BASE_URL=http://localhost:9 pnpm dev:web`
+to force `network-error`) via the shell or a `.env.local` file that Vite
+picks up.
+
+## Android (Capacitor)
+
+`apps/web/android/` is a committed native Android project (`npx cap add
+android`), kept in sync with `apps/web/src` via `pnpm --filter web build &&
+npx cap sync android` — that's the loop after any source change, before a
+Gradle rebuild. `capacitor.config.ts` sets the app id/name and `webDir`.
+Source icon/splash assets live in `apps/web/assets/`; regenerate the native
+resources with `npx capacitor-assets generate --android` after changing
+them, don't hand-edit the generated `android/app/src/main/res/mipmap-*` /
+`drawable-*` files. `lib/api.ts` uses `CapacitorHttp` specifically so
+requests route through native networking on-device, sidestepping the
+WebView's CORS enforcement rather than needing `apps/api`'s CORS allowlist
+to cover the Capacitor origin.
 
 ## SpotBuilder
 
-`components/SpotBuilder/SpotBuilder.tsx` assembles a `Spot` client-side from:
+`components/SpotBuilder/SpotBuilder.tsx` (mounted by `pages/BuilderPage.tsx`)
+assembles a `Spot` client-side via `lib/spot.ts`'s `buildOpenSpot`/
+`buildVsRaiseSpot` — shared with `pages/TypeInPage.tsx`'s parser so both
+entry paths converge on the same `Spot` construction rather than each
+inlining their own. On a match, a "Save this spot" button calls
+`saveSpot()` and shows an inline saved/error status; `pages/TypeInPage.tsx`
+has the identical affordance. Fields:
 
 - **Position** and **effective stack (bb)** inputs. The seat list is 6-max
   (no UTG1/LJ — full-ring, no chart), and drops BB when the situation is an
@@ -132,7 +167,10 @@ grid as static cells with none of the interaction wired up.
 Feature components use BEM (`spot-builder__*`, `range-grid__*`). `index.css`
 owns the design tokens — surfaces (`--surface`, `--border`), text
 (`--text-strong`, `--text-muted`), a violet `--accent`, semantic
-`--danger`, radii and shadows — defined for light and redefined under
+`--danger`/`--success` (the latter aliased to the range grid's "in range"
+green, not a new hex, so a save-succeeded state and a full-weight cell
+read as the same "good" color), radii and shadows — defined for light and
+redefined under
 `@media (prefers-color-scheme: dark)`, plus base styling for buttons,
 selects, inputs and focus rings. Lean on the tokens rather than hardcoding
 colours; a few older aliases (`--text-h`, `--code-bg`, `--accent-bg`) are
