@@ -104,6 +104,13 @@ body {
   min-height: 100svh;
   background: var(--bg);
   color: var(--text);
+  /* index.html sets viewport-fit=cover so content can draw under a notch/
+     status bar/gesture-nav bar on native builds -- these insets are what
+     actually pull it back in so nothing renders underneath them. env()
+     is 0 on a browser with no notch, so this is a no-op on desktop/most
+     phones and only does something where there's a real inset to respect. */
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 #root {
