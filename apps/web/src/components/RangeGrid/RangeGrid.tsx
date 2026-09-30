@@ -199,6 +199,11 @@ export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps)
         </div>
       )}
 
+      {/* A phone can't fit 13 comfortably-tappable columns in its width --
+          scroll horizontally rather than shrink cells below a usable touch
+          target. Desktop never triggers this (the grid's min-width sits
+          under range-grid-wrap's own max-width). */}
+      <div className="range-grid__scroll">
       <div
         className="range-grid"
         role="grid"
@@ -236,6 +241,7 @@ export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps)
             })}
           </div>
         ))}
+      </div>
       </div>
 
       <p className="range-grid__summary">

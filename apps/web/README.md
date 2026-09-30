@@ -163,6 +163,13 @@ Editable mode (`readOnly` unset):
   Home/End jump to the row ends.
 - A weighted combo summary (`N combos · X% of hands`), shown in both modes.
 
+13 columns can't all be comfortably tappable inside a phone's width, so
+`.range-grid__scroll` scrolls horizontally rather than shrinking cells
+below a usable touch target (`.range-grid`'s `min-width: 28rem` sets the
+floor) — verified against real phone widths (360/412px), not just eyeballed
+on desktop. Never triggers on desktop, where `range-grid-wrap`'s own
+`max-width` already exceeds that floor.
+
 Read-only mode (Stage 2's reference-chart display) renders the same shaded
 grid as static cells with none of the interaction wired up.
 

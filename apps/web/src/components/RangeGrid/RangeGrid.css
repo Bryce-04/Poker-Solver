@@ -39,6 +39,15 @@
 
 /* --- The grid --- */
 
+/* Scroll boundary for narrow viewports -- see the comment in RangeGrid.tsx.
+   Negative margin + matching padding lets a dragged/scrolled finger reach
+   the true edge without the page's own padding cutting it off first. */
+.range-grid__scroll {
+  overflow-x: auto;
+  margin-inline: -0.1rem;
+  padding-inline: 0.1rem;
+}
+
 .range-grid {
   display: grid;
   grid-template-columns: repeat(13, 1fr);
@@ -47,6 +56,11 @@
   background: var(--border);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* Keeps cells at a comfortably tappable size (~32px) on any viewport --
+     range-grid-wrap's own max-width (30rem) already exceeds this on
+     desktop, so this only ever forces range-grid__scroll to scroll on
+     narrower screens, never on desktop. */
+  min-width: 28rem;
   /* Paint drags must not scroll the page under the finger. */
   touch-action: none;
   user-select: none;
