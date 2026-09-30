@@ -163,12 +163,14 @@ Editable mode (`readOnly` unset):
   Home/End jump to the row ends.
 - A weighted combo summary (`N combos · X% of hands`), shown in both modes.
 
-13 columns can't all be comfortably tappable inside a phone's width, so
-`.range-grid__scroll` scrolls horizontally rather than shrinking cells
-below a usable touch target (`.range-grid`'s `min-width: 28rem` sets the
-floor) — verified against real phone widths (360/412px), not just eyeballed
-on desktop. Never triggers on desktop, where `range-grid-wrap`'s own
-`max-width` already exceeds that floor.
+The grid always fills its container width exactly (`width: 100%`, no
+`min-width`) rather than scrolling horizontally on a phone — a scroll
+wrapper was tried first, but a touch drag meant to scroll also fired the
+paint handlers underneath it, toggling cells along the way. Shrinking is
+the tradeoff: cells get smaller on a narrow phone than the ~32px usually
+recommended for touch targets, but the whole chart stays visible and
+nothing fights the drag-to-paint gesture. Cell label font-size is a
+`clamp()` so it scales down with the cells instead of overflowing.
 
 Read-only mode (Stage 2's reference-chart display) renders the same shaded
 grid as static cells with none of the interaction wired up.
