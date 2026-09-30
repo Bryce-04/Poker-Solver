@@ -47,6 +47,14 @@
   background: var(--border);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  /* Always fills its container exactly -- never wider, so there's nothing
+     to scroll. A horizontal-scroll version was tried instead (keep cells
+     at a fixed tappable size, scroll to reach the rest) but a touch drag
+     meant to scroll also fired the paint handlers underneath it, toggling
+     whatever cell the finger passed over. Shrinking cells to fit is worse
+     for precision on a small screen but doesn't have that conflict --
+     font-size below scales down with the cells so labels stay legible. */
+  width: 100%;
   /* Paint drags must not scroll the page under the finger. */
   touch-action: none;
   user-select: none;

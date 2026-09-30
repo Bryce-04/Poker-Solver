@@ -48,6 +48,14 @@
   max-width: 12rem;
 }
 
+.spot-builder__hh-input {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .spot-builder__field--radio {
   flex-direction: row;
   align-items: center;
@@ -168,6 +176,18 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
+}
+
+/* Secondary action -- outline, not filled, so "Save" stays the one thing
+   that looks like the primary button next to it. */
+.spot-builder__reset {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+
+.spot-builder__reset:hover:not(:disabled) {
+  background: var(--surface-2);
 }
 
 .spot-builder__save-status {

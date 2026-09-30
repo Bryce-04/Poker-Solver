@@ -4,8 +4,8 @@ import { listSpots } from "../lib/api";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
-// so every state (including "backend isn't live yet") gets an intentional
-// treatment instead of a blank screen.
+// so every reachable state gets an intentional treatment instead of a
+// blank screen.
 type ListState =
   | { kind: "loading" }
   | { kind: "ok"; spots: Spot[] }
@@ -28,10 +28,10 @@ function formatSavedAt(spot: Spot): string | null {
 }
 
 /**
- * Lists spots saved via apps/api's POST/GET /spots. List-only in this MVP
- * (no editing/deleting) -- see the ♥-lane plan. Until the backend lane
- * ships these routes, listSpots() resolves to { kind: "error", status: 404 },
- * which renders as a normal, already-styled outcome below, not a crash.
+ * Lists spots saved via apps/api's POST/GET /spots (live -- see
+ * docs/decisions.md). List-only in this MVP (no editing/deleting). Saved
+ * spots aren't scoped per-user yet -- there's no auth (Stage 6) -- so this
+ * lists every spot anyone has saved, not just "yours."
  */
 export function SavedSpotsPage() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
@@ -82,17 +82,9 @@ export function SavedSpotsPage() {
 
   if (state.kind === "error") {
     return (
-      <div className="spot-builder__status-block spot-builder__status-block--info">
-        <p className="spot-builder__status-title">
-          {state.status === 404
-            ? "Saved spots aren't live yet."
-            : "Unexpected API response."}
-        </p>
-        <p>
-          {state.status === 404
-            ? "The backend lane hasn't shipped POST/GET /spots yet -- this screen will populate once it does."
-            : `The request failed with HTTP ${state.status}.`}
-        </p>
+      <div className="spot-builder__status-block spot-builder__status-block--error">
+        <p className="spot-builder__status-title">Unexpected API response.</p>
+        <p>The request failed with HTTP {state.status}.</p>
       </div>
     );
   }
