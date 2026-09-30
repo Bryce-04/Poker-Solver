@@ -17,7 +17,10 @@ mounted **editable** everywhere a matched chart is shown (Builder,
 Type-in, Import) — adjust weights before "Save this spot" persists them,
 not a read-only display. Saved spots (the Saved screen, and the save
 button on the three entry screens) is wired to `apps/api`'s
-`POST`/`GET /spots`.
+`POST`/`GET /spots`. Stage 6 auth (see `## Auth` below) has a frontend
+start: Supabase sign-in, session state, and a "sign in to save spots"
+gate on all three save buttons — the backend half (verifying the token,
+scoping saved spots per user) hasn't landed yet.
 
 ## Commands
 
@@ -96,6 +99,32 @@ production builds (`apps/web/.env.production` — loaded automatically by
 against). Override it (e.g. `VITE_API_BASE_URL=http://localhost:9 pnpm dev:web`
 to force `network-error`) via the shell or a `.env.local` file that Vite
 picks up.
+
+## Auth
+
+`lib/supabase.ts` creates a Supabase client from `VITE_SUPABASE_URL`/
+`VITE_SUPABASE_ANON_KEY` (see `apps/web/.env.example` — real values come
+from the team's Supabase project, copied into a git-ignored
+`.env.local`, never committed). `lib/auth.tsx`'s `AuthProvider`/
+`useAuth()` track session state (`loading` / `signed-out` / `signed-in`),
+mounted in `App.tsx` around `BrowserRouter`; `getAccessToken()` is a
+plain async export `lib/api.ts` calls directly, since that module isn't
+a component and can't use the hook. `components/AuthStatus/AuthStatus.tsx`
+is the header's email/password sign-in (and sign-up, same form, toggled)
+plus "Signed in as X / Sign out" UI — no magic link, to avoid a redirect
+URL in the Supabase dashboard and native deep-link handling this
+Capacitor app doesn't have.
+
+`saveSpot`/`listSpots` (`lib/api.ts`) attach
+`Authorization: Bearer <token>` when a session exists, omitted (not
+blocked client-side) otherwise — sent ahead of `apps/api` actually
+verifying it, per `docs/decisions.md`'s 2026-09-30 entry. Separately,
+the save button on all three entry screens (Builder, Type in, Import)
+shows "Sign in to save spots" and skips the API call entirely when
+signed out, via each page's own `useAuth()` check. `SavedSpotsPage`
+shows a signed-out notice but still renders whatever `GET /spots`
+returns underneath it, since the backend doesn't filter per-user yet —
+full per-user scoping is the backend lane's job.
 
 ## Android (Capacitor)
 

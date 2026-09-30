@@ -20,11 +20,17 @@ dark, `index.css`) and is routed into four screens (Builder / Saved /
 Type in / Import). Saved spots is wired end-to-end: `apps/api` persists
 Spots as JSONB (`app/db.py`'s `SpotRow`, no migration tool yet -- the
 schema can still move) behind `POST`/`GET /spots`, matching the contract
-`apps/web/src/lib/api.ts` was built against (see `docs/decisions.md`) —
-not scoped per-user, since there's no auth (Stage 6) yet. `apps/api` is
-deployed on Render, `DATABASE_URL` points at Supabase; an Android build
-(Capacitor, `apps/web/android/`) has a real app icon/splash and runs
-end-to-end against the live API on a physical device.**
+`apps/web/src/lib/api.ts` was built against (see `docs/decisions.md`).
+Stage 6 auth has a frontend start: Supabase email/password sign-in,
+session state, and an `Authorization` header on save/list calls
+(`apps/web/src/lib/auth.tsx`, `lib/supabase.ts`, the header's
+`AuthStatus` component); the save button on all three entry screens
+gates on being signed in. Not done yet: `apps/api` verifying that header
+and scoping `GET /spots` per user — until that lands, saved spots stay a
+shared list regardless of who's signed in. `apps/api` is deployed on
+Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
+`apps/web/android/`) has a real app icon/splash and runs end-to-end
+against the live API on a physical device.**
 
 ## Commands
 
