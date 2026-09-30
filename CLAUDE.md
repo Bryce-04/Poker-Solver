@@ -24,7 +24,13 @@ schema can still move) behind `POST`/`GET /spots`, matching the contract
 not scoped per-user, since there's no auth (Stage 6) yet. `apps/api` is
 deployed on Render, `DATABASE_URL` points at Supabase; an Android build
 (Capacitor, `apps/web/android/`) has a real app icon/splash and runs
-end-to-end against the live API on a physical device.**
+end-to-end against the live API on a physical device. **`services/solver`
+now has a real river-only MCCFR engine** (heads-up, a fixed 5-card board,
+two ranges, the locked bet-size menu — `river_mccfr.py`, backed by a
+from-scratch hand evaluator and a range-to-combo sampler, checked against
+closed-form poker theory in `tests/test_river_mccfr.py`), not yet wired to
+`apps/api` or the frontend, and flop/turn aren't solvable yet (no runout
+logic).**
 
 ## Commands
 
