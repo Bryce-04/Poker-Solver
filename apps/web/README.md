@@ -4,18 +4,20 @@ The React + TypeScript + Vite frontend. Stage 2's manual hand builder lives
 here: the button/dropdown **spot builder** and the **13×13 range grid**. See
 [`../../docs/plan.md`](../../docs/plan.md) for the roadmap and where this fits.
 
-**Status:** routed into three screens — Builder, Saved, Type in
+**Status:** routed into four screens — Builder, Saved, Type in, Import
 (`react-router-dom`, `BrowserRouter` in `App.tsx`; see
 `docs/decisions.md`). The spot builder and range grid are wired end to
 end to `apps/api`'s reference-chart lookup; the range grid's
 weighted-brush / drag-paint / keyboard selection and weight shading are
-done, and the app has a design-token visual pass (light + dark). Stage 3
-has a small, rule-based start (`lib/parseSpotText.ts`, two phrasings
-only) on the Type-in screen. Saved spots (the Saved screen, and the "Save
-this spot" button on Builder/Type-in) is wired to `apps/api`'s
-`POST`/`GET /spots`. The editable range grid still isn't mounted
-anywhere — both screens that show a matched chart render `RangeGrid`
-read-only.
+done, and the app has a design-token visual pass (light + dark). Two
+more entry paths converge on the same `lib/spot.ts` shapes: Stage 3's
+rule-based text parser (`lib/parseSpotText.ts`) and Stage 4's hand-history
+paste import (`lib/parseHandHistory.ts`, one format). The range grid is
+mounted **editable** everywhere a matched chart is shown (Builder,
+Type-in, Import) — adjust weights before "Save this spot" persists them,
+not a read-only display. Saved spots (the Saved screen, and the save
+button on the three entry screens) is wired to `apps/api`'s
+`POST`/`GET /spots`.
 
 ## Commands
 
@@ -41,6 +43,7 @@ src/
   pages/
     BuilderPage.tsx            "/" — wraps SpotBuilder (Stage 2's button/dropdown builder)
     TypeInPage.tsx              "/type-in" — Stage 3's plain-language entry
+    ImportPage.tsx               "/import" — Stage 4's hand-history paste entry
     SavedSpotsPage.tsx          "/saved" — lists spots saved via apps/api
   components/
     SpotBuilder/              the spot builder form, reused by BuilderPage
@@ -49,7 +52,8 @@ src/
     api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot, listSpots
     spot.ts                   buildOpenSpot/buildVsRaiseSpot — the shared Spot-assembly
                               helpers every entry path converges on
-    parseSpotText.ts           Stage 3's rule-based parser (two phrasings only)
+    parseSpotText.ts           Stage 3's rule-based parser (two phrasings, plus synonyms)
+    parseHandHistory.ts        Stage 4's rule-based hand-history parser (one format)
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions

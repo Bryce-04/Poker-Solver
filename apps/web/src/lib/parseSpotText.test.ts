@@ -45,6 +45,51 @@ describe('parseSpotText', () => {
     expect(result.kind === 'parsed' && result.spot.positions_in_hand).toEqual(['BTN'])
   })
 
+  it('accepts "button" as an alias for BTN', () => {
+    const result = parseSpotText('button opens 100bb')
+    expect(result.kind).toBe('parsed')
+    expect(result.kind === 'parsed' && result.spot.positions_in_hand).toEqual(['BTN'])
+  })
+
+  it('accepts "cutoff" and "hijack" as aliases for CO/HJ', () => {
+    expect(parseSpotText('cutoff opens').kind).toBe('parsed')
+    const result = parseSpotText('hijack opens 40bb')
+    expect(result.kind === 'parsed' && result.spot.positions_in_hand).toEqual(['HJ'])
+  })
+
+  it('accepts "raises" as an alternate verb for an open', () => {
+    const result = parseSpotText('CO raises 40bb')
+    expect(result).toEqual({
+      kind: 'parsed',
+      spot: {
+        positions_in_hand: ['CO'],
+        effective_stack_bb: 40,
+        current_street: 'preflop',
+        actions: [],
+      },
+    })
+  })
+
+  it('accepts "facing" and "raise" as alternate vs-raise phrasing', () => {
+    const result = parseSpotText('BB facing a CO raise')
+    expect(result.kind).toBe('parsed')
+    expect(result.kind === 'parsed' && result.spot.actions).toEqual([
+      { position: 'CO', street: 'preflop', action: 'raise' },
+    ])
+  })
+
+  it('accepts "big blinds" spelled out instead of "bb"', () => {
+    const result = parseSpotText('UTG opens 100 big blinds')
+    expect(result.kind === 'parsed' && result.spot.effective_stack_bb).toBe(100)
+  })
+
+  it('combines a seat alias with the vs-raise phrasing on both sides', () => {
+    const result = parseSpotText('SB vs button open')
+    expect(result.kind === 'parsed' && result.spot.actions).toEqual([
+      { position: 'BTN', street: 'preflop', action: 'raise' },
+    ])
+  })
+
   it('rejects an unrecognized position', () => {
     expect(parseSpotText('ZZ opens 100bb')).toEqual({ kind: 'unrecognized' })
   })

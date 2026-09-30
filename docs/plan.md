@@ -5,23 +5,25 @@ original seven-stage pitch, the two decisions locked in before scaffolding,
 and what ships in each stage. (Full designed version: ask in the team
 channel for the artifact link if you want the formatted read.)
 
-**Status (2026-09-16):** Stage 1 complete. Stage 2 done — the spot
-builder's freeform action-list editor was cut for a two-option situation
-picker (unopened / facing one raise), the only shapes the reference charts
-answer; the range grid has weighted-brush / drag-paint / keyboard selection
-with weight shading; the app has a real design-token pass (light + dark);
-and it's routed into three screens (Builder / Saved / Type in) in
-`apps/web`. Reference-chart lookup live in `apps/api` (coverage:
-[reference-chart-coverage.md](reference-chart-coverage.md)). Stage 3 has a
-small, rule-based start: `parseSpotText.ts` recognizes the same two
-phrasings the button builder supports, not freeform text. Saved spots is wired end-to-end: `apps/api` persists
-`Spot`s (Postgres via Supabase) behind `POST`/`GET /spots`, confirmed
-against the contract `apps/web` was already built against (see
-`docs/decisions.md`). `apps/api` is deployed (Render); an Android build
-(Capacitor) has a real app icon/splash and is verified running end-to-end
-against the live API on a physical device — the range grid's touch
-ergonomics and a rehearsed demo are what's left there. Remaining:
-widening Stage 3 past its two-phrasing MVP.
+**Status (2026-09-30):** Stage 1 and 2 done. Stage 3 (`parseSpotText.ts`)
+recognizes the same two situations the button builder does, widened past
+its original literal two-phrasing MVP with synonyms (seat names like
+"button"/"cutoff", "raises" as well as "opens", "big blinds" spelled out)
+— still rule-based, still exactly two shapes, not freeform text. Stage 4
+has a small start too: `parseHandHistory.ts` reconstructs a Spot from a
+pasted hand history (one format, a full 6-handed 6-max table, the same two
+chart-coverable shapes) — the first of the "pluggable adapters" this
+stage's note called for. The range grid is finally mounted editable, not
+just as a read-only chart display: every entry path (Builder, Type in,
+Import) lets you adjust the matched range before saving it. `apps/web` is
+routed into four screens (Builder / Saved / Type in / Import). Saved spots
+is wired end-to-end: `apps/api` persists `Spot`s (Postgres via Supabase)
+behind `POST`/`GET /spots` (see `docs/decisions.md`) — not yet scoped
+per-user, since there's no auth (Stage 6) yet, so it's a shared list for
+now. `apps/api` is deployed (Render); the Android build (Capacitor) has a
+real app icon/splash and runs end-to-end against the live API on a
+physical device — a rehearsed demo is what's left there. Remaining:
+Stage 4 past its one-format MVP, and Stage 6 (real auth).
 
 ## The pitch
 
