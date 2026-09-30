@@ -6,6 +6,37 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-09-30 — Stage 5's solver starts river-only, with a hand-written evaluator
+
+**Status:** accepted
+
+**Context.** Stage 5's locked scope (`docs/plan.md`) is "one postflop
+street" generically — that covers a spot starting on the flop, turn, or
+river. Going to showdown from the flop or turn needs the rest of the board
+dealt out (a runout) before a hand can be evaluated at all; the river
+needs none, since the board's already complete. Separately, ranking a
+hand at showdown needs some evaluator — write one, or take a small
+well-tested dependency (e.g. `treys`).
+
+**Decision.** Build river-only first (`services/solver/src/poker_solver/
+river_mccfr.py` + `river_game.py`), with no runout logic. Write the hand
+evaluator from scratch (`evaluator.py`) rather than pulling in a
+third-party one — for a class project, a self-contained, independently
+unit-tested piece we wrote and understand end to end beats a dependency
+doing a core piece of the solver's correctness for us.
+
+**Consequences.** Flop/turn spots aren't solvable yet — they need Monte
+Carlo runout sampling layered on top of the range sampling this already
+does, which is real follow-up work, not a small extension. The engine is
+verified against a closed-form poker-theory result (a polarized-range-
+vs-bluffcatcher river spot), not just "did it run" — see
+`services/solver/README.md` for the one payoff-arithmetic subtlety (the
+dead pot must be in the winner's share on a fold, not just the folder's
+own street contribution) that a naive implementation would get wrong
+while still silently "converging" to the wrong equilibrium.
+
+---
+
 ## 2026-09-15 — Saved spots built against a guessed apps/api contract
 
 **Status:** accepted — confirmed 2026-09-16, `apps/api`'s `POST`/`GET

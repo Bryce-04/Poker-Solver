@@ -64,10 +64,11 @@ committed. If a model's exported names change, update the re-exports in
 python -m venv .venv && source .venv/Scripts/activate   # or .venv/bin/activate on macOS/Linux
 pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 
-cd apps/api && uvicorn app.main:app --reload             # GET /health
-cd services/solver && python -m poker_solver.kuhn_spike  # runs the CFR spike demo
+cd apps/api && uvicorn app.main:app --reload              # GET /health
+cd services/solver && python -m poker_solver.kuhn_spike   # Stage 1 toy CFR spike demo
+cd services/solver && python -m poker_solver.river_mccfr  # the real river-only solver demo
 pytest services/solver                                    # from repo root, or `pytest` from within services/solver
-pytest services/solver/tests/test_kuhn_spike.py::test_cfr_converges_to_known_game_value   # single test
+pytest services/solver/tests/test_river_mccfr.py           # the real solver's closed-form regression test
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
@@ -117,12 +118,26 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   `kuhn_spike.py` is a **throwaway** CFR proof-of-concept on Kuhn poker
   (a toy game with a known closed-form equilibrium, game value -1/18),
   used to validate that CFR-family regret matching converges correctly
-  before Stage 5's real solver depends on that assumption. Delete it once
-  Stage 5 has its own convergence tests covering the same question. Note:
-  Kuhn poker has a *family* of equilibria (parameterized by alpha in
-  [0, 1/3]) — opening-action frequencies aren't a fixed point to assert
-  on in tests; what's invariant is that the best hand always continues
-  facing a bet (see `test_kuhn_spike.py`).
+  before Stage 5's real solver depended on that assumption. Note: Kuhn
+  poker has a *family* of equilibria (parameterized by alpha in [0, 1/3])
+  — opening-action frequencies aren't a fixed point to assert on in
+  tests; what's invariant is that the best hand always continues facing
+  a bet (see `test_kuhn_spike.py`). The real solver now exists:
+  `river_mccfr.py` (chance-sampled MCCFR, heads-up, a fixed river board,
+  the locked bet-size menu — same regret-matching shape as
+  `kuhn_spike.py`'s `KuhnCfrTrainer`), backed by `evaluator.py` (a
+  from-scratch hand evaluator), `combos.py` (`HandRange`'s 169-type
+  labels → concrete, board-aware card combos), and `river_game.py` (the
+  betting action abstraction, as a pure state machine). Its own
+  closed-form convergence test (`test_river_mccfr.py`) now covers the
+  "does CFR converge correctly" question `kuhn_spike.py` was there to
+  answer first — `kuhn_spike.py` is a reasonable deletion candidate at
+  this point, kept for now rather than deleted reflexively. See
+  `services/solver/README.md` for the module layout and the one
+  payoff-arithmetic subtlety worth knowing about before touching
+  `river_game.py`'s `terminal_utility`. Not wired to `apps/api` or the
+  frontend yet; flop/turn aren't solvable yet (need Monte Carlo runout
+  sampling on top of the range sampling this already does).
 - **`apps/web`** (React + TypeScript + Vite) is the only consumer of the
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not
