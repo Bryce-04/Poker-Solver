@@ -34,7 +34,7 @@ describe('<App />', () => {
     expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('navigates to the saved-spots and type-in routes without throwing', async () => {
+  it('navigates to the saved-spots, type-in, and import routes without throwing', async () => {
     const user = userEvent.setup()
     render(<App />)
 
@@ -43,5 +43,8 @@ describe('<App />', () => {
 
     await user.click(screen.getByRole('link', { name: /type in/i }))
     expect(screen.getByText(/describe the spot/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: /^import$/i }))
+    expect(screen.getByLabelText(/paste a hand history/i)).toBeInTheDocument()
   })
 })

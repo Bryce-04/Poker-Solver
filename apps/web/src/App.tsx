@@ -2,6 +2,7 @@ import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
 import { BuilderPage } from "./pages/BuilderPage";
 import { SavedSpotsPage } from "./pages/SavedSpotsPage";
 import { TypeInPage } from "./pages/TypeInPage";
+import { ImportPage } from "./pages/ImportPage";
 import "./App.css";
 
 // react-router-dom v7's NavLink doesn't auto-apply an "active" class (that
@@ -13,9 +14,8 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
 /**
  * Stage 2 app shell -- now the router shell too. BrowserRouter lives here
  * (not in main.tsx) so App.test.tsx's `render(<App />)` keeps working with
- * no extra wrapper. Multi-page routing (builder / saved / type-in) and the
- * design-token visual pass were both open Stage 2 tickets; this is both of
- * them landed together. See docs/plan.md.
+ * no extra wrapper. Four screens: Builder (Stage 2), Saved, Type in
+ * (Stage 3), Import (Stage 4 hand-history paste). See docs/plan.md.
  */
 function App() {
   return (
@@ -40,6 +40,9 @@ function App() {
             <NavLink to="/type-in" className={navLinkClassName}>
               Type in
             </NavLink>
+            <NavLink to="/import" className={navLinkClassName}>
+              Import
+            </NavLink>
           </nav>
         </header>
         <main>
@@ -47,6 +50,7 @@ function App() {
             <Route path="/" element={<BuilderPage />} />
             <Route path="/saved" element={<SavedSpotsPage />} />
             <Route path="/type-in" element={<TypeInPage />} />
+            <Route path="/import" element={<ImportPage />} />
           </Routes>
         </main>
       </div>
