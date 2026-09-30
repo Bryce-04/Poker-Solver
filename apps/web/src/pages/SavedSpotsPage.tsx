@@ -4,8 +4,8 @@ import { listSpots } from "../lib/api";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
-// so every state (including "backend isn't live yet") gets an intentional
-// treatment instead of a blank screen.
+// so every reachable state gets an intentional treatment instead of a
+// blank screen.
 type ListState =
   | { kind: "loading" }
   | { kind: "ok"; spots: Spot[] }
