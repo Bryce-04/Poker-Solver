@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { Spot } from "@poker-solver/schema";
+import type { HandRange, Spot } from "@poker-solver/schema";
 import {
   fetchReferenceStrategy,
   saveSpot,
@@ -37,6 +37,8 @@ export function TypeInPage() {
   const [text, setText] = useState("");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
+  // Same pattern as SpotBuilder: the chart's range, editable before saving.
+  const [editedRange, setEditedRange] = useState<HandRange>({});
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -53,6 +55,7 @@ export function TypeInPage() {
     switch (result.kind) {
       case "match":
         setOutcome({ kind: "match", data: result.data, spot: parsed.spot });
+        setEditedRange(result.data.ranges[parsed.spot.positions_in_hand[0]] ?? {});
         return;
       case "no-match":
         setOutcome({ kind: "no-match" });
@@ -71,7 +74,8 @@ export function TypeInPage() {
 
   async function handleSave(spot: Spot) {
     setSaveState({ kind: "saving" });
-    const result = await saveSpot(spot);
+    const toSave: Spot = { ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } };
+    const result = await saveSpot(toSave);
     setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
   }
 
@@ -178,11 +182,11 @@ export function TypeInPage() {
           <p className="spot-builder__source-label">
             Reference chart (not a live solve): {outcome.data.chart_description}
           </p>
-          <RangeGrid
-            value={Object.values(outcome.data.ranges)[0] ?? {}}
-            onChange={() => {}}
-            readOnly
-          />
+          <p className="spot-builder__hint">
+            Adjust the range below before saving &mdash; brush weight, click, or
+            drag, same as any range grid.
+          </p>
+          <RangeGrid value={editedRange} onChange={setEditedRange} />
           <div className="spot-builder__save">
             <button
               type="button"
@@ -191,6 +195,15 @@ export function TypeInPage() {
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}
             </button>
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={() =>
+                setEditedRange(outcome.data.ranges[outcome.spot.positions_in_hand[0]] ?? {})
+              }
+            >
+              Reset to chart
+            </button>
             {saveState.kind === "saved" && (
               <span className="spot-builder__save-status spot-builder__save-status--ok">
                 Saved.
@@ -198,7 +211,7 @@ export function TypeInPage() {
             )}
             {saveState.kind === "error" && (
               <span className="spot-builder__save-status spot-builder__save-status--error">
-                Couldn&rsquo;t save &mdash; saved spots aren&rsquo;t live yet.
+                Couldn&rsquo;t save that spot &mdash; try again in a moment.
               </span>
             )}
           </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { Position, Spot } from "@poker-solver/schema";
+import type { HandRange, Position, Spot } from "@poker-solver/schema";
 import { OPENABLE_POSITIONS, SIX_MAX_POSITIONS } from "../../lib/positions";
 import {
   fetchReferenceStrategy,
@@ -18,9 +18,11 @@ import "./SpotBuilder.css";
  *
  * Position + effective stack + a "situation" choice assemble a Spot
  * client-side; it's POSTed to apps/api's /spots/reference-strategy and the
- * matched range is shown read-only via RangeGrid. Every outcome the
- * endpoint can produce (match / 404 no-match / 422 invalid / unreachable)
- * gets its own message.
+ * matched range is shown via an editable RangeGrid -- the chart is the
+ * starting point, not the final word, and "Save this spot" persists
+ * whatever the grid currently shows, not the untouched chart. Every
+ * outcome the endpoint can produce (match / 404 no-match / 422 invalid /
+ * unreachable) gets its own message.
  *
  * Stage 2's reference charts only answer two shapes, so the UI only offers
  * those: an unopened pot (open charts), or hero facing a single preflop
@@ -60,6 +62,10 @@ export function SpotBuilder() {
   const [raiser, setRaiser] = useState<Position>("CO");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
+  // The chart's range, editable before saving. Re-seeded from the chart
+  // every time a fresh match comes in (handleSubmit); RangeGrid owns no
+  // range state itself (see components/RangeGrid), so this is that state.
+  const [editedRange, setEditedRange] = useState<HandRange>({});
 
   // BB is never first to act, so it's not a valid hero seat in an unopened
   // pot. The seat list narrows with the situation, and switching to
@@ -96,6 +102,7 @@ export function SpotBuilder() {
     switch (result.kind) {
       case "match":
         setOutcome({ kind: "match", data: result.data, spot });
+        setEditedRange(result.data.ranges[position] ?? {});
         return;
       case "no-match":
         setOutcome({ kind: "no-match" });
@@ -114,7 +121,10 @@ export function SpotBuilder() {
 
   async function handleSave(spot: Spot) {
     setSaveState({ kind: "saving" });
-    const result = await saveSpot(spot);
+    // Save whatever the range grid currently shows, not the untouched
+    // chart -- the whole point of making it editable here.
+    const toSave: Spot = { ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } };
+    const result = await saveSpot(toSave);
     setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
   }
 
@@ -275,11 +285,11 @@ export function SpotBuilder() {
           <p className="spot-builder__source-label">
             Reference chart (not a live solve): {outcome.data.chart_description}
           </p>
-          <RangeGrid
-            value={Object.values(outcome.data.ranges)[0] ?? {}}
-            onChange={() => {}}
-            readOnly
-          />
+          <p className="spot-builder__hint">
+            Adjust the range below before saving &mdash; brush weight, click, or
+            drag, same as any range grid.
+          </p>
+          <RangeGrid value={editedRange} onChange={setEditedRange} />
           <div className="spot-builder__save">
             <button
               type="button"
@@ -288,6 +298,13 @@ export function SpotBuilder() {
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}
             </button>
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={() => setEditedRange(outcome.data.ranges[position] ?? {})}
+            >
+              Reset to chart
+            </button>
             {saveState.kind === "saved" && (
               <span className="spot-builder__save-status spot-builder__save-status--ok">
                 Saved.
@@ -295,7 +312,7 @@ export function SpotBuilder() {
             )}
             {saveState.kind === "error" && (
               <span className="spot-builder__save-status spot-builder__save-status--error">
-                Couldn&rsquo;t save &mdash; saved spots aren&rsquo;t live yet.
+                Couldn&rsquo;t save that spot &mdash; try again in a moment.
               </span>
             )}
           </div>
