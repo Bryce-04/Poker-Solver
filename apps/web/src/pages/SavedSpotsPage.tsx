@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Spot } from "@poker-solver/schema";
 import { listSpots } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
@@ -34,6 +35,7 @@ function formatSavedAt(spot: Spot): string | null {
  * which renders as a normal, already-styled outcome below, not a crash.
  */
 export function SavedSpotsPage() {
+  const auth = useAuth();
   const [state, setState] = useState<ListState>({ kind: "loading" });
 
   useEffect(() => {
@@ -59,6 +61,23 @@ export function SavedSpotsPage() {
     };
   }, []);
 
+  return (
+    <>
+      {auth.status === "signed-out" && (
+        <div className="spot-builder__status-block spot-builder__status-block--info">
+          <p className="spot-builder__status-title">Not signed in.</p>
+          {/* apps/api doesn't filter GET /spots per-user yet (backend lane's
+              job, see docs/decisions.md's 2026-09-30 entry) -- this list may
+              still show everyone's spots until that lands. */}
+          <p>Sign in to save your own spots.</p>
+        </div>
+      )}
+      <SavedSpotsList state={state} />
+    </>
+  );
+}
+
+function SavedSpotsList({ state }: { state: ListState }) {
   if (state.kind === "loading") {
     return (
       <p>

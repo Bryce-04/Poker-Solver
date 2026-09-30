@@ -1,4 +1,6 @@
 import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
+import { AuthStatus } from "./components/AuthStatus/AuthStatus";
+import { AuthProvider } from "./lib/auth";
 import { BuilderPage } from "./pages/BuilderPage";
 import { SavedSpotsPage } from "./pages/SavedSpotsPage";
 import { TypeInPage } from "./pages/TypeInPage";
@@ -19,38 +21,41 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
  */
 function App() {
   return (
-    <BrowserRouter>
-      <div className="app">
-        <header className="app__header">
-          <div className="app__title">
-            <img className="app__logo" src="/favicon.svg" alt="" />
-            <h1>Poker Solver</h1>
-          </div>
-          <p className="app__tagline">
-            Manual hand builder &mdash; output is a reference chart, not a live
-            solve.
-          </p>
-          <nav className="app__nav">
-            <NavLink to="/" end className={navLinkClassName}>
-              Builder
-            </NavLink>
-            <NavLink to="/saved" className={navLinkClassName}>
-              Saved
-            </NavLink>
-            <NavLink to="/type-in" className={navLinkClassName}>
-              Type in
-            </NavLink>
-          </nav>
-        </header>
-        <main>
-          <Routes>
-            <Route path="/" element={<BuilderPage />} />
-            <Route path="/saved" element={<SavedSpotsPage />} />
-            <Route path="/type-in" element={<TypeInPage />} />
-          </Routes>
-        </main>
-      </div>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="app">
+          <header className="app__header">
+            <div className="app__title">
+              <img className="app__logo" src="/favicon.svg" alt="" />
+              <h1>Poker Solver</h1>
+            </div>
+            <p className="app__tagline">
+              Manual hand builder &mdash; output is a reference chart, not a live
+              solve.
+            </p>
+            <nav className="app__nav">
+              <NavLink to="/" end className={navLinkClassName}>
+                Builder
+              </NavLink>
+              <NavLink to="/saved" className={navLinkClassName}>
+                Saved
+              </NavLink>
+              <NavLink to="/type-in" className={navLinkClassName}>
+                Type in
+              </NavLink>
+            </nav>
+            <AuthStatus />
+          </header>
+          <main>
+            <Routes>
+              <Route path="/" element={<BuilderPage />} />
+              <Route path="/saved" element={<SavedSpotsPage />} />
+              <Route path="/type-in" element={<TypeInPage />} />
+            </Routes>
+          </main>
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

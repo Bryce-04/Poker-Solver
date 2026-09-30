@@ -6,6 +6,39 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-09-30 — Frontend sends Authorization: Bearer &lt;Supabase JWT&gt; ahead of backend enforcement
+
+**Status:** proposed
+
+**Context.** Stage 6 auth UI (Supabase email/password sign-in, `apps/web`
+only) ships before the backend lane's JWT verification lands in
+`apps/api`. `lib/api.ts`'s `saveSpot`/`listSpots` now attach
+`Authorization: Bearer <token>` (from `supabase.auth.getSession()`) to
+every request where a session exists, assuming the backend will read a
+standard `Bearer` token from that header and validate it as a Supabase
+JWT.
+
+**Decision.** Ship the header now regardless of whether `apps/api` checks
+it yet -- it doesn't, today. Omit the header silently when there's no
+session rather than blocking the request client-side in `api.ts` (a
+separate, UI-level "sign in to save spots" gate exists in `SpotBuilder`/
+`TypeInPage` for that). Treat a future 401 as the existing
+`{ kind: "error", status: 401 }` outcome, not a special case.
+
+**Consequences.** Unblocks the frontend auth lane without waiting on
+backend coordination. If the header name/scheme assumption turns out
+wrong (e.g. the backend expects a cookie, a different header, or a
+different token audience/claims shape), only `lib/api.ts`'s
+`authHeaders()` helper needs to change -- callers already consume the
+typed `Result` union, not raw headers. Also unresolved until the backend
+lane lands: `GET /spots` still returns every row unfiltered, so saved
+spots aren't actually private yet regardless of this header (see
+`SavedSpotsPage`'s signed-out notice). Flip Status to
+`accepted — confirmed <date>, ...` once the backend lane's JWT
+verification ships and the contract is confirmed either way.
+
+---
+
 ## 2026-09-15 — Saved spots built against a guessed apps/api contract
 
 **Status:** accepted — confirmed 2026-09-16, `apps/api`'s `POST`/`GET

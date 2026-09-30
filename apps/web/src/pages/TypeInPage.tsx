@@ -8,6 +8,7 @@ import {
   type SpotValidationIssue,
 } from "../lib/api";
 import { parseSpotText } from "../lib/parseSpotText";
+import { useAuth } from "../lib/auth";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import "../components/SpotBuilder/SpotBuilder.css";
 
@@ -24,7 +25,12 @@ type Outcome =
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
-type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error" };
+type SaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved" }
+  | { kind: "error" }
+  | { kind: "not-signed-in" };
 
 const EXAMPLES = ["BTN opens 100bb", "BB defends CO open, 100bb"];
 
@@ -34,6 +40,7 @@ const EXAMPLES = ["BTN opens 100bb", "BB defends CO open, 100bb"];
  * supports. Freeform text is out of scope for this MVP; see docs/plan.md.
  */
 export function TypeInPage() {
+  const auth = useAuth();
   const [text, setText] = useState("");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
@@ -70,6 +77,10 @@ export function TypeInPage() {
   }
 
   async function handleSave(spot: Spot) {
+    if (auth.status !== "signed-in") {
+      setSaveState({ kind: "not-signed-in" });
+      return;
+    }
     setSaveState({ kind: "saving" });
     const result = await saveSpot(spot);
     setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
@@ -199,6 +210,11 @@ export function TypeInPage() {
             {saveState.kind === "error" && (
               <span className="spot-builder__save-status spot-builder__save-status--error">
                 Couldn&rsquo;t save &mdash; saved spots aren&rsquo;t live yet.
+              </span>
+            )}
+            {saveState.kind === "not-signed-in" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                Sign in to save spots.
               </span>
             )}
           </div>

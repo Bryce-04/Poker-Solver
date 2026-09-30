@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, vi } from 'vitest'
@@ -14,6 +15,16 @@ vi.mock('./lib/api', async (importOriginal) => ({
   listSpots: vi.fn(),
 }))
 const mockListSpots = vi.mocked(listSpots)
+
+// Mock the whole auth module rather than just supabase underneath it --
+// this is a shell-level smoke test, not an auth test (see auth.test.tsx /
+// AuthStatus.test.tsx for that), so a fixed signed-out state keeps it
+// hermetic and independent of Supabase client internals.
+vi.mock('./lib/auth', () => ({
+  AuthProvider: ({ children }: { children: ReactNode }) => children,
+  useAuth: () => ({ status: 'signed-out' as const, email: null }),
+  getAccessToken: vi.fn().mockResolvedValue(null),
+}))
 
 // Shell-level smoke test only. Behavioural tests for SpotBuilder and
 // RangeGrid belong with those components (their owners) -- this just proves
