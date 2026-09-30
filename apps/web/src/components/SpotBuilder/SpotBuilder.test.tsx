@@ -4,7 +4,10 @@ import { SpotBuilder } from "./SpotBuilder";
 import { fetchReferenceStrategy, saveSpot } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
-vi.mock("../../lib/api", () => ({ fetchReferenceStrategy: vi.fn(), saveSpot: vi.fn() }));
+vi.mock("../../lib/api", () => ({
+  fetchReferenceStrategy: vi.fn(),
+  saveSpot: vi.fn(),
+}));
 const mockFetch = vi.mocked(fetchReferenceStrategy);
 const mockSave = vi.mocked(saveSpot);
 
@@ -100,6 +103,65 @@ describe("SpotBuilder", () => {
       await screen.findByText(/BTN opening range, ~100bb effective/),
     ).toBeInTheDocument();
     expect(screen.getByRole("gridcell", { name: "AA" })).toBeInTheDocument();
+  });
+
+  it("shows the matched range editable, and saves the edited version, not the untouched chart", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({
+      kind: "match",
+      data: {
+        source: "reference_chart",
+        chart_key: "btn_open_100bb",
+        chart_description: "BTN opening range, ~100bb effective",
+        chart_source: "test",
+        ranges: { BTN: { AA: 1 } },
+      },
+    });
+    mockSave.mockResolvedValue({ kind: "saved", spot: {} as never });
+
+    render(<SpotBuilder />);
+    await user.click(screen.getByRole("button", { name: /get reference strategy/i }));
+    await screen.findByText(/BTN opening range/);
+
+    // The grid is editable now, not a static read-only display -- toggle a
+    // hand the chart didn't include.
+    await user.click(screen.getByRole("gridcell", { name: "KK" }));
+    await user.click(screen.getByRole("button", { name: /^save this spot$/i }));
+
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({ ranges: { BTN: { AA: 1, KK: 1 } } }),
+    );
+    expect(await screen.findByText(/^saved\.$/i)).toBeInTheDocument();
+  });
+
+  it("resets an edited range back to the chart", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValue({
+      kind: "match",
+      data: {
+        source: "reference_chart",
+        chart_key: "btn_open_100bb",
+        chart_description: "BTN opening range, ~100bb effective",
+        chart_source: "test",
+        ranges: { BTN: { AA: 1 } },
+      },
+    });
+
+    render(<SpotBuilder />);
+    await user.click(screen.getByRole("button", { name: /get reference strategy/i }));
+    await screen.findByText(/BTN opening range/);
+
+    await user.click(screen.getByRole("gridcell", { name: "AA" })); // toggle off
+    expect(screen.getByRole("gridcell", { name: "AA" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    await user.click(screen.getByRole("button", { name: /reset to chart/i }));
+    expect(screen.getByRole("gridcell", { name: "AA" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("distinguishes a 404 no-match from an unreachable API", async () => {

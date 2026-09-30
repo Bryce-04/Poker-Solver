@@ -8,23 +8,23 @@ A web-based poker solver focused on ease of use versus tools like PioSolver
 or GTO Wizard. Full roadmap, what's been revised from the original plan and
 why, and the architecture rationale live in [docs/plan.md](docs/plan.md) —
 read that before making structural decisions. **Current status: Stage 1
-(foundations) is complete. Stage 2 (manual hand builder) is done: the spot
-builder and 13×13 range grid in `apps/web` are wired to a reference-chart
-lookup (`POST /spots/reference-strategy`) in `apps/api` (coverage in
-[docs/reference-chart-coverage.md](docs/reference-chart-coverage.md)). The
-range grid has weighted-brush/drag-paint/keyboard selection with weight
-shading (still read-only where `SpotBuilder` mounts it — Stage 3 is its
-first editing consumer); the whole app has a design-token visual pass
-(light + dark, `index.css`) and is routed into three screens (Builder /
-Saved / Type in). Stage 3 (text entry) has a small, rule-based start —
-`parseSpotText.ts` recognizes only the same two phrasings the builder
-itself supports, not freeform text. Saved spots is wired end-to-end:
-`apps/api` persists Spots as JSONB (`app/db.py`'s `SpotRow`, no migration
-tool yet -- the schema can still move) behind `POST`/`GET /spots`,
-matching the contract `apps/web/src/lib/api.ts` was built against (see
-`docs/decisions.md`). `apps/api` is deployed on Render, `DATABASE_URL`
-points at Supabase; an Android build (Capacitor, `apps/web/android/`) is
-scaffolded and in progress.**
+and 2 are complete. Stage 3 (text entry, `parseSpotText.ts`) and Stage 4
+(hand-history import, `parseHandHistory.ts` — one format, a full 6-handed
+6-max table) both recognize only the same two shapes the button builder
+does — rule-based, not freeform text, per plan.md's "rule-based parser
+first, not LLM-first." The 13×13 range grid (weighted-brush/drag-paint/
+keyboard selection with weight shading) is mounted editable everywhere a
+matched chart is shown (Builder, Type in, Import) — adjust before saving,
+not just view. The whole app has a design-token visual pass (light +
+dark, `index.css`) and is routed into four screens (Builder / Saved /
+Type in / Import). Saved spots is wired end-to-end: `apps/api` persists
+Spots as JSONB (`app/db.py`'s `SpotRow`, no migration tool yet -- the
+schema can still move) behind `POST`/`GET /spots`, matching the contract
+`apps/web/src/lib/api.ts` was built against (see `docs/decisions.md`) —
+not scoped per-user, since there's no auth (Stage 6) yet. `apps/api` is
+deployed on Render, `DATABASE_URL` points at Supabase; an Android build
+(Capacitor, `apps/web/android/`) has a real app icon/splash and runs
+end-to-end against the live API on a physical device.**
 
 ## Commands
 

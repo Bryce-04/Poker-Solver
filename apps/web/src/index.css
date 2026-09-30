@@ -169,7 +169,8 @@ code {
 
 button,
 select,
-input {
+input,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -180,7 +181,8 @@ label {
 
 select,
 input[type='number'],
-input[type='text'] {
+input[type='text'],
+textarea {
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -190,6 +192,7 @@ input[type='text'] {
 
 select:focus-visible,
 input:focus-visible,
+textarea:focus-visible,
 button:focus-visible,
 [role='gridcell']:focus-visible {
   outline: 2px solid var(--focus);

@@ -8,8 +8,8 @@ import { listSpots } from './lib/api'
 // SavedSpotsPage calls listSpots() on mount -- mock the api module directly
 // (same convention as SpotBuilder.test.tsx) rather than the transport
 // underneath it, so this test doesn't care whether that's fetch or
-// CapacitorHttp. Stubs the real current state: a 404 until the backend
-// lane ships POST/GET /spots.
+// CapacitorHttp. POST/GET /spots is live (see docs/decisions.md); stub an
+// empty list rather than the old 404 "not shipped yet" placeholder.
 vi.mock('./lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./lib/api')>()),
   listSpots: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('./lib/auth', () => ({
 describe('<App />', () => {
   beforeEach(() => {
     mockListSpots.mockReset()
-    mockListSpots.mockResolvedValue({ kind: 'error', status: 404 })
+    mockListSpots.mockResolvedValue({ kind: 'ok', spots: [] })
   })
 
   it('renders the shell heading', () => {
@@ -45,14 +45,17 @@ describe('<App />', () => {
     expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('navigates to the saved-spots and type-in routes without throwing', async () => {
+  it('navigates to the saved-spots, type-in, and import routes without throwing', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await user.click(screen.getByRole('link', { name: /saved/i }))
-    expect(await screen.findByText(/saved spots aren.t live yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(/no saved spots yet/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: /type in/i }))
     expect(screen.getByText(/describe the spot/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: /^import$/i }))
+    expect(screen.getByLabelText(/paste a hand history/i)).toBeInTheDocument()
   })
 })

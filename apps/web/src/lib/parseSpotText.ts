@@ -2,25 +2,50 @@ import type { Position, Spot } from "@poker-solver/schema";
 import { POSITIONS } from "./positions";
 import { buildOpenSpot, buildVsRaiseSpot } from "./spot";
 
-// Stage 3 MVP: rule-based, two phrasings only -- matching the same two
+// Stage 3: rule-based, two phrasings only -- matching the same two
 // situations SpotBuilder's button/dropdown UI supports. See docs/plan.md's
 // "Added: rule-based parser first, not LLM-first." Freeform text is
 // explicitly out of scope; anything else is { kind: "unrecognized" }.
+//
+// Widened past the original MVP with synonyms, not new grammar: a few
+// common seat names people actually type instead of the abbreviation, an
+// alternate verb ("raises" as well as "opens"), and "big blinds" spelled
+// out instead of "bb". Still exactly two shapes, still no free text.
 
 const DEFAULT_STACK_BB = 100;
 
-// "BTN opens 100bb" / "UTG opens" (stack optional, defaults to 100bb --
-// matching SpotBuilder's own default).
-const OPEN_RE = /^(\w+)\s+opens?(?:\s+(\d+(?:\.\d+)?)\s*bb)?$/i;
+// Seat names people type instead of the schema's abbreviation. Multi-word
+// names ("under the gun") aren't supported -- the position token is
+// matched as a single \w+ word, same constraint the original MVP had.
+const POSITION_ALIASES: Record<string, Position> = {
+  BUTTON: "BTN",
+  CUTOFF: "CO",
+  HIJACK: "HJ",
+};
 
-// "BB defends CO's open, 100bb" / "SB vs BTN open" / "BB defends against a CO open"
-const VS_RAISE_RE =
-  /^(\w+)\s+(?:defends?|vs\.?|versus)\s+(?:an?\s+)?(\w+)(?:'s)?\s+open(?:s)?(?:,?\s+(\d+(?:\.\d+)?)\s*bb)?$/i;
+const STACK_UNIT_RE = "(?:bb|big blinds?)";
+
+// "BTN opens 100bb" / "UTG opens" / "CO raises 40bb" (stack optional,
+// defaults to 100bb -- matching SpotBuilder's own default; "raises" as an
+// alternate verb for the same unopened-pot shape -- a raise-first-in
+// *is* an open).
+const OPEN_RE = new RegExp(
+  `^(\\w+)\\s+(?:opens?|raises?)(?:\\s+(\\d+(?:\\.\\d+)?)\\s*${STACK_UNIT_RE})?$`,
+  "i",
+);
+
+// "BB defends CO's open, 100bb" / "SB vs BTN open" / "BB facing a CO raise"
+const VS_RAISE_RE = new RegExp(
+  `^(\\w+)\\s+(?:defends?|vs\\.?|versus|facing)\\s+(?:an?\\s+)?(\\w+)(?:'s)?` +
+    `\\s+(?:opens?|raises?)(?:,?\\s+(\\d+(?:\\.\\d+)?)\\s*${STACK_UNIT_RE})?$`,
+  "i",
+);
 
 export type ParseResult = { kind: "parsed"; spot: Spot } | { kind: "unrecognized" };
 
 function toPosition(raw: string): Position | null {
   const upper = raw.toUpperCase();
+  if (upper in POSITION_ALIASES) return POSITION_ALIASES[upper];
   return (POSITIONS as string[]).includes(upper) ? (upper as Position) : null;
 }
 
