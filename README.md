@@ -19,7 +19,12 @@ Stage 6 auth has a frontend start — Supabase sign-in, session state, an
 signed in — but saved spots stay an unscoped shared list until the
 backend lane verifies that header and filters per user. `apps/api` is
 deployed (Render); an Android build (Capacitor) has a real icon/splash and
-runs end-to-end against the live API on a physical device.
+runs end-to-end against the live API on a physical device. Stage 5 has a
+real start too: `services/solver` now solves a genuine river-only spot
+(heads-up, fixed board, two ranges, the locked bet-size menu) via Monte
+Carlo CFR, checked against closed-form poker theory — not yet reachable
+from `apps/api` or the app itself, and flop/turn aren't solvable yet
+(no runout logic). See `services/solver/README.md`.
 
 ## Layout
 
@@ -51,8 +56,8 @@ cd apps/api && pip install -e ../../packages/schema -e . && uvicorn app.main:app
 # web (separate terminal)
 pnpm dev:web
 
-# solver spike (separate terminal)
-cd services/solver && pip install -e ".[dev]" && python -m poker_solver.kuhn_spike
+# solver (separate terminal)
+cd services/solver && pip install -e ".[dev]" && python -m poker_solver.river_mccfr
 ```
 
 `GET http://localhost:8000/health` should return
