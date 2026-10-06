@@ -1,7 +1,16 @@
 import { CapacitorHttp } from "@capacitor/core";
 import type { Position, Spot } from "@poker-solver/schema";
+import { getAccessToken } from "./auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+// Sent ahead of apps/api actually verifying it -- see docs/decisions.md's
+// 2026-09-30 entry. Omitted (not blocked client-side) when there's no
+// session, since today's backend doesn't enforce auth either way.
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // Shaped to match apps/api/app/routes/spots.py's response dict -- not a
 // generated type, because it's an API response shape, not part of the
@@ -120,7 +129,7 @@ export async function saveSpot(spot: Spot): Promise<SaveSpotResult> {
     res = await CapacitorHttp.request({
       url: `${API_BASE_URL}/spots`,
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
       data: spot,
     });
   } catch {
@@ -150,7 +159,11 @@ export type ListSpotsResult =
 export async function listSpots(): Promise<ListSpotsResult> {
   let res: { status: number; data: unknown };
   try {
-    res = await CapacitorHttp.request({ url: `${API_BASE_URL}/spots`, method: "GET" });
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots`,
+      method: "GET",
+      headers: await authHeaders(),
+    });
   } catch {
     return { kind: "network-error" };
   }

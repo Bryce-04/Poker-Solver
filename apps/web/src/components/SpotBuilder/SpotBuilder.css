@@ -201,3 +201,7 @@
 .spot-builder__save-status--error {
   color: var(--danger);
 }
+
+.spot-builder__save-status--warn {
+  color: var(--accent);
+}

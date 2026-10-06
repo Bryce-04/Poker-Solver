@@ -13,8 +13,11 @@ plain-language entry, and Stage 4's hand-history paste import (one
 format, rule-based, not freeform — same philosophy as Stage 3). The app
 has a design-token visual pass (light + dark) and is routed into four
 screens (Builder / Saved / Type in / Import). Saved spots is wired
-end-to-end to `apps/api`'s `POST`/`GET /spots` (Postgres via Supabase),
-though not yet scoped per-user pending Stage 6 auth. `apps/api` is
+end-to-end to `apps/api`'s `POST`/`GET /spots` (Postgres via Supabase).
+Stage 6 auth has a frontend start — Supabase sign-in, session state, an
+`Authorization` header on save/list calls, save buttons gated on being
+signed in — but saved spots stay an unscoped shared list until the
+backend lane verifies that header and filters per user. `apps/api` is
 deployed (Render); an Android build (Capacitor) has a real icon/splash and
 runs end-to-end against the live API on a physical device. Stage 5 has a
 real start too: `services/solver` now solves a genuine river-only spot

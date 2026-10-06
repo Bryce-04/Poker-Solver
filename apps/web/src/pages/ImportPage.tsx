@@ -8,6 +8,7 @@ import {
   type SpotValidationIssue,
 } from "../lib/api";
 import { parseHandHistory } from "../lib/parseHandHistory";
+import { useAuth } from "../lib/auth";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import "../components/SpotBuilder/SpotBuilder.css";
 
@@ -27,7 +28,12 @@ type Outcome =
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
-type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error" };
+type SaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved" }
+  | { kind: "error" }
+  | { kind: "not-signed-in" };
 
 const EXAMPLE_HH = `PokerStars Hand #1:  Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/01 12:00:00 ET
 Table 'Atlas' 6-max Seat #4 is the button
@@ -55,6 +61,7 @@ Hero: raises $2 to $3`;
  * comes back with a specific reason, not a generic failure.
  */
 export function ImportPage() {
+  const auth = useAuth();
   const [text, setText] = useState("");
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
@@ -93,6 +100,10 @@ export function ImportPage() {
   }
 
   async function handleSave(spot: Spot) {
+    if (auth.status !== "signed-in") {
+      setSaveState({ kind: "not-signed-in" });
+      return;
+    }
     setSaveState({ kind: "saving" });
     const toSave: Spot = { ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } };
     const result = await saveSpot(toSave);
@@ -231,6 +242,11 @@ export function ImportPage() {
             {saveState.kind === "error" && (
               <span className="spot-builder__save-status spot-builder__save-status--error">
                 Couldn&rsquo;t save that spot &mdash; try again in a moment.
+              </span>
+            )}
+            {saveState.kind === "not-signed-in" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                Sign in to save spots.
               </span>
             )}
           </div>

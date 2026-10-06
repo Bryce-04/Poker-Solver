@@ -18,21 +18,27 @@ just as a read-only chart display: every entry path (Builder, Type in,
 Import) lets you adjust the matched range before saving it. `apps/web` is
 routed into four screens (Builder / Saved / Type in / Import). Saved spots
 is wired end-to-end: `apps/api` persists `Spot`s (Postgres via Supabase)
-behind `POST`/`GET /spots` (see `docs/decisions.md`) — not yet scoped
-per-user, since there's no auth (Stage 6) yet, so it's a shared list for
-now. `apps/api` is deployed (Render); the Android build (Capacitor) has a
-real app icon/splash and runs end-to-end against the live API on a
-physical device. **Stage 5 has a real start**: `services/solver` now has a
-genuine river-only MCCFR engine (`river_mccfr.py` — heads-up, a fixed
-5-card board, two ranges, the locked bet-size menu, solved via
-chance-sampled Monte Carlo CFR and checked against closed-form poker
-theory, not just "did it run"), backed by a from-scratch hand evaluator
-(`evaluator.py`) and a 169-label-to-concrete-combo sampler (`combos.py`)
-— see `services/solver/README.md`. Not yet wired to `apps/api`, no
-frontend for it, and flop/turn aren't solvable yet (they need a runout —
-dealing the rest of the board — which this doesn't do). Remaining: Stage 4
-past its one-format MVP, Stage 5's flop/turn runout + API route + frontend
-board picker, and Stage 6 (real auth).
+behind `POST`/`GET /spots` (see `docs/decisions.md`). Stage 6's frontend
+half is done too: Supabase email/password sign-in, session state, and an
+`Authorization: Bearer <token>` header on save/list calls, with the save
+button on all three entry screens gating on being signed in — sent ahead
+of the backend lane actually checking it (`docs/decisions.md`'s
+2026-09-30 entry), so saved spots are still a shared list until `apps/api`
+verifies the header and scopes `GET /spots` per user. `apps/api` is
+deployed (Render); the Android build (Capacitor) has a real app icon/splash
+and runs end-to-end against the live API on a physical device. **Stage 5
+has a real start**: `services/solver` now has a genuine river-only MCCFR
+engine (`river_mccfr.py` — heads-up, a fixed 5-card board, two ranges,
+the locked bet-size menu, solved via chance-sampled Monte Carlo CFR and
+checked against closed-form poker theory, not just "did it run"), backed
+by a from-scratch hand evaluator (`evaluator.py`) and a
+169-label-to-concrete-combo sampler (`combos.py`) — see
+`services/solver/README.md`. Not yet wired to `apps/api`, no frontend
+for it, and flop/turn aren't solvable yet (they need a runout — dealing
+the rest of the board — which this doesn't do). Remaining: Stage 4 past
+its one-format MVP, Stage 5's flop/turn runout + API route + frontend
+board picker, and Stage 6's backend half (JWT verification, per-user
+scoping).
 
 ## The pitch
 

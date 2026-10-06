@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ImportPage } from "./ImportPage";
 import { fetchReferenceStrategy, saveSpot } from "../lib/api";
+import { useAuth } from "../lib/auth";
 
 vi.mock("../lib/api", () => ({
   fetchReferenceStrategy: vi.fn(),
@@ -10,9 +11,14 @@ vi.mock("../lib/api", () => ({
 const mockFetch = vi.mocked(fetchReferenceStrategy);
 const mockSave = vi.mocked(saveSpot);
 
+vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
+const mockUseAuth = vi.mocked(useAuth);
+
 beforeEach(() => {
   mockFetch.mockReset();
   mockSave.mockReset();
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
 });
 
 const matchResponse = {
@@ -25,6 +31,13 @@ const matchResponse = {
     ranges: { BTN: { AA: 1 } },
   },
 };
+
+async function useExampleAndGetMatch(user: ReturnType<typeof userEvent.setup>) {
+  mockFetch.mockResolvedValueOnce(matchResponse);
+  await user.click(screen.getByRole("button", { name: /use example/i }));
+  await user.click(screen.getByRole("button", { name: /parse/i }));
+  await screen.findByText(/BTN opening range/);
+}
 
 describe("ImportPage", () => {
   it("fills the textarea with a working example via 'Use example'", async () => {
@@ -75,5 +88,29 @@ describe("ImportPage", () => {
   it("disables submit until there's text to parse", () => {
     render(<ImportPage />);
     expect(screen.getByRole("button", { name: /parse/i })).toBeDisabled();
+  });
+
+  it("shows a sign-in prompt instead of saving when signed out", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    const user = userEvent.setup();
+    render(<ImportPage />);
+    await useExampleAndGetMatch(user);
+
+    await user.click(screen.getByRole("button", { name: /^save this spot$/i }));
+
+    expect(await screen.findByText(/sign in to save spots/i)).toBeInTheDocument();
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it("saves normally when signed in", async () => {
+    mockSave.mockResolvedValue({ kind: "saved", spot: {} as never });
+    const user = userEvent.setup();
+    render(<ImportPage />);
+    await useExampleAndGetMatch(user);
+
+    await user.click(screen.getByRole("button", { name: /^save this spot$/i }));
+
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/^saved\.$/i)).toBeInTheDocument();
   });
 });

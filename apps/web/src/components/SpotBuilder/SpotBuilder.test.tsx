@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SpotBuilder } from "./SpotBuilder";
 import { fetchReferenceStrategy, saveSpot } from "../../lib/api";
+import { useAuth } from "../../lib/auth";
 
 vi.mock("../../lib/api", () => ({
   fetchReferenceStrategy: vi.fn(),
@@ -10,13 +11,35 @@ vi.mock("../../lib/api", () => ({
 const mockFetch = vi.mocked(fetchReferenceStrategy);
 const mockSave = vi.mocked(saveSpot);
 
+// Default signed-in so the existing fetch/match tests (which don't touch
+// save) are unaffected; overridden per-test for the save-gate cases below.
+vi.mock("../../lib/auth", () => ({ useAuth: vi.fn() }));
+const mockUseAuth = vi.mocked(useAuth);
+
 const positionSelect = () =>
   screen.getByRole("combobox", { name: /your position/i }) as HTMLSelectElement;
 
 beforeEach(() => {
   mockFetch.mockReset();
   mockSave.mockReset();
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
 });
+
+async function submitAndGetMatch(user: ReturnType<typeof userEvent.setup>) {
+  mockFetch.mockResolvedValueOnce({
+    kind: "match",
+    data: {
+      source: "reference_chart",
+      chart_key: "btn_open_100bb",
+      chart_description: "BTN opening range, ~100bb effective",
+      chart_source: "test",
+      ranges: { BTN: { AA: 1 } },
+    },
+  });
+  await user.click(screen.getByRole("button", { name: /get reference strategy/i }));
+  await screen.findByText(/BTN opening range/);
+}
 
 describe("SpotBuilder", () => {
   it("offers only 6-max openers as the hero seat in an unopened pot", () => {
@@ -155,5 +178,29 @@ describe("SpotBuilder", () => {
     mockFetch.mockResolvedValueOnce({ kind: "network-error" });
     await user.click(submit);
     expect(await screen.findByText(/couldn.t reach the api/i)).toBeInTheDocument();
+  });
+
+  it("shows a sign-in prompt instead of saving when signed out", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    const user = userEvent.setup();
+    render(<SpotBuilder />);
+    await submitAndGetMatch(user);
+
+    await user.click(screen.getByRole("button", { name: /save this spot/i }));
+
+    expect(await screen.findByText(/sign in to save spots/i)).toBeInTheDocument();
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it("saves normally when signed in", async () => {
+    mockSave.mockResolvedValue({ kind: "saved", spot: {} as never });
+    const user = userEvent.setup();
+    render(<SpotBuilder />);
+    await submitAndGetMatch(user);
+
+    await user.click(screen.getByRole("button", { name: /save this spot/i }));
+
+    expect(mockSave).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/^saved\.$/i)).toBeInTheDocument();
   });
 });

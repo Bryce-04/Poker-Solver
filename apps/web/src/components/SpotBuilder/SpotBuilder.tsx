@@ -9,6 +9,7 @@ import {
   type SpotValidationIssue,
 } from "../../lib/api";
 import { buildOpenSpot, buildVsRaiseSpot } from "../../lib/spot";
+import { useAuth } from "../../lib/auth";
 import { RangeGrid } from "../RangeGrid/RangeGrid";
 import "./SpotBuilder.css";
 
@@ -52,9 +53,15 @@ type Outcome =
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
-type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved" } | { kind: "error" };
+type SaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved" }
+  | { kind: "error" }
+  | { kind: "not-signed-in" };
 
 export function SpotBuilder() {
+  const auth = useAuth();
   // "BTN" + "unopened" is a supported spot, so a first submit is a 200.
   const [position, setPosition] = useState<Position>("BTN");
   const [effectiveStackBb, setEffectiveStackBb] = useState(100);
@@ -120,6 +127,10 @@ export function SpotBuilder() {
   }
 
   async function handleSave(spot: Spot) {
+    if (auth.status !== "signed-in") {
+      setSaveState({ kind: "not-signed-in" });
+      return;
+    }
     setSaveState({ kind: "saving" });
     // Save whatever the range grid currently shows, not the untouched
     // chart -- the whole point of making it editable here.
@@ -313,6 +324,11 @@ export function SpotBuilder() {
             {saveState.kind === "error" && (
               <span className="spot-builder__save-status spot-builder__save-status--error">
                 Couldn&rsquo;t save that spot &mdash; try again in a moment.
+              </span>
+            )}
+            {saveState.kind === "not-signed-in" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                Sign in to save spots.
               </span>
             )}
           </div>

@@ -1,0 +1,48 @@
+.auth-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.auth-status--form input {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  max-width: 10rem;
+}
+
+.auth-status--form button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.auth-status__toggle {
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  padding: 0;
+  font-weight: 500;
+  text-decoration: underline;
+}
+
+.auth-status__toggle:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent-hover);
+}
+
+.auth-status__email {
+  color: var(--text-muted);
+}
+
+.auth-status__signout {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.auth-status__error {
+  flex-basis: 100%;
+  color: var(--danger);
+  font-size: 0.8rem;
+}

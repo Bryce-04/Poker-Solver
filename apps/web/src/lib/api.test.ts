@@ -1,6 +1,12 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { fetchReferenceStrategy, listSpots, saveSpot } from './api'
+import { getAccessToken } from './auth'
+
+// authHeaders() (api.ts) calls this directly -- mock it rather than the
+// Supabase client underneath, since this is api.ts's boundary, not auth's.
+vi.mock('./auth', () => ({ getAccessToken: vi.fn() }))
+const mockGetAccessToken = vi.mocked(getAccessToken)
 
 // Minimal Spot -- fetchReferenceStrategy only JSON-serialises it, so the
 // exact shape doesn't matter here, only that a Spot goes in.
@@ -29,6 +35,8 @@ function mockResponse(status: number, data: unknown) {
 
 beforeEach(() => {
   requestMock.mockReset()
+  mockGetAccessToken.mockReset()
+  mockGetAccessToken.mockResolvedValue(null)
 })
 
 afterEach(() => {
@@ -133,6 +141,21 @@ describe('saveSpot', () => {
     requestMock.mockRejectedValue(new Error('network unreachable'))
     await expect(saveSpot(spot)).resolves.toEqual({ kind: 'network-error' })
   })
+
+  it('omits the Authorization header when there is no session', async () => {
+    mockResponse(200, spot)
+    await saveSpot(spot)
+    const [options] = requestMock.mock.calls[0]
+    expect(options.headers.Authorization).toBeUndefined()
+  })
+
+  it('attaches Authorization: Bearer <token> when a session exists', async () => {
+    mockGetAccessToken.mockResolvedValue('the-jwt')
+    mockResponse(200, spot)
+    await saveSpot(spot)
+    const [options] = requestMock.mock.calls[0]
+    expect(options.headers.Authorization).toBe('Bearer the-jwt')
+  })
 })
 
 describe('listSpots', () => {
@@ -160,5 +183,13 @@ describe('listSpots', () => {
   it('classifies a request rejection as { kind: "network-error" } and never throws', async () => {
     requestMock.mockRejectedValue(new Error('network unreachable'))
     await expect(listSpots()).resolves.toEqual({ kind: 'network-error' })
+  })
+
+  it('attaches Authorization: Bearer <token> when a session exists', async () => {
+    mockGetAccessToken.mockResolvedValue('the-jwt')
+    mockResponse(200, [spot])
+    await listSpots()
+    const [options] = requestMock.mock.calls[0]
+    expect(options.headers.Authorization).toBe('Bearer the-jwt')
   })
 })

@@ -2,12 +2,22 @@ import { render, screen } from "@testing-library/react";
 import type { Spot } from "@poker-solver/schema";
 import { SavedSpotsPage } from "./SavedSpotsPage";
 import { listSpots } from "../lib/api";
+import { useAuth } from "../lib/auth";
 
 vi.mock("../lib/api", () => ({ listSpots: vi.fn() }));
 const mockList = vi.mocked(listSpots);
 
+// No <AuthProvider> wraps this render, so useAuth() falls back to its
+// context default ("loading") unless a test opts into a real mock -- the
+// existing tests below don't care about auth state, only the new
+// signed-out one does.
+vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
+const mockUseAuth = vi.mocked(useAuth);
+
 beforeEach(() => {
   mockList.mockReset();
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ status: "loading", email: null });
 });
 
 const unopenedSpot = {
@@ -51,5 +61,14 @@ describe("SavedSpotsPage", () => {
     render(<SavedSpotsPage />);
     expect(await screen.findByText(/unexpected api response/i)).toBeInTheDocument();
     expect(screen.getByText(/500/)).toBeInTheDocument();
+  });
+
+  it("shows a signed-out notice, without hiding the (unfiltered) list underneath", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    mockList.mockResolvedValue({ kind: "ok", spots: [unopenedSpot] });
+    render(<SavedSpotsPage />);
+
+    expect(screen.getByText(/not signed in/i)).toBeInTheDocument();
+    expect(await screen.findByText(/BTN.*100bb, unopened pot/)).toBeInTheDocument();
   });
 });
