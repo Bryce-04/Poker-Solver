@@ -34,15 +34,23 @@ generated from it. Follow these steps in order for any change:
 
 4. **Update every consumer.** At minimum, check:
    - `apps/api` — anywhere it constructs, validates, or serializes the
-     changed model.
+     changed model. Saved spots are stored whole as JSONB (`SpotRow.data`
+     in `app/db.py`), so a `Spot` field change needs **no** Alembic
+     migration — but `GET /spots` re-validates every stored row through
+     the current `Spot` model, so a new *required* field (or a narrowed
+     type) breaks listing spots saved before the change. Give new fields
+     a default. Only a new real `SpotRow` column needs a migration (see
+     CLAUDE.md's Alembic notes).
    - `apps/web` — anywhere it imports the changed type from
      `@poker-solver/schema`.
    - `services/solver` — if the field affects what gets solved (rare
      before Stage 5).
 
 5. **Run the tests.** `pytest services/solver` at minimum; add/update a
-   test in `apps/api` if the change affects request/response shapes once
-   those exist.
+   test in `apps/api` if the change affects request/response shapes. Run
+   `pytest apps/api` against the local docker-compose Postgres with
+   `DATABASE_URL` set explicitly — never Supabase, since those tests
+   `TRUNCATE spots` (see CLAUDE.md).
 
 6. **Commit `models.py` and the regenerated `generated/*.d.ts` /
    `generated/index.ts` together** — never commit one without the other.

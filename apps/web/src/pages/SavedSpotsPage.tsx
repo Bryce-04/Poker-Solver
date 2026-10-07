@@ -29,52 +29,56 @@ function formatSavedAt(spot: Spot): string | null {
 }
 
 /**
- * Lists spots saved via apps/api's POST/GET /spots (live -- see
- * docs/decisions.md). List-only in this MVP (no editing/deleting). Saved
- * spots aren't scoped per-user yet -- there's no auth (Stage 6) -- so this
- * lists every spot anyone has saved, not just "yours."
+ * Lists the signed-in user's spots, saved via apps/api's POST/GET /spots
+ * (live -- see docs/decisions.md). List-only in this MVP (no editing/
+ * deleting). GET /spots requires sign-in and only returns the caller's own
+ * spots, so this only fetches once signed in -- and refetches when the
+ * signed-in account changes, so signing in on this screen (or switching
+ * accounts) shows the right list without a reload.
  */
 export function SavedSpotsPage() {
   const auth = useAuth();
-  const [state, setState] = useState<ListState>({ kind: "loading" });
+  const signedInAs = auth.status === "signed-in" ? (auth.email ?? "") : null;
+  // Each fetch result is tagged with the account it was fetched for, so a
+  // result from a previous account reads as "loading" until the new fetch
+  // lands -- derived during render rather than reset inside the effect.
+  const [fetched, setFetched] = useState<{ account: string; state: ListState } | null>(null);
+  const state: ListState =
+    fetched !== null && fetched.account === signedInAs ? fetched.state : { kind: "loading" };
 
   useEffect(() => {
+    if (signedInAs === null) return;
     let cancelled = false;
-    // Initial state is already { kind: "loading" } -- no need to set it
-    // again here (this effect only ever runs once, on mount).
     listSpots().then((result) => {
       if (cancelled) return;
       switch (result.kind) {
         case "ok":
-          setState({ kind: "ok", spots: result.spots });
+          setFetched({ account: signedInAs, state: { kind: "ok", spots: result.spots } });
           return;
         case "network-error":
-          setState({ kind: "network-error" });
+          setFetched({ account: signedInAs, state: { kind: "network-error" } });
           return;
         case "error":
-          setState({ kind: "error", status: result.status });
+          setFetched({ account: signedInAs, state: { kind: "error", status: result.status } });
           return;
       }
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [signedInAs]);
 
-  return (
-    <>
-      {auth.status === "signed-out" && (
-        <div className="spot-builder__status-block spot-builder__status-block--info">
-          <p className="spot-builder__status-title">Not signed in.</p>
-          {/* apps/api doesn't filter GET /spots per-user yet (backend lane's
-              job, see docs/decisions.md's 2026-09-30 entry) -- this list may
-              still show everyone's spots until that lands. */}
-          <p>Sign in to save your own spots.</p>
-        </div>
-      )}
-      <SavedSpotsList state={state} />
-    </>
-  );
+  if (auth.status === "signed-out") {
+    return (
+      <div className="spot-builder__status-block spot-builder__status-block--info">
+        <p className="spot-builder__status-title">Not signed in.</p>
+        <p>Sign in to see and save your own spots.</p>
+      </div>
+    );
+  }
+
+  // Auth still resolving, or a fetch in flight -- both read as loading.
+  return <SavedSpotsList state={state} />;
 }
 
 function SavedSpotsList({ state }: { state: ListState }) {
