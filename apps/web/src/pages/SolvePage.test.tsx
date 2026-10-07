@@ -207,14 +207,51 @@ describe("SolvePage", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("explains plainly when a position has no opening chart", async () => {
+  it("falls back to the defend-vs-raise chart when a position has no opening chart", async () => {
+    // BB can never open, so the first (open-chart) lookup always misses --
+    // the second lookup should be the defend chart, treating BTN (the
+    // default in-position seat) as the raiser.
+    mockFetchReference.mockResolvedValueOnce({ kind: "no-match" });
+    mockFetchReference.mockResolvedValueOnce({
+      kind: "match",
+      data: {
+        source: "reference_chart",
+        chart_key: "bb_defend_vs_btn_open_33bb",
+        chart_description: "BB defending vs a BTN open",
+        chart_source: "test",
+        ranges: { BB: { AA: 1 } },
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    await user.click(screen.getByRole("button", { name: /load bb.s opening range/i }));
+
+    expect(mockFetchReference).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ positions_in_hand: ["BB"], actions: [] }),
+    );
+    expect(mockFetchReference).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        positions_in_hand: ["BB"],
+        actions: [{ position: "BTN", street: "preflop", action: "raise" }],
+      }),
+    );
+    expect(
+      within(rangeGrids()[0]).getByRole("gridcell", { name: "AA" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("explains plainly when neither an opening nor a defend chart covers a position", async () => {
     mockFetchReference.mockResolvedValue({ kind: "no-match" });
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    // Default out-of-position seat is BB, which never has an opening chart.
     await user.click(screen.getByRole("button", { name: /load bb.s opening range/i }));
 
-    expect(await screen.findByText(/no opening chart for bb/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no reference chart covers bb opening, or defending vs btn/i),
+    ).toBeInTheDocument();
   });
 });

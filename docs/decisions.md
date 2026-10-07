@@ -6,6 +6,38 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — DEFAULT_ITERATIONS halved to 4,000; real timing logged instead of guessed at
+
+**Status:** accepted
+
+**Context.** A real solve on a physical device was reported as taking
+over a minute. Measured (not guessed) locally first: 8,000 iterations on
+a realistic wide range pair (BTN's 82-hand opening chart vs BB's 85-hand
+defend chart, 100bb) took 10.3s and produced ~42,000 distinct info sets.
+Chance-sampling keeps the betting-tree walk's cost constant regardless of
+range width (exactly one combo per player is sampled either way), but a
+wider range does mean more distinct `(combo, history)` dictionary entries
+to allocate and update each iteration -- real CPython overhead at this
+scale, not something the original `DEFAULT_ITERATIONS` comment accounted
+for (see the superseded reasoning in the 2026-10-06 `/spots/solve` entry).
+
+**Decision.** `DEFAULT_ITERATIONS: 8_000 -> 4_000` (`apps/api/app/
+solve.py`) -- confirmed via the same local measurement that this roughly
+halves wall-clock time (10.3s -> 5.0s on the wide pair) while every hand
+in a realistic range still gets a strategy back. `solve_spot` now logs
+elapsed time, iteration count, and info-set count server-side (not
+returned to the client -- diagnostic, not UI data) so a future "it's
+slow" report has real numbers to start from instead of needing to
+reproduce the measurement from scratch.
+
+**Consequences.** Per-hand precision is somewhat lower (fewer visits per
+combo). If a production deploy is still slow well beyond what halving
+implies, that points at the host's CPU allocation rather than the
+algorithm -- worth checking Render's plan/instance size before tuning
+iterations further or optimizing the engine itself.
+
+---
+
 ## 2026-10-06 — SolvePage's board input is a validated text field, not a visual picker yet
 
 **Status:** accepted
@@ -75,6 +107,17 @@ per-action-frequency response (`services/solver`'s new
 `aggregate_label_strategies`) answers only the ONE decision point implied
 by the request, not the whole downstream tree (mirrors how
 `/spots/reference-strategy` already only ever answers for one position).
+
+**Revisited 2026-10-07:** real traffic arrived (a solve on a physical
+device, reported as taking over a minute) -- see that date's entry for
+the actual measurement and the resulting `DEFAULT_ITERATIONS` change.
+The "chance-sampling means range width doesn't change per-iteration
+cost" assumption this entry's `DEFAULT_ITERATIONS` reasoning leaned on
+turned out to be only half true: the betting-tree walk's cost is
+constant, but a wider range creates more distinct info-set dictionary
+entries, which is real overhead at scale. Sync-vs-async remains
+unrevisited -- still worth watching if the host-CPU hypothesis in the
+2026-10-07 entry doesn't fully explain the reported latency.
 
 ---
 

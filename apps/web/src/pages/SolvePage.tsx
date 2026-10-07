@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { boardFromCards, parseBoardText } from "../lib/cards";
-import { buildOpenSpot } from "../lib/spot";
+import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
 import {
   fetchReferenceStrategy,
   solveSpot,
@@ -125,38 +125,62 @@ export function SolvePage() {
   }
 
   /**
-   * Seeds a position's range from its reference-chart opening range (the
-   * same curated data /spots/reference-strategy already serves for Stage
-   * 2) instead of leaving it empty -- an approximate real starting point
-   * to tweak, not an accurate postflop range (the reference chart has no
-   * idea what's happened since preflop). Positions without an opening
-   * chart (BB can't open; UTG1/LJ aren't 6-max) just report that plainly
-   * rather than silently doing nothing.
+   * Seeds a position's range from reference-chart data (the same curated
+   * charts /spots/reference-strategy already serves for Stage 2) instead
+   * of leaving it empty -- an approximate real starting point to tweak,
+   * not an accurate postflop range (the reference chart has no idea
+   * what's happened since preflop).
+   *
+   * Tries the position's own opening chart first; BB has none (it can
+   * never be first to act in an unopened pot), so for BB -- and as a
+   * second attempt for anyone else's open miss -- this falls back to the
+   * defend-vs-raise chart, treating `otherPosition` as the preflop
+   * raiser. That's a real assumption, not just a lookup: it's only
+   * accurate if the in-position player was actually the preflop
+   * aggressor, which is the common case for a heads-up postflop pot but
+   * not the only one. Charts cover BB defending against every other
+   * 6-max seat, so this combination covers every position pair the
+   * pickers allow; a genuine coverage gap (an unusual stack depth) still
+   * falls through to the plain "no chart" message.
    */
   async function loadReferenceRange(
     position: Position,
+    otherPosition: Position,
     setRange: (range: HandRange) => void,
     setStatus: (state: ChartLoadState) => void,
   ) {
     setStatus({ kind: "loading" });
-    const result = await fetchReferenceStrategy(buildOpenSpot(position, effectiveStackBb));
-    switch (result.kind) {
-      case "match":
-        setRange(result.data.ranges[position] ?? {});
-        setStatus({ kind: "loaded" });
-        return;
-      case "no-match":
-        setStatus({
-          kind: "unavailable",
-          reason: `No opening chart for ${position} at this stack -- build it manually.`,
-        });
-        return;
-      case "network-error":
-        setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
-        return;
-      default:
-        setStatus({ kind: "unavailable", reason: "Couldn't load a reference range." });
+    const openResult = await fetchReferenceStrategy(buildOpenSpot(position, effectiveStackBb));
+    if (openResult.kind === "match") {
+      setRange(openResult.data.ranges[position] ?? {});
+      setStatus({ kind: "loaded" });
+      return;
     }
+    if (openResult.kind === "network-error") {
+      setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
+      return;
+    }
+    if (openResult.kind !== "no-match") {
+      setStatus({ kind: "unavailable", reason: "Couldn't load a reference range." });
+      return;
+    }
+
+    const defendResult = await fetchReferenceStrategy(
+      buildVsRaiseSpot(position, otherPosition, effectiveStackBb),
+    );
+    if (defendResult.kind === "match") {
+      setRange(defendResult.data.ranges[position] ?? {});
+      setStatus({ kind: "loaded" });
+      return;
+    }
+    if (defendResult.kind === "network-error") {
+      setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
+      return;
+    }
+    setStatus({
+      kind: "unavailable",
+      reason: `No reference chart covers ${position} opening, or defending vs ${otherPosition}, at this stack -- build it manually.`,
+    });
   }
 
   return (
@@ -293,7 +317,9 @@ export function SolvePage() {
             <button
               type="button"
               className="spot-builder__reset"
-              onClick={() => loadReferenceRange(oopPosition, setOopRange, setOopChartState)}
+              onClick={() =>
+                loadReferenceRange(oopPosition, ipPosition, setOopRange, setOopChartState)
+              }
               disabled={oopChartState.kind === "loading"}
             >
               {oopChartState.kind === "loading"
@@ -315,7 +341,9 @@ export function SolvePage() {
             <button
               type="button"
               className="spot-builder__reset"
-              onClick={() => loadReferenceRange(ipPosition, setIpRange, setIpChartState)}
+              onClick={() =>
+                loadReferenceRange(ipPosition, oopPosition, setIpRange, setIpChartState)
+              }
               disabled={ipChartState.kind === "loading"}
             >
               {ipChartState.kind === "loading"
