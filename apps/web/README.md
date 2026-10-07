@@ -168,6 +168,30 @@ requests route through native networking on-device, sidestepping the
 WebView's CORS enforcement rather than needing `apps/api`'s CORS allowlist
 to cover the Capacitor origin.
 
+## iOS (Capacitor)
+
+`apps/web/ios/` is the committed Xcode project (`npx cap add ios`, Swift
+Package Manager — no CocoaPods). It can be generated and synced on any OS,
+but building and signing needs a Mac with Xcode. On the Mac, from the repo
+root:
+
+```
+pnpm install
+pnpm --filter web build                # production build -> talks to the deployed API
+cd apps/web && npx cap sync ios && npx cap open ios
+```
+
+In Xcode: select the **App** target → **Signing & Capabilities** → pick a
+Team (a free personal Apple ID works), plug in the iPhone, choose it as
+the run destination, and press Run. With a free Apple ID the install
+expires after 7 days (reinstall from Xcode), and the phone must allow it
+under Settings → General → VPN & Device Management, plus Developer Mode
+(Settings → Privacy & Security). If Xcode can't register the bundle id
+`com.pokersolver.app`, change it to something unique in Signing &
+Capabilities. TestFlight/App Store distribution needs the paid Apple
+Developer Program. Icons/splash come from `apps/web/assets/` via
+`npx capacitor-assets generate --ios`.
+
 ## SpotBuilder
 
 `components/SpotBuilder/SpotBuilder.tsx` (mounted by `pages/BuilderPage.tsx`)
