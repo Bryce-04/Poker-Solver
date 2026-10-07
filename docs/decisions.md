@@ -29,6 +29,14 @@ matches this app's existing precedent of a "type it in" entry path
 follow-up, not a closed question — re-file it as its own entry when it's
 actually built rather than treating this one as having answered it.
 
+**Resolved 2026-10-07:** shipped as `components/CardPicker/CardPicker.tsx`
+— an *additional* input mode (a radio toggle next to the existing text
+field), not a replacement, matching the "wants both eventually" framing
+above. Both modes validate down to the same `ParseBoardResult`
+(`parseBoardText`/`lib/cards.ts`'s new `boardFromCards`), so `SolvePage`
+has one code path past the board input regardless of which mode filled
+it in.
+
 ---
 
 ## 2026-10-06 — POST /spots/solve: a new Spot convention, not a schema change; sync, not a job queue

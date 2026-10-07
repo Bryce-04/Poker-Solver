@@ -22,9 +22,10 @@ start: Supabase sign-in, session state, and a "sign in to save spots"
 gate on all three save buttons — the backend half (verifying the token,
 scoping saved spots per user) hasn't landed yet. **Solve** (`pages/
 SolvePage.tsx`) is Stage 5's new screen: a real MCCFR solve via `apps/api`'s
-`POST /spots/solve` — both players' ranges, a board (`lib/cards.ts`'s
-validated text field, see `docs/decisions.md`), and a per-action-frequency
-result table, not a single-weight range.
+`POST /spots/solve` — both players' ranges, a board (click cards via
+`components/CardPicker/CardPicker.tsx`, or type them via `lib/cards.ts` —
+see `docs/decisions.md`), and a per-action-frequency result table, not a
+single-weight range.
 
 ## Commands
 
@@ -56,6 +57,7 @@ src/
   components/
     SpotBuilder/              the spot builder form, reused by BuilderPage
     RangeGrid/                the 13×13 starting-hand grid
+    CardPicker/               click-to-toggle board-card grid (SolvePage)
   lib/
     api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot,
                               listSpots, solveSpot
@@ -63,8 +65,8 @@ src/
                               helpers every entry path converges on
     parseSpotText.ts           Stage 3's rule-based parser (two phrasings, plus synonyms)
     parseHandHistory.ts        Stage 4's rule-based hand-history parser (one format)
-    cards.ts                   parseBoardText — Stage 5's board-text validation
-                              (SolvePage), a v1 ahead of a visual picker
+    cards.ts                   parseBoardText / boardFromCards — Stage 5's board
+                              validation (SolvePage), typed or picked
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions
@@ -179,9 +181,8 @@ Each `ReferenceStrategyResult` `kind` renders its own status block; on `match`
 the returned range is shown read-only through `RangeGrid`.
 
 **Not here:** a board card picker. `pages/SolvePage.tsx` (Stage 5) is the
-screen that needed one, and it has a v1 (a validated text field,
-`lib/cards.ts`) — a visual rank/suit picker is still deferred further;
-see `docs/decisions.md`'s 2026-10-06 entry.
+screen that needed one — see `## SolvePage` below for the
+`CardPicker`/typed-text pair it ended up with.
 
 ## SolvePage
 
@@ -197,10 +198,18 @@ from the other entry paths in a few ways:
   this street, the second is in position, and each gets its own
   editable `RangeGrid` — submit is disabled until both have at least
   one hand selected.
-- **A board, via `lib/cards.ts`'s `parseBoardText`.** Type space-separated
-  cards (`"Ks Qh 9d"`); 3/4/5 cards selects flop/turn/river
-  automatically, there's no separate street picker. A v1 validated text
-  field, not a visual rank/suit picker — see `docs/decisions.md`.
+- **A board, two input modes.** A radio toggle switches between
+  `components/CardPicker/CardPicker.tsx` (click up to 5 cards on a
+  4-suit × 13-rank grid — the default) and `lib/cards.ts`'s
+  `parseBoardText` (type space-separated cards, `"Ks Qh 9d"`, for
+  pasting/power users). Both converge on the same `ParseBoardResult`
+  (`parseBoardText`/`boardFromCards`), so everything past that point —
+  `canSubmit`, the street shown, the submitted `Spot` — has one code
+  path regardless of which mode filled it in; 3/4/5 cards selects
+  flop/turn/river automatically, there's no separate street picker.
+  Switching modes doesn't clear the other mode's input. See
+  `docs/decisions.md`'s 2026-10-06 entries for why the text field
+  shipped first and the picker came as an addition, not a replacement.
 - **An "already checked" toggle**, not a full action-history editor —
   maps directly onto `solve.py`'s "empty or exactly one seeded check"
   contract. Anything past that (mid-street betting already recorded)

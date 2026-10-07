@@ -58,3 +58,18 @@ export function parseBoardText(text: string): ParseBoardResult {
   // to the type checker on its own.
   return { kind: "ok", cards: cards as Board };
 }
+
+/**
+ * Same validation/shape as parseBoardText, for board cards assembled by
+ * clicking (components/CardPicker) instead of typing -- SolvePage's two
+ * input modes converge on this one result type either way, so everything
+ * downstream of the board (canSubmit, the submitted Spot) has exactly one
+ * code path, not two. Picker clicks can't produce a duplicate or an
+ * invalid token by construction, so only the length needs checking here.
+ */
+export function boardFromCards(cards: string[]): ParseBoardResult {
+  if (cards.length < 3 || cards.length > 5) {
+    return { kind: "error", reason: "Pick 3 (flop), 4 (turn), or 5 (river) cards." };
+  }
+  return { kind: "ok", cards: cards as Board };
+}

@@ -1,4 +1,4 @@
-import { parseBoardText } from "./cards";
+import { boardFromCards, parseBoardText } from "./cards";
 
 describe("parseBoardText", () => {
   it("parses a flop (3 cards)", () => {
@@ -52,5 +52,22 @@ describe("parseBoardText", () => {
     const result = parseBoardText("Ks Ks 9d");
     expect(result.kind).toBe("error");
     expect((result as { reason: string }).reason).toMatch(/repeated/);
+  });
+});
+
+describe("boardFromCards", () => {
+  it("accepts 3-5 picked cards as-is", () => {
+    expect(boardFromCards(["Ks", "Qh", "9d"])).toEqual({
+      kind: "ok",
+      cards: ["Ks", "Qh", "9d"],
+    });
+  });
+
+  it("rejects fewer than 3 cards", () => {
+    expect(boardFromCards(["Ks", "Qh"]).kind).toBe("error");
+  });
+
+  it("rejects more than 5 cards", () => {
+    expect(boardFromCards(["Ks", "Qh", "9d", "4c", "2s", "7h"]).kind).toBe("error");
   });
 });

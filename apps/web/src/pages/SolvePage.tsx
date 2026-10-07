@@ -2,15 +2,18 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
-import { parseBoardText } from "../lib/cards";
+import { boardFromCards, parseBoardText } from "../lib/cards";
 import {
   solveSpot,
   type LiveSolveResponse,
   type SpotValidationIssue,
 } from "../lib/api";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
+import { CardPicker } from "../components/CardPicker/CardPicker";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
+
+type BoardMode = "pick" | "text";
 
 type Outcome =
   | { kind: "idle" }
@@ -38,23 +41,31 @@ function actionColumns(strategy: Record<string, Record<string, number>>): string
 /**
  * Stage 5's live-solve screen: a real MCCFR solve (apps/api's
  * POST /spots/solve) instead of a static reference chart. Needs a board
- * (a v1 validated text field, not yet a visual rank/suit picker -- see
- * docs/decisions.md's 2026-10-06 entry) and BOTH players' ranges, not
- * just hero's -- the convention apps/api/app/solve.py defines: index 0 is
- * out-of-position/first-to-act this street, index 1 is in position.
+ * and BOTH players' ranges, not just hero's -- the convention
+ * apps/api/app/solve.py defines: index 0 is out-of-position/first-to-act
+ * this street, index 1 is in position.
+ *
+ * The board has two input modes -- click cards (CardPicker) or type them
+ * (lib/cards.ts's parseBoardText) -- per docs/decisions.md's 2026-10-06
+ * entries: the text field was a deliberate v1, and the picker is an
+ * additional mode, not a replacement. Both converge on the same
+ * ParseBoardResult, so canSubmit/the submitted Spot only have one code
+ * path past that point.
  */
 export function SolvePage() {
   const [oopPosition, setOopPosition] = useState<Position>("BB");
   const [ipPosition, setIpPosition] = useState<Position>("BTN");
   const [effectiveStackBb, setEffectiveStackBb] = useState(33);
   const [potBb, setPotBb] = useState(100);
+  const [boardMode, setBoardMode] = useState<BoardMode>("pick");
   const [boardText, setBoardText] = useState("");
+  const [pickedCards, setPickedCards] = useState<string[]>([]);
   const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
   const [oopRange, setOopRange] = useState<HandRange>({});
   const [ipRange, setIpRange] = useState<HandRange>({});
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
-  const board = parseBoardText(boardText);
+  const board = boardMode === "pick" ? boardFromCards(pickedCards) : parseBoardText(boardText);
   const positionsAreValid = oopPosition !== ipPosition;
   const stackIsValid = Number.isFinite(effectiveStackBb) && effectiveStackBb > 0;
   const potIsValid = Number.isFinite(potBb) && potBb > 0;
@@ -150,22 +161,54 @@ export function SolvePage() {
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">Board &amp; stakes</h2>
 
-          <label className="spot-builder__field">
-            Board
+          <label className="spot-builder__field spot-builder__field--radio">
             <input
-              type="text"
-              value={boardText}
-              onChange={(e) => setBoardText(e.target.value)}
-              placeholder="Ks Qh 9d"
+              type="radio"
+              name="board-mode"
+              checked={boardMode === "pick"}
+              onChange={() => setBoardMode("pick")}
             />
+            Pick cards
           </label>
-          {boardText.trim() !== "" && board.kind === "error" && (
+          <label className="spot-builder__field spot-builder__field--radio">
+            <input
+              type="radio"
+              name="board-mode"
+              checked={boardMode === "text"}
+              onChange={() => setBoardMode("text")}
+            />
+            Type it
+          </label>
+
+          {boardMode === "pick" ? (
+            <CardPicker value={pickedCards} onChange={setPickedCards} />
+          ) : (
+            <label className="spot-builder__field">
+              Board
+              <input
+                type="text"
+                value={boardText}
+                onChange={(e) => setBoardText(e.target.value)}
+                placeholder="Ks Qh 9d"
+              />
+            </label>
+          )}
+          {boardMode === "text" && boardText.trim() !== "" && board.kind === "error" && (
             <p className="spot-builder__field-error">{board.reason}</p>
           )}
-          <p className="spot-builder__hint">
-            3 cards (flop), 4 (turn), or 5 (river) &mdash; e.g. &ldquo;Ks Qh
-            9d&rdquo;.
-          </p>
+          {boardMode === "pick" && pickedCards.length > 0 && board.kind === "error" && (
+            <p className="spot-builder__field-error">{board.reason}</p>
+          )}
+          {board.kind === "ok" ? (
+            <p className="spot-builder__hint">
+              {board.cards.length === 3 ? "Flop" : board.cards.length === 4 ? "Turn" : "River"}
+              : {board.cards.join(" ")}
+            </p>
+          ) : (
+            <p className="spot-builder__hint">
+              3 cards (flop), 4 (turn), or 5 (river).
+            </p>
+          )}
 
           <label className="spot-builder__field">
             Pot (bb)
