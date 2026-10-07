@@ -17,7 +17,7 @@ from poker_solver_schema import Spot
 from ..auth import current_user_id
 from ..db import SpotRow, get_db
 from ..reference_charts import find_matching_chart
-from ..solve import InvalidSolveRequest, solve_spot
+from ..solve import InvalidSolveRequest, SolverBusy, solve_spot
 
 router = APIRouter(prefix="/spots", tags=["spots"])
 
@@ -45,13 +45,15 @@ def reference_strategy(spot: Spot) -> dict:
 
 @router.post("/solve")
 def solve(spot: Spot) -> dict:
-    """Stage 5: a real MCCFR solve, for a single postflop street -- see
-    ../solve.py for the request contract (two ranges, a flop/turn/river
-    board, at most a seeded opening check already on this street)."""
+    """Stage 5: a real range-vs-range solve, for a single postflop street --
+    see ../solve.py for the request contract (two ranges, a flop/turn/river
+    board, any non-terminal action prefix already on this street)."""
     try:
         return solve_spot(spot)
     except InvalidSolveRequest as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except SolverBusy as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
 
 
 @router.post("")

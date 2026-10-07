@@ -140,3 +140,25 @@ def test_solve_rejects_a_sized_action_with_no_size_given():
     res = client.post("/spots/solve", json=spot)
     assert res.status_code == 422
     assert "needs size_bb or size_pct_pot" in res.json()["detail"]
+
+
+def test_solve_returns_503_while_another_solve_is_running():
+    from app import solve as solve_module
+
+    assert solve_module._solve_lock.acquire(blocking=False)
+    try:
+        res = client.post("/spots/solve", json=RIVER_SPOT)
+        assert res.status_code == 503
+        assert "busy" in res.json()["detail"].lower() or "already running" in res.json()["detail"]
+    finally:
+        solve_module._solve_lock.release()
+
+
+def test_solve_reports_unconverged_when_cut_off_by_the_time_budget():
+    from poker_solver_schema import Spot
+
+    from app.solve import solve_spot
+
+    body = solve_spot(Spot(**RIVER_SPOT), target_exploitability_pct=0.0, max_seconds=0.0)
+    assert body["converged"] is False
+    assert body["iterations"] == 1

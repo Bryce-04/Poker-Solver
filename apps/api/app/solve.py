@@ -26,6 +26,7 @@ that point, is rejected (422) rather than guessed at.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 from poker_solver.betting_round import BET_SIZE_MENU, BettingRoundState
@@ -53,6 +54,25 @@ logger = logging.getLogger(__name__)
 # -- an honest precision number instead of an implied one.
 TARGET_EXPLOITABILITY_PCT = 0.5
 MAX_ITERATIONS = 250
+
+# The deployed host (Render free tier: 0.1 CPU) can be far slower than a
+# laptop, and the phone gives up after 150s (apps/web/src/lib/api.ts's
+# readTimeout). Rather than run past that and return nothing, training
+# stops at this many seconds into the solve and returns what it has --
+# with exploitability_pct and converged=False saying honestly that it's
+# less precise than usual. Leaves headroom under 150s for setup that runs
+# before the deadline is checked (the equity matrix) and the network.
+MAX_SOLVE_SECONDS = 100.0
+
+# One solve at a time. On a 0.1-CPU host, concurrent solves don't run in
+# parallel -- they split the CPU and ALL get slower, and a request the
+# phone already gave up on keeps computing anyway. A second request while
+# one is running gets an immediate "busy" (503) instead of piling on.
+_solve_lock = threading.Lock()
+
+
+class SolverBusy(RuntimeError):
+    """Another solve is already running -- the route turns this into a 503."""
 
 
 class InvalidSolveRequest(ValueError):
@@ -198,20 +218,29 @@ def solve_spot(
     spot: Spot,
     target_exploitability_pct: float = TARGET_EXPLOITABILITY_PCT,
     max_iterations: int = MAX_ITERATIONS,
+    max_seconds: float = MAX_SOLVE_SECONDS,
 ) -> dict:
+    # Validate before taking the lock -- a malformed request shouldn't make
+    # anyone else wait, or be told "busy" when it's really invalid.
     config, deciding_player, bucket_notes = build_solve_config(spot)
 
+    if not _solve_lock.acquire(blocking=False):
+        raise SolverBusy("Another solve is already running -- try again in a minute.")
     try:
         start = time.perf_counter()
         trainer = RangeCfrTrainer(config)
         setup_elapsed = time.perf_counter() - start
-        exploitability_pct = trainer.train_until(target_exploitability_pct, max_iterations)
+        exploitability_pct = trainer.train_until(
+            target_exploitability_pct, max_iterations, deadline=start + max_seconds
+        )
         elapsed = time.perf_counter() - start
     except ValueError as e:
         # e.g. "range has no combos left after removing blocked cards", or
         # every combo pair sharing a card -- a request-shape problem, not
         # a server error, so 422 not 500.
         raise InvalidSolveRequest(str(e)) from e
+    finally:
+        _solve_lock.release()
 
     # Logged for diagnosing slow solves from Render's logs (is it the
     # algorithm or the host?) -- setup is the equity matrix, the rest is
@@ -232,6 +261,10 @@ def solve_spot(
         "source": "live_solve",
         "iterations": trainer.iterations,
         "exploitability_pct": exploitability_pct,
+        # False when MAX_SOLVE_SECONDS or MAX_ITERATIONS cut training off
+        # before the precision target -- the UI says so rather than
+        # presenting a rougher answer as a fully converged one.
+        "converged": exploitability_pct < target_exploitability_pct,
         "position": spot.positions_in_hand[deciding_player],
         "strategy": trainer.label_strategies(),
         "bucketed_actions": bucket_notes,

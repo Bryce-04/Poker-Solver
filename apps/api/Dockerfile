@@ -3,6 +3,14 @@
 # as local path dependencies -- neither is on PyPI, so pip can only find
 # them if they're copied in and installed alongside apps/api).
 FROM python:3.12-slim
+# numpy's BLAS starts one thread per CPU it can *see* -- inside a container
+# that's typically every core on the host, while the container may only be
+# allowed a fraction of one (Render free tier: 0.1 CPU). The extra threads
+# just contend and get throttled, which can make numpy-heavy code (the
+# solver's matrix products) dramatically slower. One thread each.
+ENV OPENBLAS_NUM_THREADS=1 \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
 WORKDIR /app
 COPY packages/schema ./packages/schema
 COPY services/solver ./services/solver

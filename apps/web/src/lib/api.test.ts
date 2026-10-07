@@ -272,6 +272,11 @@ describe('solveSpot', () => {
     await expect(solveSpot(spot)).resolves.toEqual({ kind: 'error', status: 500 })
   })
 
+  it('classifies a 503 as { kind: "busy" } -- the server runs one solve at a time', async () => {
+    mockResponse(503, { detail: 'Another solve is already running' })
+    await expect(solveSpot(spot)).resolves.toEqual({ kind: 'busy' })
+  })
+
   it('classifies a request rejection as { kind: "network-error" } and never throws', async () => {
     requestMock.mockRejectedValue(new Error('network unreachable'))
     await expect(solveSpot(spot)).resolves.toEqual({ kind: 'network-error' })

@@ -6,6 +6,47 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — Hardening /spots/solve for Render's free tier: one solve at a time, a time budget, single-threaded BLAS
+
+**Status:** proposed — built and tested locally; root cause on Render not
+yet confirmed from its logs.
+
+**Context.** Right after the new solver deployed (PR #21), a wide-range
+flop solve from the phone hit the app's 150s timeout ("couldn't reach the
+API"). Measured against the deployed API: that flop, and even a wide
+*river* (1.6s locally), never returned within 5 minutes. Render's free
+plan gets 0.1 CPU, but that alone predicts ~16s for the river, not 300s+
+— so something pathological. Leading suspects: numpy's BLAS spawning one
+thread per *host* core inside a 0.1-CPU container (a well-known
+oversubscription slowdown); abandoned solves piling up (the server keeps
+computing after the phone gives up — this session's own timing tests
+overlapped with the phone's solve); or running out of the 512MB.
+
+**Decision.** Three mitigations, each worth having regardless of which
+suspect is confirmed:
+- `apps/api/Dockerfile` sets `OPENBLAS_NUM_THREADS`/`OMP_NUM_THREADS`/
+  `MKL_NUM_THREADS=1`.
+- `solve.py` runs one solve at a time (a non-blocking lock); a second
+  request gets an immediate 503 ("busy"), which `lib/api.ts` maps to a
+  `busy` result and `SolvePage` explains — instead of solves piling up
+  and all slowing down.
+- `solve.py` stops training at `MAX_SOLVE_SECONDS = 100` (headroom under
+  the phone's 150s timeout) and returns what it has, with
+  `converged: false` and the real `exploitability_pct`; `SolvePage` says
+  the result is rougher than usual. This gives up the earlier
+  "iteration-based, so reproducible across machines" property *only*
+  when the budget is hit — and says so in the response.
+
+**Consequences.** A deep wide-range flop on Render may still come back
+unconverged even with all three — the free tier is genuinely ~0.1 CPU.
+If it does after the logs confirm what was happening, the remaining
+levers are: more solver optimization (batching terminal products), a
+paid instance, or running solves on a desktop locally (the professor's
+guidance was that mobile doesn't need full speed). Check Render's logs
+for `solved in ...` lines to see real times before choosing.
+
+---
+
 ## 2026-10-07 — The solver is now range-vs-range Discounted CFR with exact equity; the Monte-Carlo trainer was producing noise
 
 **Status:** accepted — shipped 2026-10-07.
