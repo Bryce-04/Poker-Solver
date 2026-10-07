@@ -9,12 +9,14 @@ turn, or river, heads-up, two ranges, the locked bet-size menu (check /
 33%/66%/100% pot / all-in), solved via chance-sampled Monte Carlo CFR.
 Starting on the flop or turn samples a random runout (the rest of the
 board) once per iteration before evaluating showdown strength; starting
-on the river needs none. No `apps/api` route calls into this yet, and
-there's no solve caching — both are separate follow-up work, not part of
-this package. Multi-street solving (modeling betting across flop *and*
-turn *and* river in one tree) is a bigger, separate future direction (see
-`docs/plan.md`'s "widening the solver" section) — this only ever solves
-one street's betting at a time.
+on the river needs none. `apps/api`'s `POST /spots/solve`
+(`apps/api/app/solve.py`) now calls into this — see that file and
+`docs/decisions.md`'s 2026-10-06 entry for the request contract. No
+frontend consumes it yet, and there's no solve caching — both are
+separate follow-up work. Multi-street solving (modeling betting across
+flop *and* turn *and* river in one tree) is a bigger, separate future
+direction (see `docs/plan.md`'s "widening the solver" section) — this
+only ever solves one street's betting at a time.
 
 ```
 pip install -e ".[dev]"
@@ -50,7 +52,10 @@ src/poker_solver/
                       the above together, same regret-matching shape as
                       kuhn_spike.py's KuhnCfrTrainer. Samples a board
                       runout alongside hole cards when the board handed
-                      in isn't already 5 cards.
+                      in isn't already 5 cards. Also exports
+                      aggregate_label_strategies, which rolls combo-level
+                      strategies back up to 169-type labels -- the one
+                      function apps/api/app/solve.py actually calls.
 ```
 
 ## Why river-only first, and how flop/turn got added on top

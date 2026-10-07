@@ -36,10 +36,16 @@ two ranges, the locked bet-size menu — `postflop_mccfr.py`, backed by a
 from-scratch hand evaluator and a range-to-combo sampler, checked
 against closed-form poker theory in `tests/test_postflop_mccfr.py` (flop/
 turn via a Monte Carlo board runout, `combos.py`'s `deal_runout`, checked
-against exact brute-force equity in `tests/test_runout_equity.py`). Not
-yet wired to `apps/api` or the frontend; multi-street solving (modeling
-betting across flop *and* turn *and* river in one tree, as opposed to
-one street at a time) is a separate, bigger future direction, not done.**
+against exact brute-force equity in `tests/test_runout_equity.py`). It's
+wired up now too: `apps/api`'s `POST /spots/solve` (`app/solve.py`) calls
+into it synchronously and returns a real per-action-frequency strategy
+for whichever player's decision the request implies — see
+`docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
+convention on `Spot`, not a schema change: `positions_in_hand` needs two
+entries, `ranges` needs both). No frontend consumes it yet; multi-street
+solving (modeling betting across flop *and* turn *and* river in one
+tree, as opposed to one street at a time) is a separate, bigger future
+direction, not done.**
 
 ## Commands
 
@@ -148,9 +154,13 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   `services/solver/README.md` for the module layout, why flop/turn
   needed less new code than expected, and the one payoff-arithmetic
   subtlety worth knowing about before touching `betting_round.py`'s
-  `terminal_utility`. Not wired to `apps/api` or the frontend yet;
-  multi-street solving (one tree spanning flop+turn+river, rather than
-  one street at a time) is a separate, bigger future direction.
+  `terminal_utility`. `apps/api`'s `POST /spots/solve` (`app/solve.py`)
+  now calls into it — see `docs/decisions.md`'s 2026-10-06 entry for the
+  request contract and `aggregate_label_strategies` (rolls combo-level
+  strategies back up to 169-type labels, the one function `solve.py`
+  calls). No frontend consumes it yet; multi-street solving (one tree
+  spanning flop+turn+river, rather than one street at a time) is a
+  separate, bigger future direction.
 - **`apps/web`** (React + TypeScript + Vite) is the only consumer of the
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not

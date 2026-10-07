@@ -41,7 +41,12 @@ style Kuhn's own test suite uses for its non-unique equilibrium family
 
 from poker_solver.cards import parse_card
 from poker_solver.combos import label_to_combos
-from poker_solver.postflop_mccfr import PostflopMccfrTrainer, PostflopSpotConfig, _info_set_key
+from poker_solver.postflop_mccfr import (
+    PostflopMccfrTrainer,
+    PostflopSpotConfig,
+    _info_set_key,
+    aggregate_label_strategies,
+)
 
 RIVER_BOARD = tuple(parse_card(c) for c in ["Ks", "Qh", "9d", "4c", "2s"])
 POT_BB = 100.0
@@ -115,6 +120,42 @@ def test_bluff_and_bluffcatcher_frequencies_match_theory() -> None:
         trainer, RIVER_BOARD, player=0, label="KJo", history=("check", "all_in"), action="call"
     )
     assert abs(p_call - CALL_FREQUENCY) < TOLERANCE
+
+
+def test_aggregate_label_strategies_matches_per_hand_averaging() -> None:
+    # aggregate_label_strategies is the reusable version of this file's own
+    # _average_prob helper -- cross-check it lands on the same numbers for
+    # every action at once, across a range with more than one label.
+    trainer = _make_river_trainer(seed=1)
+    trainer.train(ITERATIONS)
+
+    aggregated = aggregate_label_strategies(
+        trainer, RIVER_BOARD, player=1, range_weights={"AA": 1.0, "33": 1.0}, history=("check",)
+    )
+
+    assert set(aggregated) == {"AA", "33"}
+    for label in aggregated:
+        for action in ("check", "all_in"):
+            expected = _average_prob(
+                trainer, RIVER_BOARD, player=1, label=label, history=("check",), action=action
+            )
+            assert abs(aggregated[label][action] - expected) < 1e-9
+        assert abs(sum(aggregated[label].values()) - 1.0) < 1e-9
+
+
+def test_aggregate_label_strategies_omits_untrained_labels() -> None:
+    trainer = _make_river_trainer(seed=1)
+    trainer.train(ITERATIONS)
+
+    # "KK" was never part of either player's range during training, so no
+    # info set exists for any of its combos -- aggregate_label_strategies
+    # should omit it rather than fabricate a number for a hand nobody
+    # ever trained (even though the label itself has legal, unblocked
+    # combos here -- 3 of KK's 6, after the board's own king of spades).
+    aggregated = aggregate_label_strategies(
+        trainer, RIVER_BOARD, player=1, range_weights={"AA": 1.0, "KK": 1.0}, history=("check",)
+    )
+    assert "KK" not in aggregated
 
 
 # --- Flop/turn: a locked value hand, to check the runout doesn't break

@@ -23,9 +23,11 @@ runs end-to-end against the live API on a physical device. Stage 5 has
 grown past its initial river-only start too: `services/solver` now
 solves any single postflop street (flop, turn, or river — heads-up, two
 ranges, the locked bet-size menu) via Monte Carlo CFR, checked against
-closed-form poker theory — not yet reachable from `apps/api` or the app
-itself, and modeling betting across *multiple* streets in one solve is
-still a separate, bigger future direction. See `services/solver/README.md`.
+closed-form poker theory, and it's reachable now too: `apps/api`'s
+`POST /spots/solve` runs a real solve and returns a per-hand strategy —
+not yet reachable from the app itself (no frontend consumes it), and
+modeling betting across *multiple* streets in one solve is still a
+separate, bigger future direction. See `services/solver/README.md`.
 
 ## Layout
 
@@ -52,7 +54,7 @@ pnpm install                  # installs apps/web + packages/schema JS deps
 docker compose -f infra/docker-compose.yml up -d db
 
 # api
-cd apps/api && pip install -e ../../packages/schema -e . && uvicorn app.main:app --reload
+cd apps/api && pip install -e ../../packages/schema -e ../../services/solver -e . && uvicorn app.main:app --reload
 
 # web (separate terminal)
 pnpm dev:web

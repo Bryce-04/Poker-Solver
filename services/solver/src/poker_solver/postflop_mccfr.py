@@ -189,6 +189,44 @@ class PostflopMccfrTrainer:
         return node_u0, node_u1
 
 
+def aggregate_label_strategies(
+    trainer: PostflopMccfrTrainer,
+    board: tuple[int, ...],
+    player: int,
+    range_weights: dict[str, float],
+    history: tuple[str, ...],
+) -> dict[str, dict[str, float]]:
+    """Aggregates combo-level average strategies back up to 169-type
+    labels, averaged uniformly across each label's unblocked combos --
+    the natural way to produce a real per-action-frequency output, now
+    that the engine isn't bound by HandRange's one-weight-per-label
+    ceiling (see models.py's HandRange docstring and reference_charts.py's
+    "known limitation" note on defend charts).
+
+    A label with zero weight in `range_weights`, or whose combos are all
+    blocked by `board`, or that never got sampled often enough to reach
+    this info set, is simply omitted -- not faked with a guess.
+    """
+    blocked = frozenset(board)
+    result: dict[str, dict[str, float]] = {}
+    for label, weight in range_weights.items():
+        if weight <= 0:
+            continue
+        combos = [c for c in label_to_combos(label) if c[0] not in blocked and c[1] not in blocked]
+        if not combos:
+            continue
+        strategies = [
+            node.average_strategy()
+            for combo in combos
+            if (node := trainer.node_map.get(_info_set_key(player, combo, history))) is not None
+        ]
+        if not strategies:
+            continue
+        actions = strategies[0].keys()
+        result[label] = {a: sum(s[a] for s in strategies) / len(strategies) for a in actions}
+    return result
+
+
 def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
     """Same polarized-range-vs-bluffcatcher scenario test_postflop_mccfr.py
     checks against closed-form numbers -- see that file's module docstring
@@ -217,13 +255,7 @@ def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
     print(f"Postflop MCCFR: {iterations:,} iterations in {elapsed:.3f}s")
 
     def average(player: int, label: str, history: tuple[str, ...]) -> dict[str, float]:
-        blocked = frozenset(board)
-        combos = [c for c in label_to_combos(label) if c[0] not in blocked and c[1] not in blocked]
-        strategies = [
-            trainer.node_map[_info_set_key(player, c, history)].average_strategy() for c in combos
-        ]
-        actions = strategies[0].keys()
-        return {a: sum(s[a] for s in strategies) / len(strategies) for a in actions}
+        return aggregate_label_strategies(trainer, board, player, {label: 1.0}, history)[label]
 
     print()
     print("Hero (AA/33) opening decision, average strategy:")

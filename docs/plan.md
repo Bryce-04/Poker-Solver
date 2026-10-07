@@ -33,12 +33,17 @@ ranges, the locked bet-size menu, via chance-sampled Monte Carlo CFR,
 checked against closed-form poker theory, not just "did it run"
 (`postflop_mccfr.py`, `betting_round.py`, backed by a from-scratch hand
 evaluator and a 169-label-to-concrete-combo sampler with a board-runout
-sampler for flop/turn — see `services/solver/README.md`). Still not
-wired to `apps/api`, no frontend for it, and this only ever solves one
-street's betting at a time — modeling a full flop→turn→river betting
-tree in one solve is a separate, bigger future direction (see "widening
-the solver" below), not something this does. Remaining: Stage 4 past its
-one-format MVP, Stage 5's API route + frontend board picker (+ eventually
+sampler for flop/turn — see `services/solver/README.md`). It's wired up
+now too: `apps/api`'s `POST /spots/solve` (`app/solve.py`) runs a real
+solve synchronously and returns a per-action-frequency strategy for
+whichever player's decision the request implies — see
+`docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
+`Spot` convention — two ranges, not one — rather than a schema change).
+No frontend consumes it yet, and this only ever solves one street's
+betting at a time — modeling a full flop→turn→river betting tree in one
+solve is a separate, bigger future direction (see "widening the solver"
+below), not something this does. Remaining: Stage 4 past its one-format
+MVP, Stage 5's frontend (board picker + results display, + eventually
 multi-street solving), and Stage 6's backend half (JWT verification,
 per-user scoping).
 

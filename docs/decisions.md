@@ -6,6 +6,45 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-06 — POST /spots/solve: a new Spot convention, not a schema change; sync, not a job queue
+
+**Status:** proposed
+
+**Context.** First real wiring from `apps/api` to `services/solver`. Two
+things came up while designing it that aren't obvious from the route code
+alone.
+
+**Decision 1 -- Spot convention, not a schema change.** Every entry path
+shipped so far (`apps/web/src/lib/spot.ts`) only ever populates ONE entry
+in `positions_in_hand`/`ranges` (hero's). A solve needs both players'
+ranges. `Spot` already allows two entries in both fields -- nothing
+there's used it yet -- so rather than changing the schema, this route
+just defines the convention explicitly: `positions_in_hand` must have
+exactly 2 entries, **index 0 is out-of-position/first-to-act this
+street, index 1 is in position**, and `ranges` must have an entry for
+both. Mid-street solving is out of scope for now too: `current_street`'s
+`actions` must be empty or exactly one check from `positions_in_hand[0]`
+-- anything else 422s with a specific message rather than guessing,
+partly because reverse-mapping an arbitrary recorded bet size onto the
+engine's fixed 33/66/100%-pot menu isn't always a clean mapping anyway.
+
+**Decision 2 -- synchronous route, not a job queue.** A solve takes
+several seconds (~3,000 iterations/sec measured earlier). The route runs
+it synchronously in a plain `def` handler (FastAPI runs those in its
+thread pool, same style as every other route here) rather than an
+async job-and-poll pattern. `DEFAULT_ITERATIONS = 8_000` (`apps/api/app/
+solve.py`) is a provisional number, not derived from a latency budget.
+
+**Consequences.** No frontend consumes this yet. Revisit the iteration
+count and the sync-vs-async call once this has real traffic to time
+against -- not something to build speculatively ahead of that. The
+per-action-frequency response (`services/solver`'s new
+`aggregate_label_strategies`) answers only the ONE decision point implied
+by the request, not the whole downstream tree (mirrors how
+`/spots/reference-strategy` already only ever answers for one position).
+
+---
+
 ## 2026-10-06 — Solver modules renamed river_* -> generalized names when flop/turn landed
 
 **Status:** accepted
