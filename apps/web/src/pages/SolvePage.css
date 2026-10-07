@@ -1,37 +1,14 @@
 /* Everything generic (form fields, status blocks, buttons) reuses
    SpotBuilder.css's spot-builder__* classes -- see that file's own
    TypeInPage/ImportPage precedent ("duplicate it once; don't
-   over-engineer a stretch item"). Only the results table is new here. */
+   over-engineer a stretch item"). The results grid itself is
+   components/StrategyGrid/StrategyGrid.css -- just the "load a reference
+   range" button row is new here. */
 
-.solve-page__table-wrap {
-  overflow-x: auto;
-}
-
-.solve-page__table {
-  border-collapse: collapse;
-  font-size: 0.85rem;
-  min-width: 100%;
-}
-
-.solve-page__table th,
-.solve-page__table td {
-  padding: 0.4rem 0.7rem;
-  text-align: right;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.solve-page__table th:first-child,
-.solve-page__table td:first-child {
-  text-align: left;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.solve-page__table thead th {
-  color: var(--text-muted);
-  font-weight: 550;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.solve-page__chart-load {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
 }

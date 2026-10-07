@@ -20,8 +20,9 @@ RIVER_SPOT = {
 
 
 def test_solve_returns_a_strategy_that_sums_to_one_per_hand():
-    # ~8,000 iterations through the full route -- a few seconds, same
-    # ballpark as services/solver's own regression tests.
+    # DEFAULT_ITERATIONS (solve.py) iterations through the full route -- a
+    # couple seconds for this narrow a range pair, same ballpark as
+    # services/solver's own regression tests.
     res = client.post("/spots/solve", json=RIVER_SPOT)
     assert res.status_code == 200
     body = res.json()

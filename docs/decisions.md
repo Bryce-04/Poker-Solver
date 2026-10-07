@@ -6,6 +6,79 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — Solve results are a 13×13 color chart, not a table; per-hand precision flagged as unverified at current sample sizes
+
+**Status:** accepted
+
+**Context.** The original results display was a scrolling HTML table
+(one row per hand, one column per action) -- unreadable at a glance, and
+nothing like how real solvers present a range. Separately, a specific
+number surfaced during testing (a wide-range BB spot showing a bottom-
+range hand jamming ~25% on a dry ace-high board) read as implausible.
+
+**Decision 1 -- chart, not table.** New `components/StrategyGrid/`
+(`apps/web/README.md`'s `## SolvePage` section has the full design):
+a 13x13 grid reusing `RangeGrid.css`'s classes directly, each cell a
+left-to-right gradient of that hand's action mix, built from a new
+palette of theme-aware CSS custom properties (`--strategy-*`, `index.css`)
+rather than hardcoded hex. Modeled on a GTO-trainer-style reference image
+the project owner shared, adapted to this app's own palette rather than
+copied directly.
+
+**Decision 2 -- name the precision gap instead of papering over it.**
+Investigated the implausible-looking number rather than just reassuring
+that it's fine: the CFR algorithm itself is validated (closed-form
+regression tests in `services/solver`), but a wide range creates tens of
+thousands of distinct info-sets (see the 2026-10-07 `DEFAULT_ITERATIONS`
+entry) against only a few thousand total iterations -- individual fringe
+combos can be reporting a frequency built on a handful of samples, not a
+converged value. `StrategyGrid` renders a hand missing from the response
+(never sampled enough for `aggregate_label_strategies` to report it) as a
+visibly flat neutral cell rather than a color, so the gap is visible
+rather than hidden, and `apps/web/README.md` now states this limitation
+directly instead of implying every displayed number is trustworthy.
+
+**Consequences.** No code fix for the precision issue itself yet --
+that needs either more iterations (slower), a smarter sampling scheme, or
+labeling low-sample-count cells distinctly from well-sampled ones (not
+done: the response doesn't currently carry a per-hand sample count to
+render that distinction). Worth a follow-up if wide-range solves are a
+primary use case rather than an edge case.
+
+---
+
+## 2026-10-07 — DEFAULT_ITERATIONS halved to 4,000; real timing logged instead of guessed at
+
+**Status:** accepted
+
+**Context.** A real solve on a physical device was reported as taking
+over a minute. Measured (not guessed) locally first: 8,000 iterations on
+a realistic wide range pair (BTN's 82-hand opening chart vs BB's 85-hand
+defend chart, 100bb) took 10.3s and produced ~42,000 distinct info sets.
+Chance-sampling keeps the betting-tree walk's cost constant regardless of
+range width (exactly one combo per player is sampled either way), but a
+wider range does mean more distinct `(combo, history)` dictionary entries
+to allocate and update each iteration -- real CPython overhead at this
+scale, not something the original `DEFAULT_ITERATIONS` comment accounted
+for (see the superseded reasoning in the 2026-10-06 `/spots/solve` entry).
+
+**Decision.** `DEFAULT_ITERATIONS: 8_000 -> 4_000` (`apps/api/app/
+solve.py`) -- confirmed via the same local measurement that this roughly
+halves wall-clock time (10.3s -> 5.0s on the wide pair) while every hand
+in a realistic range still gets a strategy back. `solve_spot` now logs
+elapsed time, iteration count, and info-set count server-side (not
+returned to the client -- diagnostic, not UI data) so a future "it's
+slow" report has real numbers to start from instead of needing to
+reproduce the measurement from scratch.
+
+**Consequences.** Per-hand precision is somewhat lower (fewer visits per
+combo). If a production deploy is still slow well beyond what halving
+implies, that points at the host's CPU allocation rather than the
+algorithm -- worth checking Render's plan/instance size before tuning
+iterations further or optimizing the engine itself.
+
+---
+
 ## 2026-10-06 — SolvePage's board input is a validated text field, not a visual picker yet
 
 **Status:** accepted
@@ -75,6 +148,17 @@ per-action-frequency response (`services/solver`'s new
 `aggregate_label_strategies`) answers only the ONE decision point implied
 by the request, not the whole downstream tree (mirrors how
 `/spots/reference-strategy` already only ever answers for one position).
+
+**Revisited 2026-10-07:** real traffic arrived (a solve on a physical
+device, reported as taking over a minute) -- see that date's entry for
+the actual measurement and the resulting `DEFAULT_ITERATIONS` change.
+The "chance-sampling means range width doesn't change per-iteration
+cost" assumption this entry's `DEFAULT_ITERATIONS` reasoning leaned on
+turned out to be only half true: the betting-tree walk's cost is
+constant, but a wider range creates more distinct info-set dictionary
+entries, which is real overhead at scale. Sync-vs-async remains
+unrevisited -- still worth watching if the host-CPU hypothesis in the
+2026-10-07 entry doesn't fully explain the reported latency.
 
 ---
 

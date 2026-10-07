@@ -3,13 +3,16 @@ import type { FormEvent } from "react";
 import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { boardFromCards, parseBoardText } from "../lib/cards";
+import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
 import {
+  fetchReferenceStrategy,
   solveSpot,
   type LiveSolveResponse,
   type SpotValidationIssue,
 } from "../lib/api";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { CardPicker } from "../components/CardPicker/CardPicker";
+import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -24,19 +27,21 @@ type Outcome =
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
+// Status for each position's "Load reference range" button -- separate
+// from the solve Outcome above, since loading a starting range and
+// submitting a solve are independent actions with independent feedback.
+type ChartLoadState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "loaded" }
+  | { kind: "unavailable"; reason: string };
+
 function streetForBoardLength(length: number): Street {
   if (length === 3) return "flop";
   if (length === 4) return "turn";
   return "river";
 }
 
-/** Every hand at one decision point shares the same legal actions, so the
- * first hand's keys are the table's columns. Empty if nothing in either
- * submitted range ever got sampled (board blocks every combo, etc). */
-function actionColumns(strategy: Record<string, Record<string, number>>): string[] {
-  const firstHand = Object.keys(strategy)[0];
-  return firstHand ? Object.keys(strategy[firstHand]) : [];
-}
 
 /**
  * Stage 5's live-solve screen: a real MCCFR solve (apps/api's
@@ -63,6 +68,8 @@ export function SolvePage() {
   const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
   const [oopRange, setOopRange] = useState<HandRange>({});
   const [ipRange, setIpRange] = useState<HandRange>({});
+  const [oopChartState, setOopChartState] = useState<ChartLoadState>({ kind: "idle" });
+  const [ipChartState, setIpChartState] = useState<ChartLoadState>({ kind: "idle" });
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   const board = boardMode === "pick" ? boardFromCards(pickedCards) : parseBoardText(boardText);
@@ -109,6 +116,65 @@ export function SolvePage() {
         setOutcome({ kind: "error", status: result.status });
         return;
     }
+  }
+
+  /**
+   * Seeds a position's range from reference-chart data (the same curated
+   * charts /spots/reference-strategy already serves for Stage 2) instead
+   * of leaving it empty -- an approximate real starting point to tweak,
+   * not an accurate postflop range (the reference chart has no idea
+   * what's happened since preflop).
+   *
+   * Tries the position's own opening chart first; BB has none (it can
+   * never be first to act in an unopened pot), so for BB -- and as a
+   * second attempt for anyone else's open miss -- this falls back to the
+   * defend-vs-raise chart, treating `otherPosition` as the preflop
+   * raiser. That's a real assumption, not just a lookup: it's only
+   * accurate if the in-position player was actually the preflop
+   * aggressor, which is the common case for a heads-up postflop pot but
+   * not the only one. Charts cover BB defending against every other
+   * 6-max seat, so this combination covers every position pair the
+   * pickers allow; a genuine coverage gap (an unusual stack depth) still
+   * falls through to the plain "no chart" message.
+   */
+  async function loadReferenceRange(
+    position: Position,
+    otherPosition: Position,
+    setRange: (range: HandRange) => void,
+    setStatus: (state: ChartLoadState) => void,
+  ) {
+    setStatus({ kind: "loading" });
+    const openResult = await fetchReferenceStrategy(buildOpenSpot(position, effectiveStackBb));
+    if (openResult.kind === "match") {
+      setRange(openResult.data.ranges[position] ?? {});
+      setStatus({ kind: "loaded" });
+      return;
+    }
+    if (openResult.kind === "network-error") {
+      setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
+      return;
+    }
+    if (openResult.kind !== "no-match") {
+      setStatus({ kind: "unavailable", reason: "Couldn't load a reference range." });
+      return;
+    }
+
+    const defendResult = await fetchReferenceStrategy(
+      buildVsRaiseSpot(position, otherPosition, effectiveStackBb),
+    );
+    if (defendResult.kind === "match") {
+      setRange(defendResult.data.ranges[position] ?? {});
+      setStatus({ kind: "loaded" });
+      return;
+    }
+    if (defendResult.kind === "network-error") {
+      setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
+      return;
+    }
+    setStatus({
+      kind: "unavailable",
+      reason: `No reference chart covers ${position} opening, or defending vs ${otherPosition}, at this stack -- build it manually.`,
+    });
   }
 
   return (
@@ -241,11 +307,49 @@ export function SolvePage() {
 
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">{oopPosition}&rsquo;s range</h2>
+          <div className="solve-page__chart-load">
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={() =>
+                loadReferenceRange(oopPosition, ipPosition, setOopRange, setOopChartState)
+              }
+              disabled={oopChartState.kind === "loading"}
+            >
+              {oopChartState.kind === "loading"
+                ? "Loading…"
+                : `Load ${oopPosition}'s opening range`}
+            </button>
+            {oopChartState.kind === "unavailable" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                {oopChartState.reason}
+              </span>
+            )}
+          </div>
           <RangeGrid value={oopRange} onChange={setOopRange} />
         </section>
 
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">{ipPosition}&rsquo;s range</h2>
+          <div className="solve-page__chart-load">
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={() =>
+                loadReferenceRange(ipPosition, oopPosition, setIpRange, setIpChartState)
+              }
+              disabled={ipChartState.kind === "loading"}
+            >
+              {ipChartState.kind === "loading"
+                ? "Loading…"
+                : `Load ${ipPosition}'s opening range`}
+            </button>
+            {ipChartState.kind === "unavailable" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                {ipChartState.reason}
+              </span>
+            )}
+          </div>
           <RangeGrid value={ipRange} onChange={setIpRange} />
         </section>
 
@@ -326,32 +430,7 @@ export function SolvePage() {
               &mdash; try more iterations or a narrower board/range combination.
             </p>
           ) : (
-            <div className="solve-page__table-wrap">
-              <table className="solve-page__table">
-                <thead>
-                  <tr>
-                    <th>Hand</th>
-                    {actionColumns(outcome.data.strategy).map((action) => (
-                      <th key={action}>{action}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(outcome.data.strategy)
-                    .sort()
-                    .map((hand) => (
-                      <tr key={hand}>
-                        <td>{hand}</td>
-                        {actionColumns(outcome.data.strategy).map((action) => (
-                          <td key={action}>
-                            {Math.round((outcome.data.strategy[hand][action] ?? 0) * 100)}%
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+            <StrategyGrid strategy={outcome.data.strategy} />
           )}
         </div>
       )}
