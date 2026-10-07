@@ -11,19 +11,23 @@ everywhere a matched chart shows up, not just viewable. Three ways into a
 spot now converge on the same shapes: the button builder, Stage 3's
 plain-language entry, and Stage 4's hand-history paste import (one
 format, rule-based, not freeform — same philosophy as Stage 3). The app
-has a design-token visual pass (light + dark) and is routed into four
-screens (Builder / Saved / Type in / Import). Saved spots is wired
+has a design-token visual pass (light + dark) and is routed into five
+screens (Builder / Saved / Type in / Import / Solve). Saved spots is wired
 end-to-end to `apps/api`'s `POST`/`GET /spots` (Postgres via Supabase).
 Stage 6 auth works end to end for saved spots — Supabase sign-in in the
 app, and `apps/api` verifying the sign-in token and returning only your
 own saved spots. `apps/api` is
 deployed (Render); an Android build (Capacitor) has a real icon/splash and
-runs end-to-end against the live API on a physical device. Stage 5 has a
-real start too: `services/solver` now solves a genuine river-only spot
-(heads-up, fixed board, two ranges, the locked bet-size menu) via Monte
-Carlo CFR, checked against closed-form poker theory — not yet reachable
-from `apps/api` or the app itself, and flop/turn aren't solvable yet
-(no runout logic). See `services/solver/README.md`.
+runs end-to-end against the live API on a physical device. Stage 5 has
+grown past its initial river-only start too: `services/solver` now
+solves any single postflop street (flop, turn, or river — heads-up, two
+ranges, the locked bet-size menu) via Monte Carlo CFR, checked against
+closed-form poker theory, and it's reachable now too: `apps/api`'s
+`POST /spots/solve` runs a real solve and returns a per-hand strategy,
+and the new **Solve** screen drives it end to end (two ranges, a board,
+a results table) — a visual board-card picker and modeling betting
+across *multiple* streets in one solve are still separate, bigger future
+directions. See `services/solver/README.md`.
 
 ## Layout
 
@@ -50,13 +54,13 @@ pnpm install                  # installs apps/web + packages/schema JS deps
 docker compose -f infra/docker-compose.yml up -d db
 
 # api
-cd apps/api && pip install -e ../../packages/schema -e . && uvicorn app.main:app --reload
+cd apps/api && pip install -e ../../packages/schema -e ../../services/solver -e . && uvicorn app.main:app --reload
 
 # web (separate terminal)
 pnpm dev:web
 
 # solver (separate terminal)
-cd services/solver && pip install -e ".[dev]" && python -m poker_solver.river_mccfr
+cd services/solver && pip install -e ".[dev]" && python -m poker_solver.postflop_mccfr
 ```
 
 `GET http://localhost:8000/health` should return

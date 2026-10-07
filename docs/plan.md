@@ -5,7 +5,7 @@ original seven-stage pitch, the two decisions locked in before scaffolding,
 and what ships in each stage. (Full designed version: ask in the team
 channel for the artifact link if you want the formatted read.)
 
-**Status (2026-09-30):** Stage 1 and 2 done. Stage 3 (`parseSpotText.ts`)
+**Status (2026-10-06):** Stage 1 and 2 done. Stage 3 (`parseSpotText.ts`)
 recognizes the same two situations the button builder does, widened past
 its original literal two-phrasing MVP with synonyms (seat names like
 "button"/"cutoff", "raises" as well as "opens", "big blinds" spelled out)
@@ -16,7 +16,8 @@ chart-coverable shapes) — the first of the "pluggable adapters" this
 stage's note called for. The range grid is finally mounted editable, not
 just as a read-only chart display: every entry path (Builder, Type in,
 Import) lets you adjust the matched range before saving it. `apps/web` is
-routed into four screens (Builder / Saved / Type in / Import). Saved spots
+routed into five screens (Builder / Saved / Type in / Import / Solve).
+Saved spots
 is wired end-to-end: `apps/api` persists `Spot`s (Postgres via Supabase)
 behind `POST`/`GET /spots` (see `docs/decisions.md`). Stage 6's frontend
 half is done too: Supabase email/password sign-in, session state, and an
@@ -27,17 +28,29 @@ project's public keys) and scopes `POST`/`GET /spots` per user, with the
 `spots` table moved under Alembic migrations. `apps/api` is
 deployed (Render); the Android build (Capacitor) has a real app icon/splash
 and runs end-to-end against the live API on a physical device. **Stage 5
-has a real start**: `services/solver` now has a genuine river-only MCCFR
-engine (`river_mccfr.py` — heads-up, a fixed 5-card board, two ranges,
-the locked bet-size menu, solved via chance-sampled Monte Carlo CFR and
-checked against closed-form poker theory, not just "did it run"), backed
-by a from-scratch hand evaluator (`evaluator.py`) and a
-169-label-to-concrete-combo sampler (`combos.py`) — see
-`services/solver/README.md`. Not yet wired to `apps/api`, no frontend
-for it, and flop/turn aren't solvable yet (they need a runout — dealing
-the rest of the board — which this doesn't do). Remaining: Stage 4 past
-its one-format MVP, Stage 5's flop/turn runout + API route + frontend
-board picker, and the rest of Stage 6 (tags, search).
+has grown past its initial river-only start**: `services/solver` now
+solves any single postflop street — flop, turn, or river — heads-up, two
+ranges, the locked bet-size menu, via chance-sampled Monte Carlo CFR,
+checked against closed-form poker theory, not just "did it run"
+(`postflop_mccfr.py`, `betting_round.py`, backed by a from-scratch hand
+evaluator and a 169-label-to-concrete-combo sampler with a board-runout
+sampler for flop/turn — see `services/solver/README.md`). It's wired up
+now too: `apps/api`'s `POST /spots/solve` (`app/solve.py`) runs a real
+solve synchronously and returns a per-action-frequency strategy for
+whichever player's decision the request implies — see
+`docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
+`Spot` convention — two ranges, not one — rather than a schema change).
+`apps/web` has a screen for it now too: the new **Solve** tab
+(`pages/SolvePage.tsx`) — two positions, two ranges, a board (click
+cards via `components/CardPicker/CardPicker.tsx`, or type them via
+`lib/cards.ts` — see `docs/decisions.md`'s 2026-10-06/07 entries), and a
+results table showing real per-action frequencies per hand, not a
+single chart weight. This only ever solves one street's betting at a
+time — modeling a full flop→turn→river betting tree in one solve is a
+separate, bigger future direction (see "widening the solver" below), not
+something this does. Remaining: Stage 4 past its one-format MVP, Stage
+5's solve caching + eventually multi-street solving, and the rest of
+Stage 6 (tags, search).
 
 ## The pitch
 
@@ -122,9 +135,12 @@ Once Stage 5's narrow scope is validated and cached in production, in
 roughly this order of effort:
 
 1. **More bet sizes** — cheap; same MCCFR, bigger action space per node.
-2. **More streets** (flop→turn→river) — the big one. Tree size grows
-   combinatorially; needs card abstraction (bucketing similar hands) to
-   stay solvable in reasonable time, not just more compute.
+2. **Multi-street solving** — one tree spanning flop→turn→river betting
+   in a single solve, instead of one street at a time (any single street
+   is already solvable — see `services/solver/README.md`). The big one.
+   Tree size grows combinatorially; needs card abstraction (bucketing
+   similar hands) to stay solvable in reasonable time, not just more
+   compute.
 3. **3+ players** — CFR's convergence guarantees weaken outside heads-up;
    realistically last.
 4. **Arbitrary bet sizing** — architecturally simple, but hurts solve

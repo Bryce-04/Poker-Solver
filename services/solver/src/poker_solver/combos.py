@@ -13,7 +13,7 @@ import bisect
 import random
 from collections.abc import Sequence
 
-from .cards import RANKS
+from .cards import FULL_DECK, RANKS
 
 Combo = tuple[int, int]
 
@@ -109,3 +109,13 @@ def sample_deal(
         "couldn't find a non-colliding deal after "
         f"{max_attempts} attempts -- ranges likely overlap almost entirely"
     )
+
+
+def deal_runout(blocked: frozenset[int], count: int, rng: random.Random) -> tuple[int, ...]:
+    """Deals `count` unique cards uniformly at random from the deck, for
+    completing a board that isn't at the river yet (flop needs 2 more
+    cards, turn needs 1, river needs 0). `blocked` is every card already
+    spoken for this iteration -- the known board plus both players'
+    sampled hole cards -- so the runout can never collide with them."""
+    available = [c for c in FULL_DECK if c not in blocked]
+    return tuple(rng.sample(available, count))

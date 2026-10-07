@@ -1,6 +1,6 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { fetchReferenceStrategy, listSpots, saveSpot } from './api'
+import { fetchReferenceStrategy, listSpots, saveSpot, solveSpot } from './api'
 import { getAccessToken } from './auth'
 
 // authHeaders() (api.ts) calls this directly -- mock it rather than the
@@ -191,5 +191,55 @@ describe('listSpots', () => {
     await listSpots()
     const [options] = requestMock.mock.calls[0]
     expect(options.headers.Authorization).toBe('Bearer the-jwt')
+  })
+})
+
+describe('solveSpot', () => {
+  const solveBody = {
+    source: 'live_solve',
+    iterations: 8000,
+    position: 'BTN',
+    strategy: { AA: { check: 0.0, all_in: 1.0 } },
+  }
+
+  it('POSTs the spot to /spots/solve', async () => {
+    mockResponse(200, solveBody)
+
+    await solveSpot(spot)
+
+    expect(requestMock).toHaveBeenCalledTimes(1)
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url).toMatch(/\/spots\/solve$/)
+    expect(options.method).toBe('POST')
+    expect(options.data).toEqual(spot)
+  })
+
+  it('classifies a 2xx as { kind: "solved" } carrying the response body', async () => {
+    mockResponse(200, solveBody)
+    await expect(solveSpot(spot)).resolves.toEqual({ kind: 'solved', data: solveBody })
+  })
+
+  it('classifies a 422 with an array detail as { kind: "invalid" }', async () => {
+    const detail = [{ loc: ['body', 'pot_bb'], msg: 'field required', type: 'missing' }]
+    mockResponse(422, { detail })
+    await expect(solveSpot(spot)).resolves.toEqual({ kind: 'invalid', issues: detail })
+  })
+
+  it('classifies a 422 with a string detail as { kind: "rejected" } with the reason', async () => {
+    mockResponse(422, { detail: 'ranges is missing an entry for: BTN' })
+    await expect(solveSpot(spot)).resolves.toEqual({
+      kind: 'rejected',
+      reason: 'ranges is missing an entry for: BTN',
+    })
+  })
+
+  it('classifies any other non-2xx as { kind: "error" } with the status', async () => {
+    mockResponse(500, { detail: 'boom' })
+    await expect(solveSpot(spot)).resolves.toEqual({ kind: 'error', status: 500 })
+  })
+
+  it('classifies a request rejection as { kind: "network-error" } and never throws', async () => {
+    requestMock.mockRejectedValue(new Error('network unreachable'))
+    await expect(solveSpot(spot)).resolves.toEqual({ kind: 'network-error' })
   })
 })

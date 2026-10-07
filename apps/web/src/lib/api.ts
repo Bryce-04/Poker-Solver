@@ -173,3 +173,59 @@ export async function listSpots(): Promise<ListSpotsResult> {
   }
   return { kind: "error", status: res.status };
 }
+
+// Shaped to match apps/api/app/solve.py's response dict.
+export interface LiveSolveResponse {
+  source: "live_solve";
+  iterations: number;
+  position: Position;
+  strategy: Record<string, Record<string, number>>;
+}
+
+// /spots/solve's 422s aren't one shape: a schema-invalid Spot (missing
+// field, wrong type) comes from FastAPI/Pydantic as { detail: [...] },
+// same as every other route here ("invalid"); a well-formed Spot this
+// route still can't solve (wrong board length, a missing range, a bet
+// already recorded this street) comes from solve.py's own
+// InvalidSolveRequest as { detail: "<message>" } -- a plain string. These
+// need different UI treatment ("fix these fields" vs. "this route can't
+// solve that yet, here's why"), so they're different kinds, not one
+// generic "invalid".
+export type SolveSpotResult =
+  | { kind: "solved"; data: LiveSolveResponse }
+  | { kind: "invalid"; issues: SpotValidationIssue[] }
+  | { kind: "rejected"; reason: string }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * POSTs a Spot to /spots/solve and classifies the response. Same
+ * CapacitorHttp-based convention as the rest of this module -- never
+ * throws, transport failures come back as { kind: "network-error" }.
+ */
+export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots/solve`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: spot,
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "solved", data: asJson(res.data) as LiveSolveResponse };
+  }
+  if (res.status === 422) {
+    const body = asJson(res.data);
+    const detail = (body as { detail?: unknown } | undefined)?.detail;
+    if (typeof detail === "string") {
+      return { kind: "rejected", reason: detail };
+    }
+    return { kind: "invalid", issues: parseValidationIssues(body) };
+  }
+  return { kind: "error", status: res.status };
+}

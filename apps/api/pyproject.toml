@@ -13,6 +13,7 @@ dependencies = [
     "alembic>=1.13",
     "pyjwt[crypto]>=2.8",
     "poker-solver-schema",
+    "poker-solver-engine",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +24,7 @@ dev = [
 
 [tool.uv.sources]
 poker-solver-schema = { path = "../../packages/schema", editable = true }
+poker-solver-engine = { path = "../../services/solver", editable = true }
 
 [build-system]
 requires = ["hatchling"]

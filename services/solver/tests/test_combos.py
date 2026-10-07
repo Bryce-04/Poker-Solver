@@ -5,6 +5,7 @@ import pytest
 from poker_solver.cards import card_rank, card_suit, parse_card
 from poker_solver.combos import (
     WeightedRangeSampler,
+    deal_runout,
     expand_range_to_combos,
     label_to_combos,
     sample_deal,
@@ -84,3 +85,25 @@ def test_sample_deal_never_collides() -> None:
 def test_sampler_rejects_empty_range() -> None:
     with pytest.raises(ValueError):
         WeightedRangeSampler([])
+
+
+def test_deal_runout_returns_the_requested_count() -> None:
+    rng = random.Random(0)
+    assert len(deal_runout(frozenset(), 2, rng)) == 2
+    assert len(deal_runout(frozenset(), 1, rng)) == 1
+    assert len(deal_runout(frozenset(), 0, rng)) == 0
+
+
+def test_deal_runout_never_returns_a_blocked_card() -> None:
+    blocked = frozenset(parse_card(c) for c in ["As", "Kd", "2c"])
+    rng = random.Random(0)
+    for _ in range(500):
+        runout = deal_runout(blocked, 2, rng)
+        assert not (set(runout) & blocked)
+
+
+def test_deal_runout_never_duplicates_a_card() -> None:
+    rng = random.Random(0)
+    for _ in range(500):
+        runout = deal_runout(frozenset(), 2, rng)
+        assert len(set(runout)) == len(runout)

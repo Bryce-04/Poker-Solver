@@ -1,10 +1,11 @@
-"""Chance-sampled Monte Carlo CFR for the river-only game (river_game.py),
-given two ranges and a fixed board. Same regret-matching shape as
+"""Chance-sampled Monte Carlo CFR for one postflop street (flop, turn, or
+river), given two ranges and a board. Same regret-matching shape as
 kuhn_spike.py's KuhnCfrTrainer -- see that file's docstring for the CFR
 background -- adapted for: a per-node dynamic action set (Kuhn's is a fixed
 two-action constant), chance-sampled hole cards drawn from weighted ranges
-instead of an exhaustive tree walk, and utilities returned as an explicit
-(u0, u1) pair instead of negated.
+instead of an exhaustive tree walk, utilities returned as an explicit
+(u0, u1) pair instead of negated, and (new) a sampled board runout when
+the street isn't the river yet.
 
 Why not negate like Kuhn does: Kuhn is strictly zero-sum at every node
 (antes only). Here, pot_bb is dead money from earlier streets that neither
@@ -12,6 +13,15 @@ player "contributed" this street, so u0 + u1 == pot_bb (a nonzero constant)
 at every terminal -- negation would silently break. Returning both
 utilities explicitly and using them directly is also the more standard
 pattern for real (non-toy) poker CFR.
+
+Flop/turn vs. river: betting_round.py's state machine has no idea how many
+board cards there are -- it's pure pot/action bookkeeping. The only new
+thing a shorter board needs is dealing the rest of it before a showdown
+can be evaluated, which is exactly what chance-sampling already does for
+hole cards: sample the whole iteration's chance outcome (hole cards AND
+any missing board cards) once at the top of the loop, then walk the
+(now chance-fixed) betting tree. That's why `train` samples the runout
+right alongside the hole cards, before any CFR recursion starts.
 """
 
 from __future__ import annotations
@@ -20,10 +30,18 @@ import random
 import time
 from dataclasses import dataclass, field
 
+from .betting_round import BettingRoundState
 from .cards import card_str, parse_card
-from .combos import WeightedRangeSampler, expand_range_to_combos, label_to_combos, sample_deal
+from .combos import (
+    WeightedRangeSampler,
+    deal_runout,
+    expand_range_to_combos,
+    label_to_combos,
+    sample_deal,
+)
 from .evaluator import evaluate_best
-from .river_game import RiverState
+
+BOARD_SIZE_AT_RIVER = 5
 
 
 @dataclass
@@ -53,8 +71,8 @@ class _InfoSetNode:
 
 
 @dataclass
-class RiverSpotConfig:
-    board: tuple[int, ...]  # exactly 5 cards -- river-only scope
+class PostflopSpotConfig:
+    board: tuple[int, ...]  # 3 (flop), 4 (turn), or 5 (river) cards
     pot_bb: float
     effective_stack_bb: float
     range0: dict[str, float]
@@ -62,17 +80,24 @@ class RiverSpotConfig:
     first_to_act: int = 0
     prior_history: tuple[str, ...] = ()
 
+    def __post_init__(self) -> None:
+        if len(self.board) not in (3, 4, 5):
+            raise ValueError(
+                f"board must be 3 (flop), 4 (turn), or 5 (river) cards, got {len(self.board)}"
+            )
+
 
 def _info_set_key(player: int, hand: tuple[int, int], history: tuple[str, ...]) -> str:
     combo = "".join(sorted(card_str(c) for c in hand))
     return f"{player}|{combo}|{'/'.join(history)}"
 
 
-class RiverMccfrTrainer:
-    def __init__(self, config: RiverSpotConfig, seed: int = 0) -> None:
+class PostflopMccfrTrainer:
+    def __init__(self, config: PostflopSpotConfig, seed: int = 0) -> None:
         self._config = config
         self._rng = random.Random(seed)
         self._nodes: dict[str, _InfoSetNode] = {}
+        self._runout_needed = BOARD_SIZE_AT_RIVER - len(config.board)
         board_blocked = frozenset(config.board)
         self._sampler0 = WeightedRangeSampler(
             expand_range_to_combos(config.range0, blocked=board_blocked)
@@ -89,11 +114,19 @@ class RiverMccfrTrainer:
         total0 = total1 = 0.0
         for _ in range(iterations):
             hand0, hand1 = sample_deal(self._sampler0, self._sampler1, self._rng)
-            # Evaluated once per iteration and reused at every terminal this
-            # iteration's tree walk reaches, not once per terminal.
-            strength0 = evaluate_best(hand0 + self._config.board)
-            strength1 = evaluate_best(hand1 + self._config.board)
-            state = RiverState.initial(
+            if self._runout_needed:
+                blocked = frozenset(self._config.board) | set(hand0) | set(hand1)
+                runout = deal_runout(blocked, self._runout_needed, self._rng)
+                board = self._config.board + runout
+            else:
+                board = self._config.board
+            # Evaluated once per iteration (full chance outcome -- hole
+            # cards AND any sampled runout -- is fixed before any betting
+            # is walked) and reused at every terminal this iteration's
+            # tree walk reaches, not once per terminal.
+            strength0 = evaluate_best(hand0 + board)
+            strength1 = evaluate_best(hand1 + board)
+            state = BettingRoundState.initial(
                 self._config.pot_bb,
                 self._config.effective_stack_bb,
                 self._config.first_to_act,
@@ -106,7 +139,7 @@ class RiverMccfrTrainer:
 
     def _cfr(
         self,
-        state: RiverState,
+        state: BettingRoundState,
         hand0: tuple[int, int],
         hand1: tuple[int, int],
         strength0: object,
@@ -156,17 +189,56 @@ class RiverMccfrTrainer:
         return node_u0, node_u1
 
 
-def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
-    """Same polarized-range-vs-bluffcatcher scenario test_river_mccfr.py
-    checks against closed-form numbers -- see that file's module docstring
-    for the full derivation. Board Ks Qh 9d 4c 2s, pot_bb=100,
-    effective_stack_bb=33 (exactly the 33%-pot size, so Hero's options
-    collapse to check/all_in and Villain's to fold/call). Run directly:
+def aggregate_label_strategies(
+    trainer: PostflopMccfrTrainer,
+    board: tuple[int, ...],
+    player: int,
+    range_weights: dict[str, float],
+    history: tuple[str, ...],
+) -> dict[str, dict[str, float]]:
+    """Aggregates combo-level average strategies back up to 169-type
+    labels, averaged uniformly across each label's unblocked combos --
+    the natural way to produce a real per-action-frequency output, now
+    that the engine isn't bound by HandRange's one-weight-per-label
+    ceiling (see models.py's HandRange docstring and reference_charts.py's
+    "known limitation" note on defend charts).
 
-        python -m poker_solver.river_mccfr
+    A label with zero weight in `range_weights`, or whose combos are all
+    blocked by `board`, or that never got sampled often enough to reach
+    this info set, is simply omitted -- not faked with a guess.
+    """
+    blocked = frozenset(board)
+    result: dict[str, dict[str, float]] = {}
+    for label, weight in range_weights.items():
+        if weight <= 0:
+            continue
+        combos = [c for c in label_to_combos(label) if c[0] not in blocked and c[1] not in blocked]
+        if not combos:
+            continue
+        strategies = [
+            node.average_strategy()
+            for combo in combos
+            if (node := trainer.node_map.get(_info_set_key(player, combo, history))) is not None
+        ]
+        if not strategies:
+            continue
+        actions = strategies[0].keys()
+        result[label] = {a: sum(s[a] for s in strategies) / len(strategies) for a in actions}
+    return result
+
+
+def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
+    """Same polarized-range-vs-bluffcatcher scenario test_postflop_mccfr.py
+    checks against closed-form numbers -- see that file's module docstring
+    for the full derivation. Board Ks Qh 9d 4c 2s (the river -- no runout
+    needed), pot_bb=100, effective_stack_bb=33 (exactly the 33%-pot size,
+    so Hero's options collapse to check/all_in and Villain's to fold/call).
+    Run directly:
+
+        python -m poker_solver.postflop_mccfr
     """
     board = tuple(parse_card(c) for c in ["Ks", "Qh", "9d", "4c", "2s"])
-    config = RiverSpotConfig(
+    config = PostflopSpotConfig(
         board=board,
         pot_bb=100.0,
         effective_stack_bb=33.0,
@@ -175,21 +247,15 @@ def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
         first_to_act=1,
         prior_history=("check",),
     )
-    trainer = RiverMccfrTrainer(config, seed=seed)
+    trainer = PostflopMccfrTrainer(config, seed=seed)
 
     start = time.perf_counter()
     trainer.train(iterations)
     elapsed = time.perf_counter() - start
-    print(f"River MCCFR: {iterations:,} iterations in {elapsed:.3f}s")
+    print(f"Postflop MCCFR: {iterations:,} iterations in {elapsed:.3f}s")
 
     def average(player: int, label: str, history: tuple[str, ...]) -> dict[str, float]:
-        blocked = frozenset(board)
-        combos = [c for c in label_to_combos(label) if c[0] not in blocked and c[1] not in blocked]
-        strategies = [
-            trainer.node_map[_info_set_key(player, c, history)].average_strategy() for c in combos
-        ]
-        actions = strategies[0].keys()
-        return {a: sum(s[a] for s in strategies) / len(strategies) for a in actions}
+        return aggregate_label_strategies(trainer, board, player, {label: 1.0}, history)[label]
 
     print()
     print("Hero (AA/33) opening decision, average strategy:")

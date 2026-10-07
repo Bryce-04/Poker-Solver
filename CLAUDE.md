@@ -34,13 +34,27 @@ listed for no one. The `spots` table is managed by Alembic
 (`apps/api/migrations`), not `create_all`. `apps/api` is deployed on
 Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
-against the live API on a physical device. **`services/solver` now has
-a real river-only MCCFR engine** (heads-up, a fixed 5-card board, two
-ranges, the locked bet-size menu — `river_mccfr.py`, backed by a
+against the live API on a physical device. **`services/solver` now
+solves any single postflop street** — flop, turn, or river, heads-up,
+two ranges, the locked bet-size menu — `postflop_mccfr.py`, backed by a
 from-scratch hand evaluator and a range-to-combo sampler, checked
-against closed-form poker theory in `tests/test_river_mccfr.py`), not
-yet wired to `apps/api` or the frontend, and flop/turn aren't solvable
-yet (no runout logic).**
+against closed-form poker theory in `tests/test_postflop_mccfr.py` (flop/
+turn via a Monte Carlo board runout, `combos.py`'s `deal_runout`, checked
+against exact brute-force equity in `tests/test_runout_equity.py`). It's
+wired up now too: `apps/api`'s `POST /spots/solve` (`app/solve.py`) calls
+into it synchronously and returns a real per-action-frequency strategy
+for whichever player's decision the request implies — see
+`docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
+convention on `Spot`, not a schema change: `positions_in_hand` needs two
+entries, `ranges` needs both). `apps/web` has a screen for it now too:
+`pages/SolvePage.tsx` ("Solve") — two positions, two `RangeGrid`s, a
+validated board text field (`lib/cards.ts`, a v1 ahead of a visual
+rank/suit picker — see `docs/decisions.md`), and a results table (not a
+chart — each hand's real per-action frequencies, not one weight).
+Multi-street solving (modeling betting across flop *and* turn *and*
+river in one tree, as opposed to one street at a time) is a separate,
+bigger future
+direction, not done.**
 
 ## Commands
 
@@ -74,11 +88,11 @@ committed. If a model's exported names change, update the re-exports in
 python -m venv .venv && source .venv/Scripts/activate   # or .venv/bin/activate on macOS/Linux
 pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 
-cd apps/api && uvicorn app.main:app --reload              # GET /health
-cd services/solver && python -m poker_solver.kuhn_spike   # Stage 1 toy CFR spike demo
-cd services/solver && python -m poker_solver.river_mccfr  # the real river-only solver demo
-pytest services/solver                                    # from repo root, or `pytest` from within services/solver
-pytest services/solver/tests/test_river_mccfr.py           # the real solver's closed-form regression test
+cd apps/api && uvicorn app.main:app --reload                 # GET /health
+cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
+cd services/solver && python -m poker_solver.postflop_mccfr  # the real solver demo
+pytest services/solver                                       # from repo root, or `pytest` from within services/solver
+pytest services/solver/tests/test_postflop_mccfr.py           # the real solver's closed-form regression tests
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
@@ -149,21 +163,29 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   — opening-action frequencies aren't a fixed point to assert on in
   tests; what's invariant is that the best hand always continues facing
   a bet (see `test_kuhn_spike.py`). The real solver now exists:
-  `river_mccfr.py` (chance-sampled MCCFR, heads-up, a fixed river board,
-  the locked bet-size menu — same regret-matching shape as
-  `kuhn_spike.py`'s `KuhnCfrTrainer`), backed by `evaluator.py` (a
-  from-scratch hand evaluator), `combos.py` (`HandRange`'s 169-type
-  labels → concrete, board-aware card combos), and `river_game.py` (the
-  betting action abstraction, as a pure state machine). Its own
-  closed-form convergence test (`test_river_mccfr.py`) now covers the
-  "does CFR converge correctly" question `kuhn_spike.py` was there to
-  answer first — `kuhn_spike.py` is a reasonable deletion candidate at
-  this point, kept for now rather than deleted reflexively. See
-  `services/solver/README.md` for the module layout and the one
-  payoff-arithmetic subtlety worth knowing about before touching
-  `river_game.py`'s `terminal_utility`. Not wired to `apps/api` or the
-  frontend yet; flop/turn aren't solvable yet (need Monte Carlo runout
-  sampling on top of the range sampling this already does).
+  `postflop_mccfr.py` (chance-sampled MCCFR for one postflop street —
+  flop, turn, or river — heads-up, the locked bet-size menu — same
+  regret-matching shape as `kuhn_spike.py`'s `KuhnCfrTrainer`), backed by
+  `evaluator.py` (a from-scratch hand evaluator), `combos.py`
+  (`HandRange`'s 169-type labels → concrete, board-aware card combos,
+  plus `deal_runout` for sampling the rest of the board on the flop/
+  turn), and `betting_round.py` (the betting action abstraction, as a
+  pure state machine — genuinely card-agnostic, which is why it needed
+  no changes at all to support flop/turn). Its own closed-form
+  convergence tests (`test_postflop_mccfr.py`) now cover the "does CFR
+  converge correctly" question `kuhn_spike.py` was there to answer first
+  — `kuhn_spike.py` is a reasonable deletion candidate at this point,
+  kept for now rather than deleted reflexively. See
+  `services/solver/README.md` for the module layout, why flop/turn
+  needed less new code than expected, and the one payoff-arithmetic
+  subtlety worth knowing about before touching `betting_round.py`'s
+  `terminal_utility`. `apps/api`'s `POST /spots/solve` (`app/solve.py`)
+  now calls into it — see `docs/decisions.md`'s 2026-10-06 entry for the
+  request contract and `aggregate_label_strategies` (rolls combo-level
+  strategies back up to 169-type labels, the one function `solve.py`
+  calls). `apps/web/src/pages/SolvePage.tsx` ("Solve") now consumes it;
+  multi-street solving (one tree spanning flop+turn+river, rather than
+  one street at a time) is a separate, bigger future direction.
 - **`apps/web`** (React + TypeScript + Vite) is the only consumer of the
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not
