@@ -6,6 +6,31 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-06 — SolvePage's board input is a validated text field, not a visual picker yet
+
+**Status:** accepted
+
+**Context.** Stage 5's `SolvePage` (`apps/web/src/pages/SolvePage.tsx`) is
+the first screen that needs a board at all — the 2026-09-09 "board card
+picker is out of Stage 2" entry re-filed this exact question against
+Stage 5. Two ways to let someone enter 3-5 cards: a visual rank/suit
+click-grid (closer to this app's "ease of use" pitch and to what that
+older entry's wording implied), or a validated text field (type
+`"Ks Qh 9d"`, parsed against the schema's card notation).
+
+**Decision.** Text field for v1 (`lib/cards.ts`'s `parseBoardText`) —
+confirmed with the project owner, who wants a visual picker eventually
+but agreed a validated text field is enough to get the Solve screen
+working end to end now. Much less to build than a click-grid, and
+matches this app's existing precedent of a "type it in" entry path
+(Stage 3's `parseSpotText.ts`).
+
+**Consequences.** A visual rank/suit picker remains a real, wanted
+follow-up, not a closed question — re-file it as its own entry when it's
+actually built rather than treating this one as having answered it.
+
+---
+
 ## 2026-10-06 — POST /spots/solve: a new Spot convention, not a schema change; sync, not a job queue
 
 **Status:** proposed
@@ -204,6 +229,11 @@ which is the first thing that needs a board.
 **Consequences.** `Spot.board` stays at its schema default (empty list).
 The builder is preflop-only for Stage 2, which matches the reference-chart
 scope exactly.
+
+**Resolved 2026-10-06:** Stage 5's `SolvePage` is the screen this was
+re-filed against — see that date's entry below for what actually shipped
+(a validated text field, not yet the visual picker this entry's wording
+implied).
 
 ---
 

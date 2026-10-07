@@ -4,8 +4,8 @@ The React + TypeScript + Vite frontend. Stage 2's manual hand builder lives
 here: the button/dropdown **spot builder** and the **13×13 range grid**. See
 [`../../docs/plan.md`](../../docs/plan.md) for the roadmap and where this fits.
 
-**Status:** routed into four screens — Builder, Saved, Type in, Import
-(`react-router-dom`, `BrowserRouter` in `App.tsx`; see
+**Status:** routed into five screens — Builder, Saved, Type in, Import,
+Solve (`react-router-dom`, `BrowserRouter` in `App.tsx`; see
 `docs/decisions.md`). The spot builder and range grid are wired end to
 end to `apps/api`'s reference-chart lookup; the range grid's
 weighted-brush / drag-paint / keyboard selection and weight shading are
@@ -20,7 +20,11 @@ button on the three entry screens) is wired to `apps/api`'s
 `POST`/`GET /spots`. Stage 6 auth (see `## Auth` below) has a frontend
 start: Supabase sign-in, session state, and a "sign in to save spots"
 gate on all three save buttons — the backend half (verifying the token,
-scoping saved spots per user) hasn't landed yet.
+scoping saved spots per user) hasn't landed yet. **Solve** (`pages/
+SolvePage.tsx`) is Stage 5's new screen: a real MCCFR solve via `apps/api`'s
+`POST /spots/solve` — both players' ranges, a board (`lib/cards.ts`'s
+validated text field, see `docs/decisions.md`), and a per-action-frequency
+result table, not a single-weight range.
 
 ## Commands
 
@@ -47,16 +51,20 @@ src/
     BuilderPage.tsx            "/" — wraps SpotBuilder (Stage 2's button/dropdown builder)
     TypeInPage.tsx              "/type-in" — Stage 3's plain-language entry
     ImportPage.tsx               "/import" — Stage 4's hand-history paste entry
+    SolvePage.tsx                "/solve" — Stage 5's live MCCFR solve
     SavedSpotsPage.tsx          "/saved" — lists spots saved via apps/api
   components/
     SpotBuilder/              the spot builder form, reused by BuilderPage
     RangeGrid/                the 13×13 starting-hand grid
   lib/
-    api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot, listSpots
+    api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot,
+                              listSpots, solveSpot
     spot.ts                   buildOpenSpot/buildVsRaiseSpot — the shared Spot-assembly
                               helpers every entry path converges on
     parseSpotText.ts           Stage 3's rule-based parser (two phrasings, plus synonyms)
     parseHandHistory.ts        Stage 4's rule-based hand-history parser (one format)
+    cards.ts                   parseBoardText — Stage 5's board-text validation
+                              (SolvePage), a v1 ahead of a visual picker
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions
@@ -76,7 +84,7 @@ and nowhere else. Don't hand-write a parallel type; regenerate the package
 ## Talking to the API
 
 `lib/api.ts` is the single fetch chokepoint, built on `CapacitorHttp` (not
-`fetch` — see the Android section below) with three functions, none of
+`fetch` — see the Android section below) with four functions, none of
 which ever throw: every outcome comes back as a tagged result and callers
 switch on `.kind` instead of try/catch.
 
@@ -85,6 +93,7 @@ switch on `.kind` instead of try/catch.
 | `fetchReferenceStrategy(spot)` | `POST /spots/reference-strategy` | `match` (2xx, `.data` is a `ReferenceStrategyResponse`) / `no-match` (404) / `invalid` (422, `.issues`) / `network-error` / `error` (`.status`) |
 | `saveSpot(spot)` | `POST /spots` | `saved` (2xx, `.spot` echoes the server-assigned `id`/`created_at`) / `invalid` / `network-error` / `error` |
 | `listSpots()` | `GET /spots` | `ok` (`.spots: Spot[]`) / `network-error` / `error` |
+| `solveSpot(spot)` | `POST /spots/solve` | `solved` (2xx, `.data` is a `LiveSolveResponse`) / `invalid` (422 with an array `detail` — schema-level) / `rejected` (422 with a string `detail` — `apps/api/app/solve.py`'s own `InvalidSolveRequest`) / `network-error` / `error` |
 
 `ReferenceStrategyResponse` mirrors `apps/api/app/routes/spots.py`'s response
 dict and is the one shared seam — coordinate with whoever owns `apps/api`
@@ -169,8 +178,46 @@ block enumerates the current coverage. The matcher is owned by
 Each `ReferenceStrategyResult` `kind` renders its own status block; on `match`
 the returned range is shown read-only through `RangeGrid`.
 
-**Not here:** a board card picker (deferred to Stage 5 — nothing preflop
-needs it).
+**Not here:** a board card picker. `pages/SolvePage.tsx` (Stage 5) is the
+screen that needed one, and it has a v1 (a validated text field,
+`lib/cards.ts`) — a visual rank/suit picker is still deferred further;
+see `docs/decisions.md`'s 2026-10-06 entry.
+
+## SolvePage
+
+`pages/SolvePage.tsx` is Stage 5's screen: a real MCCFR solve
+(`apps/api`'s `POST /spots/solve`) instead of a static reference chart.
+It's the first screen needing *two* ranges and a board, so it departs
+from the other entry paths in a few ways:
+
+- **Two positions, two `RangeGrid`s.** `apps/web/src/lib/spot.ts`'s
+  helpers only ever fill in hero's position/range; this screen defines
+  its own convention instead (matching `apps/api/app/solve.py`'s
+  contract): the first position picker is out-of-position/first-to-act
+  this street, the second is in position, and each gets its own
+  editable `RangeGrid` — submit is disabled until both have at least
+  one hand selected.
+- **A board, via `lib/cards.ts`'s `parseBoardText`.** Type space-separated
+  cards (`"Ks Qh 9d"`); 3/4/5 cards selects flop/turn/river
+  automatically, there's no separate street picker. A v1 validated text
+  field, not a visual rank/suit picker — see `docs/decisions.md`.
+- **An "already checked" toggle**, not a full action-history editor —
+  maps directly onto `solve.py`'s "empty or exactly one seeded check"
+  contract. Anything past that (mid-street betting already recorded)
+  isn't solvable yet, so there's no UI for it.
+- **Results are a table, not a chart.** Each hand in the deciding
+  player's range is a row; each legal action at that decision is a
+  column. Unlike every `ReferenceStrategyResult`/`HandRange` elsewhere in
+  the app (one weight per hand), this is a genuine distribution over
+  multiple actions per hand — `LiveSolveResponse.strategy` in `lib/api.ts`.
+- **A solve takes a few seconds** (it's running thousands of real MCCFR
+  iterations server-side, not a lookup) — the loading state says so
+  explicitly rather than looking stuck.
+
+Reuses `SpotBuilder.css`'s `spot-builder__*` classes for every generic
+piece (fields, status blocks, buttons), same as `TypeInPage`/`ImportPage`;
+`SolvePage.css` only adds the results-table styling, which nothing else
+needed before this.
 
 ## RangeGrid
 

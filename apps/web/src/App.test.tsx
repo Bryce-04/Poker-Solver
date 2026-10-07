@@ -57,5 +57,8 @@ describe('<App />', () => {
 
     await user.click(screen.getByRole('link', { name: /^import$/i }))
     expect(screen.getByLabelText(/paste a hand history/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('link', { name: /^solve$/i }))
+    expect(screen.getByLabelText(/out of position/i)).toBeInTheDocument()
   })
 })

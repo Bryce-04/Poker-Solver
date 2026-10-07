@@ -42,9 +42,14 @@ into it synchronously and returns a real per-action-frequency strategy
 for whichever player's decision the request implies — see
 `docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
 convention on `Spot`, not a schema change: `positions_in_hand` needs two
-entries, `ranges` needs both). No frontend consumes it yet; multi-street
-solving (modeling betting across flop *and* turn *and* river in one
-tree, as opposed to one street at a time) is a separate, bigger future
+entries, `ranges` needs both). `apps/web` has a screen for it now too:
+`pages/SolvePage.tsx` ("Solve") — two positions, two `RangeGrid`s, a
+validated board text field (`lib/cards.ts`, a v1 ahead of a visual
+rank/suit picker — see `docs/decisions.md`), and a results table (not a
+chart — each hand's real per-action frequencies, not one weight).
+Multi-street solving (modeling betting across flop *and* turn *and*
+river in one tree, as opposed to one street at a time) is a separate,
+bigger future
 direction, not done.**
 
 ## Commands
@@ -158,9 +163,9 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   now calls into it — see `docs/decisions.md`'s 2026-10-06 entry for the
   request contract and `aggregate_label_strategies` (rolls combo-level
   strategies back up to 169-type labels, the one function `solve.py`
-  calls). No frontend consumes it yet; multi-street solving (one tree
-  spanning flop+turn+river, rather than one street at a time) is a
-  separate, bigger future direction.
+  calls). `apps/web/src/pages/SolvePage.tsx` ("Solve") now consumes it;
+  multi-street solving (one tree spanning flop+turn+river, rather than
+  one street at a time) is a separate, bigger future direction.
 - **`apps/web`** (React + TypeScript + Vite) is the only consumer of the
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not

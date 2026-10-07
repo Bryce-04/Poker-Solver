@@ -16,7 +16,8 @@ chart-coverable shapes) — the first of the "pluggable adapters" this
 stage's note called for. The range grid is finally mounted editable, not
 just as a read-only chart display: every entry path (Builder, Type in,
 Import) lets you adjust the matched range before saving it. `apps/web` is
-routed into four screens (Builder / Saved / Type in / Import). Saved spots
+routed into five screens (Builder / Saved / Type in / Import / Solve).
+Saved spots
 is wired end-to-end: `apps/api` persists `Spot`s (Postgres via Supabase)
 behind `POST`/`GET /spots` (see `docs/decisions.md`). Stage 6's frontend
 half is done too: Supabase email/password sign-in, session state, and an
@@ -39,12 +40,17 @@ solve synchronously and returns a per-action-frequency strategy for
 whichever player's decision the request implies — see
 `docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
 `Spot` convention — two ranges, not one — rather than a schema change).
-No frontend consumes it yet, and this only ever solves one street's
+`apps/web` has a screen for it now too: the new **Solve** tab
+(`pages/SolvePage.tsx`) — two positions, two ranges, a board (a v1
+validated text field, `lib/cards.ts` — a visual rank/suit picker is
+deliberately deferred further, see `docs/decisions.md`'s 2026-10-06
+entry), and a results table showing real per-action frequencies per
+hand, not a single chart weight. This only ever solves one street's
 betting at a time — modeling a full flop→turn→river betting tree in one
 solve is a separate, bigger future direction (see "widening the solver"
 below), not something this does. Remaining: Stage 4 past its one-format
-MVP, Stage 5's frontend (board picker + results display, + eventually
-multi-street solving), and Stage 6's backend half (JWT verification,
+MVP, Stage 5's visual board picker + solve caching + eventually
+multi-street solving, and Stage 6's backend half (JWT verification,
 per-user scoping).
 
 ## The pitch
