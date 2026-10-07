@@ -34,14 +34,19 @@ class SpotRow(Base):
     """A saved Spot, stored whole as JSONB rather than normalized -- the
     Spot schema (packages/schema) is still evolving, and `data` is what
     gets round-tripped back into a Spot on read. `id`/`created_at` are
-    real columns purely for the primary key and list ordering.
+    real columns purely for the primary key and list ordering, and
+    `created_by` so GET /spots can filter per user without reaching into the
+    JSONB. It's nullable because rows saved before Stage 6 auth have no
+    owner -- they're kept, just never listed for anyone.
+
+    The table itself is managed by Alembic (apps/api/migrations), not
+    create_all -- create_all never adds a column to a table that already
+    exists, which is exactly what the deployed database needed here.
     """
 
     __tablename__ = "spots"
 
     id = Column(UUID(as_uuid=True), primary_key=True)
     created_at = Column(DateTime(timezone=True), nullable=False)
+    created_by = Column(UUID(as_uuid=True), nullable=True, index=True)
     data = Column(JSONB, nullable=False)
-
-
-Base.metadata.create_all(engine)
