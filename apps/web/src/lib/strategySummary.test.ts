@@ -1,4 +1,5 @@
-import { formatMix, overallMix } from "./strategySummary";
+import type { Spot } from "@poker-solver/schema";
+import { describeSpot, formatMix, overallMix } from "./strategySummary";
 
 describe("overallMix", () => {
   it("averages each action across hands, in a fixed order", () => {
@@ -21,5 +22,19 @@ describe("overallMix", () => {
 describe("formatMix", () => {
   it("renders labels and rounded percentages", () => {
     expect(formatMix([["check", 0.384], ["all_in", 0.616]])).toBe("Check 38%, All-in 62%");
+  });
+});
+
+describe("describeSpot", () => {
+  it("summarizes seats, street + board, and pot", () => {
+    expect(
+      describeSpot({
+        positions_in_hand: ["BB", "BTN"],
+        effective_stack_bb: 99,
+        pot_bb: 2.5,
+        board: ["Ks", "Qh", "9d"],
+        current_street: "flop",
+      } as Spot),
+    ).toBe("BB vs BTN · flop Ks Qh 9d · pot 2.5bb");
   });
 });

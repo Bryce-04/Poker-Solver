@@ -266,3 +266,94 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
   }
   return { kind: "error", status: res.status };
 }
+
+// A solve the user chose to keep -- shaped to match apps/api/app/routes/
+// solves.py. `result` is the same LiveSolveResponse /spots/solve returned.
+export interface SavedSolve {
+  id: string;
+  created_at: string;
+  label: string | null;
+  spot: Spot;
+  result: LiveSolveResponse;
+}
+
+function normalizeSavedSolve(raw: SavedSolve): SavedSolve {
+  // Same deploy-lag reasoning as solveSpot: bucketed_actions may be absent
+  // on a result saved by an older backend.
+  return { ...raw, result: { ...raw.result, bucketed_actions: raw.result.bucketed_actions ?? [] } };
+}
+
+export type SaveSolveResult =
+  | { kind: "saved"; solve: SavedSolve }
+  | { kind: "invalid" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** POSTs a finished solve (the Spot that was submitted + its result) to
+ * /solves. Requires sign-in. Never throws, like the rest of this module. */
+export async function saveSolve(
+  spot: Spot,
+  result: LiveSolveResponse,
+  label?: string,
+): Promise<SaveSolveResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/solves`,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      data: { spot, result, ...(label ? { label } : {}) },
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "saved", solve: normalizeSavedSolve(asJson(res.data) as SavedSolve) };
+  }
+  if (res.status === 422) return { kind: "invalid" };
+  return { kind: "error", status: res.status };
+}
+
+export type ListSolvesResult =
+  | { kind: "ok"; solves: SavedSolve[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** GETs the signed-in user's saved solves, newest first. */
+export async function listSolves(): Promise<ListSolvesResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/solves`,
+      method: "GET",
+      headers: await authHeaders(),
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "ok", solves: (asJson(res.data) as SavedSolve[]).map(normalizeSavedSolve) };
+  }
+  return { kind: "error", status: res.status };
+}
+
+export type DeleteSolveResult =
+  | { kind: "deleted" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** DELETEs one of the signed-in user's saved solves. */
+export async function deleteSolve(id: string): Promise<DeleteSolveResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/solves/${encodeURIComponent(id)}`,
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status >= 200 && res.status < 300) return { kind: "deleted" };
+  return { kind: "error", status: res.status };
+}

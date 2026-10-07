@@ -9,6 +9,7 @@ import { STREET_ORDER, preflopContext, summarizeHand, toBettingActions } from ".
 import type { BuilderAction } from "../lib/handBuilder";
 import {
   fetchReferenceStrategy,
+  saveSolve,
   solveSpot,
   type LiveSolveResponse,
   type SpotValidationIssue,
@@ -19,6 +20,7 @@ import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
 import { StreetActions } from "../components/StreetActions/StreetActions";
 import { Step } from "../components/Step/Step";
 import { formatMix, overallMix } from "../lib/strategySummary";
+import { useAuth } from "../lib/auth";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -28,7 +30,8 @@ type SetupMode = "click" | "paste";
 type Outcome =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "solved"; data: LiveSolveResponse }
+  // `spot` is exactly what was submitted, kept so "Save this solve" can store it.
+  | { kind: "solved"; data: LiveSolveResponse; spot: Spot }
   | { kind: "invalid"; issues: SpotValidationIssue[] }
   | { kind: "rejected"; reason: string }
   | { kind: "busy" }
@@ -38,6 +41,13 @@ type Outcome =
 // Status for each position's "Load reference range" button -- separate
 // from the solve Outcome above, since loading a starting range and
 // submitting a solve are independent actions with independent feedback.
+type SaveSolveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved" }
+  | { kind: "error" }
+  | { kind: "not-signed-in" };
+
 type ChartLoadState =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -103,6 +113,8 @@ export function SolvePage() {
     setChartStates((prev) => ({ ...prev, [position]: state }));
   }
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const auth = useAuth();
+  const [saveState, setSaveState] = useState<SaveSolveState>({ kind: "idle" });
 
   // Click-through mode's own state: a true starting stack (before any
   // action) plus each street's real action log -- pot_bb/effective_stack_bb
@@ -186,10 +198,11 @@ export function SolvePage() {
     };
 
     setOutcome({ kind: "loading" });
+    setSaveState({ kind: "idle" });
     const result = await solveSpot(spot);
     switch (result.kind) {
       case "solved":
-        setOutcome({ kind: "solved", data: result.data });
+        setOutcome({ kind: "solved", data: result.data, spot });
         return;
       case "invalid":
         setOutcome({ kind: "invalid", issues: result.issues });
@@ -269,6 +282,17 @@ export function SolvePage() {
     });
   }
 
+  async function handleSaveSolve() {
+    if (outcome.kind !== "solved") return;
+    if (auth.status !== "signed-in") {
+      setSaveState({ kind: "not-signed-in" });
+      return;
+    }
+    setSaveState({ kind: "saving" });
+    const result = await saveSolve(outcome.spot, outcome.data);
+    setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
+  }
+
   /** Back to a blank page: every input, both ranges, and any result. */
   function resetAll() {
     setSetupMode("click");
@@ -280,6 +304,7 @@ export function SolvePage() {
     setRanges({});
     setChartStates({});
     setOutcome({ kind: "idle" });
+    setSaveState({ kind: "idle" });
     setStartingStackBb(100);
     setStreets(EMPTY_STREETS);
     setRedoStack([]);
@@ -818,6 +843,31 @@ export function SolvePage() {
           ) : (
             <StrategyGrid strategy={outcome.data.strategy} />
           )}
+          <div className="solve-page__actions">
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={handleSaveSolve}
+              disabled={saveState.kind === "saving" || saveState.kind === "saved"}
+            >
+              {saveState.kind === "saving" ? "Saving…" : "Save this solve"}
+            </button>
+            {saveState.kind === "saved" && (
+              <span className="spot-builder__save-status spot-builder__save-status--ok">
+                Saved &mdash; find it on the Saved tab.
+              </span>
+            )}
+            {saveState.kind === "error" && (
+              <span className="spot-builder__save-status spot-builder__save-status--error">
+                Couldn&rsquo;t save that solve &mdash; try again in a moment.
+              </span>
+            )}
+            {saveState.kind === "not-signed-in" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                Sign in to save solves.
+              </span>
+            )}
+          </div>
           <details className="solve-page__details">
             <summary>Details</summary>
             {outcome.data.exploitability_pct !== undefined && (

@@ -1,16 +1,24 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
-import { fetchReferenceStrategy, solveSpot } from "../lib/api";
+import { fetchReferenceStrategy, saveSolve, solveSpot } from "../lib/api";
+import { useAuth } from "../lib/auth";
 
 vi.mock("../lib/api", () => ({
   solveSpot: vi.fn(),
   fetchReferenceStrategy: vi.fn(),
+  saveSolve: vi.fn(),
 }));
+vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
+const mockUseAuth = vi.mocked(useAuth);
+const mockSaveSolve = vi.mocked(saveSolve);
 const mockSolve = vi.mocked(solveSpot);
 const mockFetchReference = vi.mocked(fetchReferenceStrategy);
 
 beforeEach(() => {
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
+  mockSaveSolve.mockReset();
   mockSolve.mockReset();
   mockFetchReference.mockReset();
 });
@@ -638,5 +646,67 @@ Hero: checks
         actions: [{ position: "BB", street: "flop", action: "check" }],
       }),
     );
+  });
+});
+
+describe("SolvePage -- saving a solve", () => {
+  const SOLVED = {
+    kind: "solved" as const,
+    data: {
+      source: "live_solve" as const,
+      iterations: 100,
+      position: "BTN" as const,
+      strategy: { AA: { check: 0.25, bet_small: 0.75 } },
+      bucketed_actions: [],
+    },
+  };
+
+  async function solveOnce(user: ReturnType<typeof userEvent.setup>) {
+    mockSolve.mockResolvedValue(SOLVED);
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+    await screen.findByText(/BTN.s strategy/i);
+  }
+
+  it("saves the submitted spot together with the result", async () => {
+    const user = userEvent.setup();
+    mockSaveSolve.mockResolvedValue({ kind: "saved", solve: {} as never });
+    await solveOnce(user);
+
+    await user.click(screen.getByRole("button", { name: /save this solve/i }));
+
+    expect(mockSaveSolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        positions_in_hand: ["BB", "BTN"],
+        board: ["Ks", "Qh", "9d"],
+        current_street: "flop",
+      }),
+      SOLVED.data,
+    );
+    expect(await screen.findByText(/find it on the saved tab/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save this solve/i })).toBeDisabled();
+  });
+
+  it("asks a signed-out user to sign in instead of calling the API", async () => {
+    const user = userEvent.setup();
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    await solveOnce(user);
+
+    await user.click(screen.getByRole("button", { name: /save this solve/i }));
+
+    expect(await screen.findByText(/sign in to save solves/i)).toBeInTheDocument();
+    expect(mockSaveSolve).not.toHaveBeenCalled();
+  });
+
+  it("says so when saving fails, and allows trying again", async () => {
+    const user = userEvent.setup();
+    mockSaveSolve.mockResolvedValue({ kind: "network-error" });
+    await solveOnce(user);
+
+    await user.click(screen.getByRole("button", { name: /save this solve/i }));
+
+    expect(await screen.findByText(/couldn.t save that solve/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save this solve/i })).not.toBeDisabled();
   });
 });

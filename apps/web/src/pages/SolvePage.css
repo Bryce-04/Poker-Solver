@@ -86,3 +86,7 @@
   display: flex;
   gap: 0.5rem;
 }
+
+.saved-solves {
+  margin-top: 1.5rem;
+}

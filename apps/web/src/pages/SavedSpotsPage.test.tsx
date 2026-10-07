@@ -1,11 +1,15 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Spot } from "@poker-solver/schema";
 import { SavedSpotsPage } from "./SavedSpotsPage";
-import { listSpots } from "../lib/api";
+import { deleteSolve, listSolves, listSpots } from "../lib/api";
+import type { SavedSolve } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
-vi.mock("../lib/api", () => ({ listSpots: vi.fn() }));
+vi.mock("../lib/api", () => ({ listSpots: vi.fn(), listSolves: vi.fn(), deleteSolve: vi.fn() }));
 const mockList = vi.mocked(listSpots);
+const mockListSolves = vi.mocked(listSolves);
+const mockDeleteSolve = vi.mocked(deleteSolve);
 
 // Signed in by default -- the page only fetches once signed in, since
 // GET /spots requires it. The auth-specific tests at the bottom override it.
@@ -13,6 +17,9 @@ vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
 const mockUseAuth = vi.mocked(useAuth);
 
 beforeEach(() => {
+  mockListSolves.mockReset();
+  mockListSolves.mockResolvedValue({ kind: "ok", solves: [] });
+  mockDeleteSolve.mockReset();
   mockList.mockReset();
   mockUseAuth.mockReset();
   mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
@@ -93,5 +100,87 @@ describe("SavedSpotsPage", () => {
     rerender(<SavedSpotsPage />);
     expect(await screen.findByText(/BB.*40bb, facing a raise from CO/)).toBeInTheDocument();
     expect(mockList).toHaveBeenCalledTimes(2);
+  });
+});
+
+const savedSolve: SavedSolve = {
+  id: "solve-1",
+  created_at: "2026-01-02T12:00:00Z",
+  label: null,
+  spot: {
+    positions_in_hand: ["BB", "BTN"],
+    effective_stack_bb: 99,
+    pot_bb: 2.5,
+    board: ["Ks", "Qh", "9d"],
+    current_street: "flop",
+  } as unknown as Spot,
+  result: {
+    source: "live_solve",
+    iterations: 100,
+    position: "BB",
+    strategy: { AA: { check: 0.25, bet_small: 0.75 } },
+    bucketed_actions: [],
+  },
+};
+
+describe("SavedSpotsPage -- saved solves", () => {
+  beforeEach(() => {
+    mockList.mockResolvedValue({ kind: "ok", spots: [] });
+  });
+
+  it("lists saved solves and opens one into the strategy chart", async () => {
+    const user = userEvent.setup();
+    mockListSolves.mockResolvedValue({ kind: "ok", solves: [savedSolve] });
+    render(<SavedSpotsPage />);
+
+    expect(await screen.findByText("BB vs BTN · flop Ks Qh 9d · pot 2.5bb")).toBeInTheDocument();
+    expect(screen.queryByRole("grid", { name: /solved strategy/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^view$/i }));
+    expect(screen.getByRole("grid", { name: /solved strategy/i })).toBeInTheDocument();
+    expect(screen.getByText(/BB to act.*Check 25%, Bet Small \(25%\) 75%/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^hide$/i }));
+    expect(screen.queryByRole("grid", { name: /solved strategy/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a specific empty state when there are no saved solves", async () => {
+    render(<SavedSpotsPage />);
+    expect(await screen.findByText(/no saved solves yet/i)).toBeInTheDocument();
+  });
+
+  it("deletes a solve only after a confirmation click, then removes it from the list", async () => {
+    const user = userEvent.setup();
+    mockListSolves.mockResolvedValue({ kind: "ok", solves: [savedSolve] });
+    mockDeleteSolve.mockResolvedValue({ kind: "deleted" });
+    render(<SavedSpotsPage />);
+    await screen.findByText(/BB vs BTN/);
+
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+    expect(mockDeleteSolve).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /confirm delete/i }));
+
+    expect(mockDeleteSolve).toHaveBeenCalledWith("solve-1");
+    expect(await screen.findByText(/no saved solves yet/i)).toBeInTheDocument();
+  });
+
+  it("keeps the solve and says so when deleting fails", async () => {
+    const user = userEvent.setup();
+    mockListSolves.mockResolvedValue({ kind: "ok", solves: [savedSolve] });
+    mockDeleteSolve.mockResolvedValue({ kind: "network-error" });
+    render(<SavedSpotsPage />);
+    await screen.findByText(/BB vs BTN/);
+
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+    await user.click(screen.getByRole("button", { name: /confirm delete/i }));
+
+    expect(await screen.findByText(/couldn.t delete that solve/i)).toBeInTheDocument();
+    expect(screen.getByText(/BB vs BTN/)).toBeInTheDocument();
+  });
+
+  it("does not request solves while signed out", () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    render(<SavedSpotsPage />);
+    expect(mockListSolves).not.toHaveBeenCalled();
   });
 });
