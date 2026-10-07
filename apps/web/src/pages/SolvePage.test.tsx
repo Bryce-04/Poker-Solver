@@ -1,15 +1,18 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
-import { solveSpot } from "../lib/api";
+import { fetchReferenceStrategy, solveSpot } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   solveSpot: vi.fn(),
+  fetchReferenceStrategy: vi.fn(),
 }));
 const mockSolve = vi.mocked(solveSpot);
+const mockFetchReference = vi.mocked(fetchReferenceStrategy);
 
 beforeEach(() => {
   mockSolve.mockReset();
+  mockFetchReference.mockReset();
 });
 
 // Three grids are on the page by default (CardPicker, then OOP's and IP's
@@ -176,5 +179,42 @@ describe("SolvePage", () => {
     mockSolve.mockResolvedValueOnce({ kind: "error", status: 500 });
     await user.click(submit);
     expect(await screen.findByText(/http 500/i)).toBeInTheDocument();
+  });
+
+  it("loads a position's opening range from the reference chart", async () => {
+    mockFetchReference.mockResolvedValue({
+      kind: "match",
+      data: {
+        source: "reference_chart",
+        chart_key: "btn_open_33bb",
+        chart_description: "BTN opening range",
+        chart_source: "test",
+        ranges: { BTN: { AA: 1, KQs: 1 } },
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    // Default in-position seat is BTN.
+    await user.click(screen.getByRole("button", { name: /load btn.s opening range/i }));
+
+    expect(mockFetchReference).toHaveBeenCalledWith(
+      expect.objectContaining({ positions_in_hand: ["BTN"], effective_stack_bb: 33 }),
+    );
+    // The loaded range lands in BTN's own grid (the second RangeGrid).
+    expect(
+      within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("explains plainly when a position has no opening chart", async () => {
+    mockFetchReference.mockResolvedValue({ kind: "no-match" });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    // Default out-of-position seat is BB, which never has an opening chart.
+    await user.click(screen.getByRole("button", { name: /load bb.s opening range/i }));
+
+    expect(await screen.findByText(/no opening chart for bb/i)).toBeInTheDocument();
   });
 });

@@ -3,7 +3,9 @@ import type { FormEvent } from "react";
 import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { boardFromCards, parseBoardText } from "../lib/cards";
+import { buildOpenSpot } from "../lib/spot";
 import {
+  fetchReferenceStrategy,
   solveSpot,
   type LiveSolveResponse,
   type SpotValidationIssue,
@@ -23,6 +25,15 @@ type Outcome =
   | { kind: "rejected"; reason: string }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
+
+// Status for each position's "Load reference range" button -- separate
+// from the solve Outcome above, since loading a starting range and
+// submitting a solve are independent actions with independent feedback.
+type ChartLoadState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "loaded" }
+  | { kind: "unavailable"; reason: string };
 
 function streetForBoardLength(length: number): Street {
   if (length === 3) return "flop";
@@ -63,6 +74,8 @@ export function SolvePage() {
   const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
   const [oopRange, setOopRange] = useState<HandRange>({});
   const [ipRange, setIpRange] = useState<HandRange>({});
+  const [oopChartState, setOopChartState] = useState<ChartLoadState>({ kind: "idle" });
+  const [ipChartState, setIpChartState] = useState<ChartLoadState>({ kind: "idle" });
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   const board = boardMode === "pick" ? boardFromCards(pickedCards) : parseBoardText(boardText);
@@ -108,6 +121,41 @@ export function SolvePage() {
       case "error":
         setOutcome({ kind: "error", status: result.status });
         return;
+    }
+  }
+
+  /**
+   * Seeds a position's range from its reference-chart opening range (the
+   * same curated data /spots/reference-strategy already serves for Stage
+   * 2) instead of leaving it empty -- an approximate real starting point
+   * to tweak, not an accurate postflop range (the reference chart has no
+   * idea what's happened since preflop). Positions without an opening
+   * chart (BB can't open; UTG1/LJ aren't 6-max) just report that plainly
+   * rather than silently doing nothing.
+   */
+  async function loadReferenceRange(
+    position: Position,
+    setRange: (range: HandRange) => void,
+    setStatus: (state: ChartLoadState) => void,
+  ) {
+    setStatus({ kind: "loading" });
+    const result = await fetchReferenceStrategy(buildOpenSpot(position, effectiveStackBb));
+    switch (result.kind) {
+      case "match":
+        setRange(result.data.ranges[position] ?? {});
+        setStatus({ kind: "loaded" });
+        return;
+      case "no-match":
+        setStatus({
+          kind: "unavailable",
+          reason: `No opening chart for ${position} at this stack -- build it manually.`,
+        });
+        return;
+      case "network-error":
+        setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
+        return;
+      default:
+        setStatus({ kind: "unavailable", reason: "Couldn't load a reference range." });
     }
   }
 
@@ -241,11 +289,45 @@ export function SolvePage() {
 
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">{oopPosition}&rsquo;s range</h2>
+          <div className="solve-page__chart-load">
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={() => loadReferenceRange(oopPosition, setOopRange, setOopChartState)}
+              disabled={oopChartState.kind === "loading"}
+            >
+              {oopChartState.kind === "loading"
+                ? "Loading…"
+                : `Load ${oopPosition}'s opening range`}
+            </button>
+            {oopChartState.kind === "unavailable" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                {oopChartState.reason}
+              </span>
+            )}
+          </div>
           <RangeGrid value={oopRange} onChange={setOopRange} />
         </section>
 
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">{ipPosition}&rsquo;s range</h2>
+          <div className="solve-page__chart-load">
+            <button
+              type="button"
+              className="spot-builder__reset"
+              onClick={() => loadReferenceRange(ipPosition, setIpRange, setIpChartState)}
+              disabled={ipChartState.kind === "loading"}
+            >
+              {ipChartState.kind === "loading"
+                ? "Loading…"
+                : `Load ${ipPosition}'s opening range`}
+            </button>
+            {ipChartState.kind === "unavailable" && (
+              <span className="spot-builder__save-status spot-builder__save-status--warn">
+                {ipChartState.reason}
+              </span>
+            )}
+          </div>
           <RangeGrid value={ipRange} onChange={setIpRange} />
         </section>
 

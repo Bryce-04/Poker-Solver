@@ -198,7 +198,12 @@ from the other entry paths in a few ways:
   contract): the first position picker is out-of-position/first-to-act
   this street, the second is in position, and each gets its own
   editable `RangeGrid` — submit is disabled until both have at least
-  one hand selected.
+  one hand selected. A "Load \<position\>'s opening range" button next to
+  each grid calls `fetchReferenceStrategy`/`buildOpenSpot` (the same
+  Stage 2 chart data) to seed a real starting range instead of an empty
+  grid — an approximate preflop-opening starting point to tweak, not an
+  accurate postflop range; positions with no opening chart (BB, UTG1,
+  LJ) say so plainly rather than doing nothing.
 - **A board, two input modes.** A radio toggle switches between
   `components/CardPicker/CardPicker.tsx` (click up to 5 cards on a
   4-suit × 13-rank grid — the default) and `lib/cards.ts`'s

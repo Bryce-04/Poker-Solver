@@ -3,6 +3,14 @@
    TypeInPage/ImportPage precedent ("duplicate it once; don't
    over-engineer a stretch item"). Only the results table is new here. */
 
+.solve-page__chart-load {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
 .solve-page__table-wrap {
   overflow-x: auto;
 }
