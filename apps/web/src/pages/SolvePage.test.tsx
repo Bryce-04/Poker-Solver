@@ -45,6 +45,115 @@ async function fillMinimalForm(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("SolvePage -- click-through mode (the default)", () => {
+  it("works out who is in/out of position from the two seats, in either pick order", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    await user.selectOptions(screen.getByLabelText(/^player 2$/i), "UTG"); // BB + UTG
+    expect(screen.getByText(/BB is out of position/i)).toBeInTheDocument();
+    expect(screen.getByText(/UTG is in position/i)).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/^player 1$/i), "BTN"); // BTN + UTG
+    await user.selectOptions(screen.getByLabelText(/^player 2$/i), "SB"); // BTN + SB
+    expect(screen.getByText(/SB is out of position/i)).toBeInTheDocument();
+  });
+
+  it("disables the seat the other player already picked", () => {
+    render(<SolvePage />);
+    const player1 = screen.getByLabelText(/^player 1$/i);
+    expect(within(player1).getByRole("option", { name: "BTN" })).toBeDisabled();
+    expect(within(player1).getByRole("option", { name: "UTG" })).not.toBeDisabled();
+  });
+
+  it("keeps a range with its seat when the other seat changes", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })); // BB (OOP)
+
+    await user.selectOptions(screen.getByLabelText(/^player 2$/i), "UTG");
+    // BB is still out of position, so its range is still first and still has KJo.
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("Back and Forward step through the hand's actions, across streets", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    const back = () => screen.getByRole("button", { name: /back one action/i });
+    const forward = () => screen.getByRole("button", { name: /forward one action/i });
+    expect(back()).toBeDisabled();
+    expect(forward()).toBeDisabled();
+
+    await closePreflopByChecking(user); // BTN calls, BB checks
+    expect(screen.getByText("BB checks")).toBeInTheDocument();
+
+    await user.click(back());
+    expect(screen.queryByText("BB checks")).not.toBeInTheDocument();
+    expect(screen.getByText("BTN calls")).toBeInTheDocument();
+    expect(forward()).not.toBeDisabled();
+
+    await user.click(back());
+    expect(screen.queryByText("BTN calls")).not.toBeInTheDocument();
+    expect(back()).toBeDisabled();
+
+    await user.click(forward());
+    await user.click(forward());
+    expect(screen.getByText("BTN calls")).toBeInTheDocument();
+    expect(screen.getByText("BB checks")).toBeInTheDocument();
+    expect(forward()).toBeDisabled();
+  });
+
+  it("a new action after Back clears Forward; a street's own Undo feeds Forward", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    const forward = () => screen.getByRole("button", { name: /forward one action/i });
+
+    await closePreflopByChecking(user);
+    await user.click(screen.getByRole("button", { name: /undo last action/i }));
+    expect(forward()).not.toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // a fresh action
+    expect(forward()).toBeDisabled();
+  });
+
+  it("Reset clears Forward history", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await closePreflopByChecking(user);
+    await user.click(screen.getByRole("button", { name: /back one action/i }));
+    await user.click(screen.getByRole("button", { name: /^reset$/i }));
+    expect(screen.getByRole("button", { name: /forward one action/i })).toBeDisabled();
+  });
+
+  it("Reset clears the board, ranges, and preflop action back to a blank page", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    expect(screen.getByRole("button", { name: /^solve$/i })).not.toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /^reset$/i }));
+
+    expect(screen.getByRole("button", { name: /^solve$/i })).toBeDisabled();
+    expect(screen.getByText(/pick at least 3 board cards/i)).toBeInTheDocument();
+    expect(screen.getByText(/add hands to bb.s range/i)).toBeInTheDocument();
+    expect(screen.queryByText(/preflop action is closed/i)).not.toBeInTheDocument();
+  });
+
+  it("lists exactly what's missing while Solve is disabled", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    expect(screen.getByText(/pick at least 3 board cards/i)).toBeInTheDocument();
+    expect(screen.getByText(/add hands to bb.s range/i)).toBeInTheDocument();
+    expect(screen.getByText(/add hands to btn.s range/i)).toBeInTheDocument();
+
+    await fillMinimalForm(user);
+    expect(screen.queryByText(/pick at least 3 board cards/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/add hands to/i)).not.toBeInTheDocument();
+  });
+
   it("disables submit until preflop closes, a board is picked, and both ranges are filled", async () => {
     const user = userEvent.setup();
     render(<SolvePage />);
@@ -59,7 +168,7 @@ describe("SolvePage -- click-through mode (the default)", () => {
     render(<SolvePage />);
     await fillMinimalForm(user);
 
-    expect(screen.getByText(/pot entering the flop: 2bb/i)).toBeInTheDocument();
+    expect(screen.getByText(/pot entering the flop: 2.5bb/i)).toBeInTheDocument();
     expect(screen.getByText(/effective stack: 99bb/i)).toBeInTheDocument();
   });
 
@@ -89,9 +198,9 @@ describe("SolvePage -- click-through mode (the default)", () => {
     expect(screen.getByText(/preflop action is closed/i)).toBeInTheDocument();
 
     // Matches handBuilder.test.ts's own closed-form check of this exact
-    // sequence: both matched at 21bb, pot = 21 + 21 = 42, stack = 100 - 21.
+    // sequence: both matched at 21bb, pot = 21 + 21 + 0.5 dead SB = 42.5, stack = 100 - 21.
     await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
-    expect(screen.getByText(/pot entering the flop: 42bb/i)).toBeInTheDocument();
+    expect(screen.getByText(/pot entering the flop: 42.5bb/i)).toBeInTheDocument();
     expect(screen.getByText(/effective stack: 79bb/i)).toBeInTheDocument();
   });
 
@@ -152,7 +261,7 @@ describe("SolvePage -- click-through mode (the default)", () => {
       expect.objectContaining({
         positions_in_hand: ["BB", "BTN"],
         effective_stack_bb: 99,
-        pot_bb: 2,
+        pot_bb: 2.5,
         board: ["Ks", "Qh", "9d"],
         current_street: "flop",
         actions: [],
@@ -184,7 +293,7 @@ describe("SolvePage -- click-through mode (the default)", () => {
     expect(mockSolve).toHaveBeenCalledWith(
       expect.objectContaining({
         current_street: "flop",
-        actions: [{ position: "BB", street: "flop", action: "bet", size_bb: 2 }],
+        actions: [{ position: "BB", street: "flop", action: "bet", size_bb: 3 }],
       }),
     );
   });
@@ -296,9 +405,9 @@ describe("SolvePage -- click-through mode (the default)", () => {
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    await user.clear(screen.getByLabelText(/starting effective stack/i));
-    await user.type(screen.getByLabelText(/starting effective stack/i), "150");
-    await user.click(screen.getByRole("button", { name: /load btn.s opening range/i }));
+    await user.clear(screen.getByLabelText(/starting stack/i));
+    await user.type(screen.getByLabelText(/starting stack/i), "150");
+    await user.click(screen.getByRole("button", { name: /load btn.s typical range/i }));
 
     expect(mockFetchReference).toHaveBeenCalledWith(
       expect.objectContaining({ positions_in_hand: ["BTN"], effective_stack_bb: 150 }),
@@ -349,7 +458,7 @@ describe("SolvePage -- click-through mode (the default)", () => {
     render(<SolvePage />);
 
     // Default in-position seat is BTN; default starting stack is 100bb.
-    await user.click(screen.getByRole("button", { name: /load btn.s opening range/i }));
+    await user.click(screen.getByRole("button", { name: /load btn.s typical range/i }));
 
     expect(mockFetchReference).toHaveBeenCalledWith(
       expect.objectContaining({ positions_in_hand: ["BTN"], effective_stack_bb: 100 }),
@@ -378,7 +487,7 @@ describe("SolvePage -- click-through mode (the default)", () => {
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    await user.click(screen.getByRole("button", { name: /load bb.s opening range/i }));
+    await user.click(screen.getByRole("button", { name: /load bb.s typical range/i }));
 
     expect(mockFetchReference).toHaveBeenNthCalledWith(
       1,
@@ -401,7 +510,7 @@ describe("SolvePage -- click-through mode (the default)", () => {
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    await user.click(screen.getByRole("button", { name: /load bb.s opening range/i }));
+    await user.click(screen.getByRole("button", { name: /load bb.s typical range/i }));
 
     expect(
       await screen.findByText(/no reference chart covers bb opening, or defending vs btn/i),
@@ -446,8 +555,9 @@ Hero: checks
     fireEvent.change(screen.getByLabelText(/paste a hand history/i), { target: { value: hh } });
     await user.click(screen.getByRole("button", { name: /^load from hand history$/i }));
 
-    expect(screen.getByLabelText(/out of position/i)).toHaveValue("BB");
-    expect(screen.getByLabelText(/^in position$/i)).toHaveValue("BTN");
+    expect(screen.getByLabelText(/^player 1$/i)).toHaveValue("BB");
+    expect(screen.getByLabelText(/^player 2$/i)).toHaveValue("BTN");
+    expect(screen.getByText(/BB is out of position/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^pot \(bb\)$/i)).toHaveValue(6.5);
     expect(screen.getByLabelText(/^effective stack \(bb\)$/i)).toHaveValue(97);
     expect(screen.getByRole("checkbox")).toBeChecked();
