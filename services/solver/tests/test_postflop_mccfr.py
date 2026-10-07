@@ -11,12 +11,12 @@ AA (the nut overpair, always beats KJo) or 33 (bottom pair, always loses
 to KJo) -- no in-between hands, and neither rank is on the board, so both
 labels are fully unblocked (6 combos each, value combos == bluff combos).
 
-pot_bb=100, effective_stack_bb=33 -- exactly the 33%-pot size, which
-collapses Hero's options to {check, all_in} and Villain's response to
-{fold, call} (see test_betting_round.py's menu-collapse tests). That turns
-this into a textbook polarized-range-vs-bluffcatcher push/fold subgame,
-whose Nash equilibrium frequencies are derivable in closed form from the
-indifference principle:
+pot_bb=100, effective_stack_bb=25 -- exactly the bet_small (25%-pot) size,
+which collapses Hero's options to {check, all_in} and Villain's response
+to {fold, call} (see test_betting_round.py's menu-collapse tests). That
+turns this into a textbook polarized-range-vs-bluffcatcher push/fold
+subgame, whose Nash equilibrium frequencies are derivable in closed form
+from the indifference principle:
 
   - Villain's calling frequency must make Hero's bluff (33) exactly
     indifferent between shoving and checking back:
@@ -26,7 +26,7 @@ indifference principle:
     combos, so this reduces cleanly):
     beta* = shove / (pot_bb + shove)
 
-With pot_bb=100, shove=33: c* = 100/133 ~= 0.7519, beta* = 33/133 ~= 0.2481.
+With pot_bb=100, shove=25: c* = 100/125 = 0.8, beta* = 25/125 = 0.2.
 
 Flop/turn scenarios below don't attempt the same two-sided closed-form
 match -- once a runout is involved, the villain's own hand strength also
@@ -50,10 +50,10 @@ from poker_solver.postflop_mccfr import (
 
 RIVER_BOARD = tuple(parse_card(c) for c in ["Ks", "Qh", "9d", "4c", "2s"])
 POT_BB = 100.0
-SHOVE_BB = 33.0
+SHOVE_BB = 25.0  # exactly bet_small (25% pot) -- see the module docstring
 
-CALL_FREQUENCY = POT_BB / (POT_BB + SHOVE_BB)  # ~0.7519
-BLUFF_FREQUENCY = SHOVE_BB / (POT_BB + SHOVE_BB)  # ~0.2481
+CALL_FREQUENCY = POT_BB / (POT_BB + SHOVE_BB)  # 0.8
+BLUFF_FREQUENCY = SHOVE_BB / (POT_BB + SHOVE_BB)  # 0.2
 
 ITERATIONS = 20_000  # ~6-7s: the tree itself is tiny (2-3 decision nodes),
 # evaluate_best (two 7-card evaluations per iteration) is what dominates

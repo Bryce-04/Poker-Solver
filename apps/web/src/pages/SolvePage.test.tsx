@@ -23,28 +23,29 @@ function rangeGrids() {
   return screen.getAllByRole("grid", { name: /starting hand range/i });
 }
 
-const RIVER_CARD_LABELS = [
-  /king of spades/i,
-  /queen of hearts/i,
-  /9 of diamonds/i,
-  /4 of clubs/i,
-  /2 of spades/i,
-];
-
 async function pickBoard(user: ReturnType<typeof userEvent.setup>, labels: RegExp[]) {
   for (const label of labels) {
     await user.click(screen.getByRole("gridcell", { name: label }));
   }
 }
 
+/** Default BB(OOP)/BTN(IP) heads-up preflop, closed the cheapest way: IP
+ * completes the small blind, OOP checks behind -- leaves pot/stack at the
+ * blinds-only 2bb/99bb, which is all most tests need. */
+async function closePreflopByChecking(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^call/i }));
+  await user.click(screen.getByRole("button", { name: /^check$/i }));
+}
+
 async function fillMinimalForm(user: ReturnType<typeof userEvent.setup>) {
-  await pickBoard(user, RIVER_CARD_LABELS);
+  await closePreflopByChecking(user);
+  await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
   await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
   await user.click(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }));
 }
 
-describe("SolvePage", () => {
-  it("disables submit until both ranges and the board are filled in", async () => {
+describe("SolvePage -- click-through mode (the default)", () => {
+  it("disables submit until preflop closes, a board is picked, and both ranges are filled", async () => {
     const user = userEvent.setup();
     render(<SolvePage />);
     expect(screen.getByRole("button", { name: /^solve$/i })).toBeDisabled();
@@ -53,13 +54,81 @@ describe("SolvePage", () => {
     expect(screen.getByRole("button", { name: /^solve$/i })).not.toBeDisabled();
   });
 
-  it("shows a board validation error until enough cards are picked", async () => {
+  it("computes pot and effective stack from blinds alone when preflop is just checked through", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+
+    expect(screen.getByText(/pot entering the flop: 2bb/i)).toBeInTheDocument();
+    expect(screen.getByText(/effective stack: 99bb/i)).toBeInTheDocument();
+  });
+
+  it("supports a preflop 3-bet and 4-bet before closing, with real escalating sizes", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    const sizeInput = () => screen.getByLabelText(/to \(bb\)/i);
+
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "3");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BTN opens to 3
+
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "9");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BB 3-bets to 9
+
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "21");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BTN 4-bets to 21
+
+    await user.click(screen.getByRole("button", { name: /^call/i })); // BB calls
+
+    expect(screen.getByText("BTN raises to 3bb")).toBeInTheDocument();
+    expect(screen.getByText("BB raises to 9bb")).toBeInTheDocument();
+    expect(screen.getByText("BTN raises to 21bb")).toBeInTheDocument();
+    expect(screen.getByText("BB calls")).toBeInTheDocument();
+    expect(screen.getByText(/preflop action is closed/i)).toBeInTheDocument();
+
+    // Matches handBuilder.test.ts's own closed-form check of this exact
+    // sequence: both matched at 21bb, pot = 21 + 21 = 42, stack = 100 - 21.
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    expect(screen.getByText(/pot entering the flop: 42bb/i)).toBeInTheDocument();
+    expect(screen.getByText(/effective stack: 79bb/i)).toBeInTheDocument();
+  });
+
+  it("ends the hand on a preflop fold and disables solving", async () => {
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    await pickBoard(user, [/king of spades/i, /queen of hearts/i]);
-    expect(await screen.findByText(/3 \(flop\)/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^fold$/i }));
+    expect(screen.getByText(/folds -- the hand ends here/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^solve$/i })).toBeDisabled();
+  });
+
+  it("blocks the flop section until preflop closes", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    expect(screen.getByText(/finish the preflop's action/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^solve$/i })).toBeDisabled();
+  });
+
+  it("carries pot/stack through flop and turn action to reach a river decision", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    await closePreflopByChecking(user);
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // OOP checks the flop
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // IP checks back, flop closes
+
+    await user.click(screen.getByRole("gridcell", { name: /4 of clubs/i })); // turn card
+    await user.click(screen.getByRole("button", { name: /^bet$/i })); // OOP bets the turn (default size)
+    await user.click(screen.getByRole("button", { name: /^call/i })); // IP calls, turn closes
+
+    await user.click(screen.getByRole("gridcell", { name: /2 of spades/i })); // river card
+    expect(screen.getByRole("heading", { name: /^river$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^check$/i })).toBeInTheDocument();
   });
 
   it("submits the expected Spot shape and renders the returned strategy", async () => {
@@ -70,6 +139,7 @@ describe("SolvePage", () => {
         iterations: 8000,
         position: "BTN",
         strategy: { AA: { check: 0.05, all_in: 0.95 } },
+        bucketed_actions: [],
       },
     });
     const user = userEvent.setup();
@@ -81,74 +151,126 @@ describe("SolvePage", () => {
     expect(mockSolve).toHaveBeenCalledWith(
       expect.objectContaining({
         positions_in_hand: ["BB", "BTN"],
-        board: ["Ks", "Qh", "9d", "4c", "2s"],
-        current_street: "river",
+        effective_stack_bb: 99,
+        pot_bb: 2,
+        board: ["Ks", "Qh", "9d"],
+        current_street: "flop",
         actions: [],
         ranges: { BB: { KJo: 1 }, BTN: { AA: 1 } },
       }),
     );
 
     expect(await screen.findByText(/BTN.s strategy/i)).toBeInTheDocument();
-    // "AA" is also a cell label in both range-building grids -- the
-    // StrategyGrid cell's aria-label is its own distinct "AA: ..." format,
-    // so this scopes to it without an ambiguous-match error.
     expect(
       screen.getByRole("gridcell", { name: /^AA: Check 5%, All-in 95%$/i }),
     ).toBeInTheDocument();
   });
 
-  it("submits the same Spot shape via the typed-board mode", async () => {
+  it("submits a seeded bet as a real action, not just a check", async () => {
     mockSolve.mockResolvedValue({
       kind: "solved",
-      data: { source: "live_solve", iterations: 8000, position: "BTN", strategy: {} },
+      data: { source: "live_solve", iterations: 4000, position: "BTN", strategy: {}, bucketed_actions: [] },
     });
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    await user.click(screen.getByRole("radio", { name: /type it/i }));
-    await user.type(screen.getByLabelText(/^board$/i), "Ks Qh 9d 4c 2s");
+    await closePreflopByChecking(user);
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    await user.click(screen.getByRole("button", { name: /^bet$/i })); // OOP bets the flop
     await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
     await user.click(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }));
     await user.click(screen.getByRole("button", { name: /^solve$/i }));
 
     expect(mockSolve).toHaveBeenCalledWith(
-      expect.objectContaining({ board: ["Ks", "Qh", "9d", "4c", "2s"] }),
+      expect.objectContaining({
+        current_street: "flop",
+        actions: [{ position: "BB", street: "flop", action: "bet", size_bb: 2 }],
+      }),
     );
   });
 
-  it("keeps each board mode's own input when switching back and forth", async () => {
-    const user = userEvent.setup();
-    render(<SolvePage />);
-
-    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
-    await user.click(screen.getByRole("radio", { name: /type it/i }));
-    await user.type(screen.getByLabelText(/^board$/i), "7s 7h 7d");
-    await user.click(screen.getByRole("radio", { name: /pick cards/i }));
-
-    // The three picked cards are still selected, untouched by the detour
-    // through text mode.
-    expect(screen.getByRole("gridcell", { name: /king of spades/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  });
-
-  it("seeds an opening check from OOP when the checkbox is ticked", async () => {
+  it("shows how close to equilibrium the solve got, when the backend reports it", async () => {
     mockSolve.mockResolvedValue({
       kind: "solved",
-      data: { source: "live_solve", iterations: 8000, position: "BTN", strategy: {} },
+      data: {
+        source: "live_solve",
+        iterations: 175,
+        exploitability_pct: 0.44,
+        position: "BTN",
+        strategy: {},
+        bucketed_actions: [],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+
+    expect(await screen.findByText(/within 0\.44% of the pot/i)).toBeInTheDocument();
+  });
+
+  it("omits the precision line for an older backend that doesn't report it", async () => {
+    mockSolve.mockResolvedValue({
+      kind: "solved",
+      data: { source: "live_solve", iterations: 4000, position: "BTN", strategy: {}, bucketed_actions: [] },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+
+    expect(await screen.findByText(/BTN.s strategy/i)).toBeInTheDocument();
+    expect(screen.queryByText(/of the pot of a\s+true equilibrium/i)).not.toBeInTheDocument();
+  });
+
+  it("displays any bucketing notes the backend returns", async () => {
+    mockSolve.mockResolvedValue({
+      kind: "solved",
+      data: {
+        source: "live_solve",
+        iterations: 4000,
+        position: "BTN",
+        strategy: {},
+        bucketed_actions: ["BB's 2bb bet -> bucketed to 75% pot (bet_medium)"],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+
+    expect(await screen.findByText(/bucketed to 75% pot/i)).toBeInTheDocument();
+  });
+
+  it("submits the same Spot shape via the typed-board mode", async () => {
+    mockSolve.mockResolvedValue({
+      kind: "solved",
+      data: { source: "live_solve", iterations: 8000, position: "BTN", strategy: {}, bucketed_actions: [] },
     });
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    await fillMinimalForm(user);
-    await user.click(screen.getByRole("checkbox"));
+    await closePreflopByChecking(user);
+    await user.click(screen.getByRole("radio", { name: /type it/i }));
+    await user.type(screen.getByLabelText(/^board$/i), "Ks Qh 9d");
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
+    await user.click(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }));
     await user.click(screen.getByRole("button", { name: /^solve$/i }));
 
-    expect(mockSolve).toHaveBeenCalledWith(
-      expect.objectContaining({
-        actions: [{ position: "BB", street: "river", action: "check" }],
-      }),
+    expect(mockSolve).toHaveBeenCalledWith(expect.objectContaining({ board: ["Ks", "Qh", "9d"] }));
+  });
+
+  it("uses the starting stack, not a fixed default, for reference-chart lookups", async () => {
+    mockFetchReference.mockResolvedValue({ kind: "no-match" });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    await user.clear(screen.getByLabelText(/starting effective stack/i));
+    await user.type(screen.getByLabelText(/starting effective stack/i), "150");
+    await user.click(screen.getByRole("button", { name: /load btn.s opening range/i }));
+
+    expect(mockFetchReference).toHaveBeenCalledWith(
+      expect.objectContaining({ positions_in_hand: ["BTN"], effective_stack_bb: 150 }),
     );
   });
 
@@ -186,7 +308,7 @@ describe("SolvePage", () => {
       kind: "match",
       data: {
         source: "reference_chart",
-        chart_key: "btn_open_33bb",
+        chart_key: "btn_open_100bb",
         chart_description: "BTN opening range",
         chart_source: "test",
         ranges: { BTN: { AA: 1, KQs: 1 } },
@@ -195,11 +317,11 @@ describe("SolvePage", () => {
     const user = userEvent.setup();
     render(<SolvePage />);
 
-    // Default in-position seat is BTN.
+    // Default in-position seat is BTN; default starting stack is 100bb.
     await user.click(screen.getByRole("button", { name: /load btn.s opening range/i }));
 
     expect(mockFetchReference).toHaveBeenCalledWith(
-      expect.objectContaining({ positions_in_hand: ["BTN"], effective_stack_bb: 33 }),
+      expect.objectContaining({ positions_in_hand: ["BTN"], effective_stack_bb: 100 }),
     );
     // The loaded range lands in BTN's own grid (the second RangeGrid).
     expect(
@@ -216,7 +338,7 @@ describe("SolvePage", () => {
       kind: "match",
       data: {
         source: "reference_chart",
-        chart_key: "bb_defend_vs_btn_open_33bb",
+        chart_key: "bb_defend_vs_btn_open_100bb",
         chart_description: "BB defending vs a BTN open",
         chart_source: "test",
         ranges: { BB: { AA: 1 } },
@@ -254,6 +376,12 @@ describe("SolvePage", () => {
       await screen.findByText(/no reference chart covers bb opening, or defending vs btn/i),
     ).toBeInTheDocument();
   });
+});
+
+describe("SolvePage -- paste-a-hand-history mode", () => {
+  async function switchToPasteMode(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("radio", { name: /from a hand history/i }));
+  }
 
   it("fills positions/board/pot/stack from a pasted hand history, leaving ranges untouched", async () => {
     const hh = `PokerStars Hand #3:  Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/01 12:00:00 ET
@@ -279,6 +407,7 @@ Hero: checks
 `;
     const user = userEvent.setup();
     render(<SolvePage />);
+    await switchToPasteMode(user);
 
     // fireEvent.change, not user.type -- the hand history's "[7h 7s]"
     // brackets collide with userEvent's special-key syntax (e.g. "{enter}"),
@@ -289,7 +418,7 @@ Hero: checks
     expect(screen.getByLabelText(/out of position/i)).toHaveValue("BB");
     expect(screen.getByLabelText(/^in position$/i)).toHaveValue("BTN");
     expect(screen.getByLabelText(/^pot \(bb\)$/i)).toHaveValue(6.5);
-    expect(screen.getByLabelText(/effective stack/i)).toHaveValue(97);
+    expect(screen.getByLabelText(/^effective stack \(bb\)$/i)).toHaveValue(97);
     expect(screen.getByRole("checkbox")).toBeChecked();
     expect(
       screen.getByRole("gridcell", { name: /jack of clubs/i }),
@@ -309,10 +438,64 @@ Hero: checks
   it("shows the parser's reason when a hand history can't be loaded", async () => {
     const user = userEvent.setup();
     render(<SolvePage />);
+    await switchToPasteMode(user);
 
     await user.type(screen.getByLabelText(/paste a hand history/i), "not a real hand history");
     await user.click(screen.getByRole("button", { name: /^load from hand history$/i }));
 
     expect(await screen.findByText(/table size and button seat/i)).toBeInTheDocument();
+  });
+
+  it("disables submit until a hand history has actually been loaded", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await switchToPasteMode(user);
+    expect(screen.getByRole("button", { name: /^solve$/i })).toBeDisabled();
+  });
+
+  it("seeds an opening check from OOP when the checkbox is ticked, and solves from pasted pot/stack", async () => {
+    mockSolve.mockResolvedValue({
+      kind: "solved",
+      data: { source: "live_solve", iterations: 8000, position: "BTN", strategy: {}, bucketed_actions: [] },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await switchToPasteMode(user);
+
+    fireEvent.change(screen.getByLabelText(/paste a hand history/i), {
+      target: {
+        value: `PokerStars Hand #3:  Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/01 12:00:00 ET
+Table 'Atlas' 6-max Seat #1 is the button
+Seat 1: Dave ($100 in chips)
+Seat 2: Eve ($100 in chips)
+Seat 3: Hero ($100 in chips)
+Seat 4: Alice ($100 in chips)
+Seat 5: Grace ($100 in chips)
+Seat 6: Frank ($100 in chips)
+Eve: posts small blind $0.50
+Hero: posts big blind $1
+*** HOLE CARDS ***
+Dealt to Hero [7h 7s]
+Alice: folds
+Grace: folds
+Frank: folds
+Dave: raises $2 to $3
+Eve: folds
+Hero: calls $2
+*** FLOP *** [2h 7d Jc]
+Hero: checks
+`,
+      },
+    });
+    await user.click(screen.getByRole("button", { name: /^load from hand history$/i }));
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
+    await user.click(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }));
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+
+    expect(mockSolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actions: [{ position: "BB", street: "flop", action: "check" }],
+      }),
+    );
   });
 });

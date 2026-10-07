@@ -7,8 +7,9 @@ river -- postflop_mccfr.py decides that by how many board cards it hands
 the caller and whether it samples a runout before showdown. Nothing here
 changed when flop/turn support was added; it was already card-agnostic.
 
-Locked scope (docs/plan.md): fixed bet-size menu (check / 33% / 66% / 100%
-pot / all-in), heads-up, symmetric effective stacks.
+Locked scope (docs/plan.md): fixed bet-size menu (check / bet_small 25% /
+bet_medium 75% / bet_large 125% pot / all-in), heads-up, symmetric
+effective stacks.
 """
 
 from __future__ import annotations
@@ -17,7 +18,11 @@ from dataclasses import dataclass
 
 _EPS = 1e-9
 
-BET_SIZE_MENU: tuple[tuple[float, str], ...] = ((0.33, "b33"), (0.66, "b66"), (1.0, "b100"))
+BET_SIZE_MENU: tuple[tuple[float, str], ...] = (
+    (0.25, "bet_small"),
+    (0.75, "bet_medium"),
+    (1.25, "bet_large"),
+)
 _SIZE_BY_LABEL = {label: frac for frac, label in BET_SIZE_MENU}
 
 # Bet + 2 raises before only fold/call/all_in remain. Tunable -- keeps the
@@ -44,18 +49,30 @@ class BettingRoundState:
         first_to_act: int = 0,
         prior_history: tuple[str, ...] = (),
     ) -> BettingRoundState:
-        """prior_history seeds an already-taken action (e.g. an OOP check
-        before the solve's subgame starts) without it counting toward this
-        street's raise cap. Assumes prior_history contains no bet/raise --
-        this engine only ever seeds a leading check with it."""
-        return cls(
+        """first_to_act is whoever acts NEXT, once prior_history has played
+        out. prior_history (e.g. apps/api/app/solve.py seeding a recorded
+        bet before the solve's subgame starts) is REPLAYED through apply(),
+        not just recorded -- a seeded bet has to actually put chips in.
+        An earlier version only stored the labels with contributed left
+        at (0, 0), which was harmless while the only seed was a check but
+        meant that calling a seeded bet cost nothing and folding to it won
+        only the dead pot. Seeded aggression also counts toward
+        MAX_AGGRESSIVE_ACTIONS, same as it would have mid-tree.
+
+        Actions strictly alternate, so the street's opener is recoverable
+        from first_to_act and the history's length."""
+        opener = first_to_act if len(prior_history) % 2 == 0 else 1 - first_to_act
+        state = cls(
             pot_bb=pot_bb,
             stack_bb=stack_bb,
             contributed=(0.0, 0.0),
-            to_act=first_to_act,
-            history=tuple(prior_history),
+            to_act=opener,
+            history=(),
             num_aggressive_actions=0,
         )
+        for action in prior_history:
+            state = state.apply(action)
+        return state
 
     def _facing_bet(self) -> bool:
         return bool(self.history) and self.history[-1] in AGGRESSIVE_LABELS

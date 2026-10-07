@@ -231,9 +231,9 @@ def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
     """Same polarized-range-vs-bluffcatcher scenario test_postflop_mccfr.py
     checks against closed-form numbers -- see that file's module docstring
     for the full derivation. Board Ks Qh 9d 4c 2s (the river -- no runout
-    needed), pot_bb=100, effective_stack_bb=33 (exactly the 33%-pot size,
-    so Hero's options collapse to check/all_in and Villain's to fold/call).
-    Run directly:
+    needed), pot_bb=100, effective_stack_bb=25 (exactly the bet_small/
+    25%-pot size, so Hero's options collapse to check/all_in and
+    Villain's to fold/call). Run directly:
 
         python -m poker_solver.postflop_mccfr
     """
@@ -241,7 +241,7 @@ def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
     config = PostflopSpotConfig(
         board=board,
         pot_bb=100.0,
-        effective_stack_bb=33.0,
+        effective_stack_bb=25.0,
         range0={"KJo": 1.0},
         range1={"AA": 1.0, "33": 1.0},
         first_to_act=1,
@@ -260,10 +260,10 @@ def run_demo(iterations: int = 20_000, seed: int = 1) -> None:
     print()
     print("Hero (AA/33) opening decision, average strategy:")
     print(f"  AA: {average(1, 'AA', ('check',))}")
-    print(f"  33: {average(1, '33', ('check',))}  (theory: shove ~= 33/133 = 0.2481)")
+    print(f"  33: {average(1, '33', ('check',))}  (theory: shove = 25/125 = 0.2)")
     print()
     print("Villain (KJo) facing a shove, average strategy:")
-    print(f"  KJo: {average(0, 'KJo', ('check', 'all_in'))}  (theory: call ~= 100/133 = 0.7519)")
+    print(f"  KJo: {average(0, 'KJo', ('check', 'all_in'))}  (theory: call = 100/125 = 0.8)")
 
 
 if __name__ == "__main__":

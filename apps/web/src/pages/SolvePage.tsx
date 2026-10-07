@@ -5,6 +5,8 @@ import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { boardFromCards, parseBoardText } from "../lib/cards";
 import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
 import { parseHandHistoryToPostflopSetup } from "../lib/parseHandHistory";
+import { STREET_ORDER, summarizeHand, toBettingActions } from "../lib/handBuilder";
+import type { BuilderAction } from "../lib/handBuilder";
 import {
   fetchReferenceStrategy,
   solveSpot,
@@ -14,10 +16,12 @@ import {
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { CardPicker } from "../components/CardPicker/CardPicker";
 import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
+import { StreetActions } from "../components/StreetActions/StreetActions";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
 type BoardMode = "pick" | "text";
+type SetupMode = "click" | "paste";
 
 type Outcome =
   | { kind: "idle" }
@@ -43,6 +47,12 @@ function streetForBoardLength(length: number): Street {
   return "river";
 }
 
+const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
+  preflop: [],
+  flop: [],
+  turn: [],
+  river: [],
+};
 
 /**
  * Stage 5's live-solve screen: a real MCCFR solve (apps/api's
@@ -51,40 +61,52 @@ function streetForBoardLength(length: number): Street {
  * apps/api/app/solve.py defines: index 0 is out-of-position/first-to-act
  * this street, index 1 is in position.
  *
+ * Two alternative ways to reach a decision point, picked via setupMode:
+ * clicking through the hand street by street (lib/handBuilder.ts derives
+ * pot_bb/effective_stack_bb from real actions plus 1/2 blinds, instead of
+ * them being typed in), or pasting a hand history
+ * (lib/parseHandHistory.ts's parseHandHistoryToPostflopSetup) when one's
+ * already in hand. Both converge on the same board/ranges/solve machinery
+ * below them -- see docs/decisions.md's 2026-10-07 entry for why these
+ * are kept as two separate modes rather than merged into one state model.
+ *
  * The board has two input modes -- click cards (CardPicker) or type them
  * (lib/cards.ts's parseBoardText) -- per docs/decisions.md's 2026-10-06
- * entries: the text field was a deliberate v1, and the picker is an
- * additional mode, not a replacement. Both converge on the same
- * ParseBoardResult, so canSubmit/the submitted Spot only have one code
- * path past that point.
+ * entries, shared by both setup modes: 3/4/5 cards picked is what unlocks
+ * the flop/turn/river action-builder sections in click mode.
  */
 export function SolvePage() {
+  const [setupMode, setSetupMode] = useState<SetupMode>("click");
   const [oopPosition, setOopPosition] = useState<Position>("BB");
   const [ipPosition, setIpPosition] = useState<Position>("BTN");
-  const [effectiveStackBb, setEffectiveStackBb] = useState(33);
-  const [potBb, setPotBb] = useState(100);
   const [boardMode, setBoardMode] = useState<BoardMode>("pick");
   const [boardText, setBoardText] = useState("");
   const [pickedCards, setPickedCards] = useState<string[]>([]);
-  const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
   const [oopRange, setOopRange] = useState<HandRange>({});
   const [ipRange, setIpRange] = useState<HandRange>({});
   const [oopChartState, setOopChartState] = useState<ChartLoadState>({ kind: "idle" });
   const [ipChartState, setIpChartState] = useState<ChartLoadState>({ kind: "idle" });
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+
+  // Click-through mode's own state: a true starting stack (before any
+  // action) plus each street's real action log -- pot_bb/effective_stack_bb
+  // for whichever street the board's card count lands on are computed from
+  // these, never typed in directly (see docs/decisions.md's 2026-10-07
+  // entry on why the old flat pot_bb=100/effective_stack_bb=33 defaults
+  // didn't make sense).
+  const [startingStackBb, setStartingStackBb] = useState(100);
+  const [streets, setStreets] = useState<Record<Street, BuilderAction[]>>(EMPTY_STREETS);
+
+  // Paste mode's own state -- unchanged from before this street-by-street
+  // builder existed: a hand history directly tells you pot/stack/board at
+  // the point it stops, so there's nothing to click through.
   const [handHistoryText, setHandHistoryText] = useState("");
   const [handHistoryError, setHandHistoryError] = useState<string | null>(null);
+  const [pastedPotBb, setPastedPotBb] = useState(0);
+  const [pastedStackBb, setPastedStackBb] = useState(0);
+  const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
+  const [pasteLoaded, setPasteLoaded] = useState(false);
 
-  /**
-   * Fast-forwards the board/pot/stack/positions fields straight to a
-   * postflop decision point recorded in a pasted hand history, instead of
-   * manually re-solving every earlier street -- reading what already
-   * happened is a much cheaper problem than solving it. Ranges are left
-   * untouched: a hand history doesn't reveal villain's actual holdings,
-   * so those still come from "Load <position>'s opening range" or manual
-   * painting. See docs/decisions.md's entry on why this doesn't attempt
-   * real multi-street solving.
-   */
   function loadFromHandHistory() {
     const result = parseHandHistoryToPostflopSetup(handHistoryText);
     if (result.kind === "unrecognized") {
@@ -95,35 +117,51 @@ export function SolvePage() {
     const { setup } = result;
     setOopPosition(setup.oopPosition);
     setIpPosition(setup.ipPosition);
-    setEffectiveStackBb(setup.effectiveStackBb);
-    setPotBb(setup.potBb);
+    setPastedStackBb(setup.effectiveStackBb);
+    setPastedPotBb(setup.potBb);
     setBoardMode("pick");
     setPickedCards(setup.board);
     setOopAlreadyChecked(setup.oopAlreadyChecked);
+    setPasteLoaded(true);
   }
 
   const board = boardMode === "pick" ? boardFromCards(pickedCards) : parseBoardText(boardText);
+  const boardLength =
+    board.kind === "ok" ? board.cards.length : boardMode === "pick" ? pickedCards.length : 0;
   const positionsAreValid = oopPosition !== ipPosition;
-  const stackIsValid = Number.isFinite(effectiveStackBb) && effectiveStackBb > 0;
-  const potIsValid = Number.isFinite(potBb) && potBb > 0;
+
+  const handSummary = summarizeHand(oopPosition, ipPosition, startingStackBb, streets, boardLength);
+
+  const potBb = setupMode === "click" ? handSummary.potBb : pastedPotBb;
+  const effectiveStackBb = setupMode === "click" ? handSummary.effectiveStackBb : pastedStackBb;
+  const currentStreet = setupMode === "click" ? handSummary.targetStreet : streetForBoardLength(boardLength);
+  const currentStreetActions: BuilderAction[] =
+    setupMode === "click"
+      ? streets[handSummary.targetStreet]
+      : oopAlreadyChecked
+        ? [{ position: oopPosition, action: "check" }]
+        : [];
+
+  const setupIsReady =
+    setupMode === "click"
+      ? handSummary.blockedReason === null && boardLength >= 3
+      : pasteLoaded;
+
   const rangesAreValid = Object.keys(oopRange).length > 0 && Object.keys(ipRange).length > 0;
   const canSubmit =
-    positionsAreValid && stackIsValid && potIsValid && rangesAreValid && board.kind === "ok";
+    positionsAreValid && setupIsReady && rangesAreValid && board.kind === "ok";
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit || board.kind !== "ok") return;
 
-    const street = streetForBoardLength(board.cards.length);
     const spot: Spot = {
       positions_in_hand: [oopPosition, ipPosition],
       effective_stack_bb: effectiveStackBb,
       pot_bb: potBb,
       board: board.cards,
-      current_street: street,
-      actions: oopAlreadyChecked
-        ? [{ position: oopPosition, street, action: "check" }]
-        : [],
+      current_street: currentStreet,
+      actions: toBettingActions(currentStreet, currentStreetActions),
       ranges: { [oopPosition]: oopRange, [ipPosition]: ipRange },
     };
 
@@ -173,8 +211,9 @@ export function SolvePage() {
     setRange: (range: HandRange) => void,
     setStatus: (state: ChartLoadState) => void,
   ) {
+    const stackForChart = setupMode === "click" ? startingStackBb : effectiveStackBb;
     setStatus({ kind: "loading" });
-    const openResult = await fetchReferenceStrategy(buildOpenSpot(position, effectiveStackBb));
+    const openResult = await fetchReferenceStrategy(buildOpenSpot(position, stackForChart));
     if (openResult.kind === "match") {
       setRange(openResult.data.ranges[position] ?? {});
       setStatus({ kind: "loaded" });
@@ -190,7 +229,7 @@ export function SolvePage() {
     }
 
     const defendResult = await fetchReferenceStrategy(
-      buildVsRaiseSpot(position, otherPosition, effectiveStackBb),
+      buildVsRaiseSpot(position, otherPosition, stackForChart),
     );
     if (defendResult.kind === "match") {
       setRange(defendResult.data.ranges[position] ?? {});
@@ -207,37 +246,71 @@ export function SolvePage() {
     });
   }
 
+  function setStreetActions(street: Street, actions: BuilderAction[]) {
+    setStreets((prev) => ({ ...prev, [street]: actions }));
+  }
+
   return (
     <div className="spot-builder">
       <form className="spot-builder__form" onSubmit={handleSubmit}>
         <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">Jump to a decision from a hand history</h2>
-          <label className="spot-builder__field">
-            Paste a hand history
-            <textarea
-              className="spot-builder__hh-input"
-              rows={4}
-              value={handHistoryText}
-              onChange={(e) => setHandHistoryText(e.target.value)}
-              placeholder="Paste up through the point just before the decision you want to look at"
+          <h2 className="spot-builder__legend">Jump to a decision</h2>
+          <label className="spot-builder__field spot-builder__field--radio">
+            <input
+              type="radio"
+              name="setup-mode"
+              checked={setupMode === "click"}
+              onChange={() => setSetupMode("click")}
             />
+            Click through the hand
           </label>
-          <button type="button" className="spot-builder__reset" onClick={loadFromHandHistory}>
-            Load from hand history
-          </button>
-          {handHistoryError && <p className="spot-builder__field-error">{handHistoryError}</p>}
-          <p className="spot-builder__hint">
-            Fills in positions, board, pot, and stack from what actually
-            happened in the hand -- not ranges, since a hand history doesn&rsquo;t
-            reveal villain&rsquo;s actual cards.
-          </p>
+          <label className="spot-builder__field spot-builder__field--radio">
+            <input
+              type="radio"
+              name="setup-mode"
+              checked={setupMode === "paste"}
+              onChange={() => setSetupMode("paste")}
+            />
+            From a hand history
+          </label>
+
+          {setupMode === "paste" && (
+            <>
+              <label className="spot-builder__field">
+                Paste a hand history
+                <textarea
+                  className="spot-builder__hh-input"
+                  rows={4}
+                  value={handHistoryText}
+                  onChange={(e) => setHandHistoryText(e.target.value)}
+                  placeholder="Paste up through the point just before the decision you want to look at"
+                />
+              </label>
+              <button type="button" className="spot-builder__reset" onClick={loadFromHandHistory}>
+                Load from hand history
+              </button>
+              {handHistoryError && <p className="spot-builder__field-error">{handHistoryError}</p>}
+              <p className="spot-builder__hint">
+                Fills in positions, board, pot, and stack from what actually
+                happened in the hand -- not ranges, since a hand history doesn&rsquo;t
+                reveal villain&rsquo;s actual cards.
+              </p>
+            </>
+          )}
+          {setupMode === "click" && (
+            <p className="spot-builder__hint">
+              Set the positions and starting stack below, then click through
+              the hand street by street -- pot and effective stack are
+              computed from what you enter, not typed in.
+            </p>
+          )}
         </section>
 
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">Players</h2>
 
           <label className="spot-builder__field">
-            Out of position (acts first)
+            Out of position (acts first postflop)
             <select
               value={oopPosition}
               onChange={(e) => setOopPosition(e.target.value as Position)}
@@ -267,18 +340,91 @@ export function SolvePage() {
             <p className="spot-builder__field-error">The two positions must differ.</p>
           )}
 
-          <label className="spot-builder__field spot-builder__field--radio">
-            <input
-              type="checkbox"
-              checked={oopAlreadyChecked}
-              onChange={(e) => setOopAlreadyChecked(e.target.checked)}
-            />
-            {oopPosition} already checked &mdash; solve {ipPosition}&rsquo;s decision
-          </label>
+          {setupMode === "click" && (
+            <label className="spot-builder__field">
+              Starting effective stack (bb)
+              <input
+                type="number"
+                min={0}
+                step="any"
+                value={startingStackBb}
+                onChange={(e) => setStartingStackBb(Number(e.target.value))}
+              />
+            </label>
+          )}
+
+          {setupMode === "paste" && (
+            <label className="spot-builder__field spot-builder__field--radio">
+              <input
+                type="checkbox"
+                checked={oopAlreadyChecked}
+                onChange={(e) => setOopAlreadyChecked(e.target.checked)}
+              />
+              {oopPosition} already checked &mdash; solve {ipPosition}&rsquo;s decision
+            </label>
+          )}
         </section>
 
+        {setupMode === "click" &&
+          STREET_ORDER.map((street, idx) => {
+            const minCards = idx === 0 ? 0 : idx + 2; // preflop=always, flop=3, turn=4, river=5
+            if (boardLength < minCards) return null;
+            const targetIdx = STREET_ORDER.indexOf(handSummary.targetStreet);
+            // Reached: this street already closed and we've moved past it
+            // -- show its log as history, not live controls. Current:
+            // this is exactly where the walk stopped. Blocked: the very
+            // next street after where the walk stopped (shown once, with
+            // why); anything further out just isn't rendered yet.
+            if (idx > targetIdx + 1) return null;
+            const status = idx < targetIdx ? "reached" : idx === targetIdx ? "current" : "blocked";
+
+            return (
+              <section className="spot-builder__section" key={street}>
+                <h2 className="spot-builder__legend">
+                  {street.charAt(0).toUpperCase() + street.slice(1)}
+                </h2>
+                {street === "preflop" && status === "current" && (
+                  <p className="spot-builder__hint">
+                    Blinds assumed at 1bb/0.5bb. {ipPosition} (small blind)
+                    acts first.
+                  </p>
+                )}
+                {status === "blocked" ? (
+                  <p className="spot-builder__field-error">{handSummary.blockedReason}</p>
+                ) : (
+                <StreetActions
+                  street={street}
+                  ctx={
+                    street === "preflop"
+                      ? {
+                          oopPosition,
+                          ipPosition,
+                          potBeforeBb: 0,
+                          stackBeforeBb: startingStackBb,
+                          firstToAct: ipPosition,
+                          initialContributed: { [oopPosition]: 1, [ipPosition]: 0.5 },
+                          isPreflop: true,
+                        }
+                      : {
+                          oopPosition,
+                          ipPosition,
+                          potBeforeBb: status === "current" ? handSummary.potBb : 0,
+                          stackBeforeBb:
+                            status === "current" ? handSummary.effectiveStackBb : startingStackBb,
+                          firstToAct: oopPosition,
+                        }
+                  }
+                  actions={streets[street]}
+                  onChange={(next) => setStreetActions(street, next)}
+                  disabled={status === "reached"}
+                />
+                )}
+              </section>
+            );
+          })}
+
         <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">Board &amp; stakes</h2>
+          <h2 className="spot-builder__legend">Board</h2>
 
           <label className="spot-builder__field spot-builder__field--radio">
             <input
@@ -329,32 +475,23 @@ export function SolvePage() {
             </p>
           )}
 
-          <label className="spot-builder__field">
-            Pot (bb)
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={potBb}
-              onChange={(e) => setPotBb(Number(e.target.value))}
-            />
-          </label>
-          {!potIsValid && (
-            <p className="spot-builder__field-error">Enter a pot size greater than 0.</p>
+          {setupMode === "click" && board.kind === "ok" && (
+            <p className="spot-builder__hint">
+              Pot entering the {currentStreet}: {potBb.toLocaleString()}bb &middot; effective
+              stack: {effectiveStackBb.toLocaleString()}bb
+            </p>
           )}
-
-          <label className="spot-builder__field">
-            Effective stack (bb)
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={effectiveStackBb}
-              onChange={(e) => setEffectiveStackBb(Number(e.target.value))}
-            />
-          </label>
-          {!stackIsValid && (
-            <p className="spot-builder__field-error">Enter a stack size greater than 0.</p>
+          {setupMode === "paste" && (
+            <>
+              <label className="spot-builder__field">
+                Pot (bb)
+                <input type="number" min={0} step="any" value={pastedPotBb} onChange={(e) => setPastedPotBb(Number(e.target.value))} />
+              </label>
+              <label className="spot-builder__field">
+                Effective stack (bb)
+                <input type="number" min={0} step="any" value={pastedStackBb} onChange={(e) => setPastedStackBb(Number(e.target.value))} />
+              </label>
+            </>
           )}
         </section>
 
@@ -415,15 +552,15 @@ export function SolvePage() {
         {outcome.kind === "idle" && (
           <p>
             Set up both players&rsquo; ranges and a board, then solve &mdash; this
-            runs a real MCCFR solve, not a lookup, so it takes a few seconds.
+            runs a real equilibrium solve, not a lookup, so it takes a few seconds.
           </p>
         )}
 
         {outcome.kind === "loading" && (
           <p>
             <span className="spot-builder__spinner" aria-hidden="true" />
-            Solving&hellip; this runs thousands of iterations server-side, so
-            it can take several seconds.
+            Solving&hellip; this trains until the result is within 0.5% of the
+            pot of a true equilibrium, so a wide-range flop can take a while.
           </p>
         )}
 
@@ -477,6 +614,20 @@ export function SolvePage() {
             Live solve ({outcome.data.iterations.toLocaleString()} iterations)
             &mdash; {outcome.data.position}&rsquo;s strategy:
           </p>
+          {outcome.data.exploitability_pct !== undefined && (
+            <p className="spot-builder__hint">
+              Within {outcome.data.exploitability_pct.toFixed(2)}% of the pot of a
+              true equilibrium &mdash; the most a perfect opponent could gain
+              against this strategy.
+            </p>
+          )}
+          {outcome.data.bucketed_actions.length > 0 && (
+            <ul className="spot-builder__hint">
+              {outcome.data.bucketed_actions.map((note, idx) => (
+                <li key={idx}>{note}</li>
+              ))}
+            </ul>
+          )}
           {Object.keys(outcome.data.strategy).length === 0 ? (
             <p className="spot-builder__hint">
               No hand in that range got enough samples to report a strategy for

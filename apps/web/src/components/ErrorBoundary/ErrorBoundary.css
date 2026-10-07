@@ -1,0 +1,18 @@
+.error-boundary {
+  margin: 1.25rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--text-strong);
+}
+
+.error-boundary__title {
+  font-weight: 650;
+  color: var(--danger);
+  margin: 0 0 0.4rem;
+}
+
+.error-boundary__reset {
+  margin-top: 0.6rem;
+}

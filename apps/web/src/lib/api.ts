@@ -178,8 +178,20 @@ export async function listSpots(): Promise<ListSpotsResult> {
 export interface LiveSolveResponse {
   source: "live_solve";
   iterations: number;
+  // How far the result is from equilibrium -- what a perfect opponent could
+  // gain against it, as % of the pot. apps/api trains until this drops
+  // below its target (0.5%). Optional: an older deployed backend (before
+  // range-vs-range CFR) doesn't send it, and Render deploys separately from
+  // the web build -- so only show it when it's there.
+  exploitability_pct?: number;
   position: Position;
   strategy: Record<string, Record<string, number>>;
+  // Human-readable notes on any bet/raise in the submitted actions that
+  // got lossily bucketed onto the engine's fixed bet-size menu (e.g. "BTN's
+  // 47% pot bet -> bucketed to 75% pot (bet_medium)") -- see
+  // apps/api/app/solve.py's _replay_street_actions. Empty when nothing
+  // needed bucketing (e.g. the seeded action was only a check).
+  bucketed_actions: string[];
 }
 
 // /spots/solve's 422s aren't one shape: a schema-invalid Spot (missing
@@ -211,13 +223,27 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: spot,
+      // CapacitorHttp's native default read timeout is far shorter than a
+      // real solve can take (measured: 60s+ on the deployed host for a
+      // wide range) -- without this, the app gives up and reports
+      // "network-error" while the solve is still running server-side. No
+      // other function in this module needs this; they're all fast.
+      connectTimeout: 20_000,
+      readTimeout: 150_000,
     });
   } catch {
     return { kind: "network-error" };
   }
 
   if (res.status >= 200 && res.status < 300) {
-    return { kind: "solved", data: asJson(res.data) as LiveSolveResponse };
+    const data = asJson(res.data) as LiveSolveResponse;
+    // A deploy lag between frontend and backend is real (Render deploys
+    // separately from the web build) -- bucketed_actions is a newer field
+    // the live API may not send yet. Normalize here, once, rather than
+    // every consumer needing an optional check: an older backend's
+    // response is still a fully valid "solved" result, just with nothing
+    // to disclose.
+    return { kind: "solved", data: { ...data, bucketed_actions: data.bucketed_actions ?? [] } };
   }
   if (res.status === 422) {
     const body = asJson(res.data);

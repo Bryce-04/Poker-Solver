@@ -24,8 +24,13 @@ returning only the signed-in user's own spots. **Solve** (`pages/
 SolvePage.tsx`) is Stage 5's new screen: a real MCCFR solve via `apps/api`'s
 `POST /spots/solve` — both players' ranges, a board (click cards via
 `components/CardPicker/CardPicker.tsx`, or type them via `lib/cards.ts` —
-see `docs/decisions.md`), and a per-action-frequency result table, not a
-single-weight range.
+see `docs/decisions.md`), and results as a color-coded strategy chart
+(`components/StrategyGrid/StrategyGrid.tsx`), not a single-weight range.
+Reaching a decision point now has two modes: a real click-through hand
+builder (`lib/handBuilder.ts`, `components/StreetActions/
+StreetActions.tsx` — the default) or pasting a hand history
+(`lib/parseHandHistory.ts`) — see the `## SolvePage` section below for
+both, and `docs/decisions.md`'s 2026-10-07 entries for the design.
 
 ## Commands
 
@@ -58,13 +63,24 @@ src/
     SpotBuilder/              the spot builder form, reused by BuilderPage
     RangeGrid/                the 13×13 starting-hand grid
     CardPicker/               click-to-toggle board-card grid (SolvePage)
+    StrategyGrid/             13×13 color-coded solve-result chart (SolvePage)
+    StreetActions/            one street's action log + "add an action"
+                              controls (SolvePage's click-through builder)
+    ErrorBoundary/            wraps every route (App.tsx): a render crash shows a
+                              recoverable message, not a blank screen
   lib/
     api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot,
                               listSpots, solveSpot
     spot.ts                   buildOpenSpot/buildVsRaiseSpot — the shared Spot-assembly
                               helpers every entry path converges on
     parseSpotText.ts           Stage 3's rule-based parser (two phrasings, plus synonyms)
-    parseHandHistory.ts        Stage 4's rule-based hand-history parser (one format)
+    parseHandHistory.ts        Stage 4's rule-based hand-history parser (one format),
+                              plus parseHandHistoryToPostflopSetup (SolvePage's
+                              "from a hand history" setup mode)
+    handBuilder.ts             SolvePage's click-through setup mode: walks
+                              preflop -> flop -> turn -> river from real
+                              actions, deriving pot_bb/effective_stack_bb
+                              instead of them being typed in
     cards.ts                   parseBoardText / boardFromCards — Stage 5's board
                               validation (SolvePage), typed or picked
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
@@ -192,18 +208,45 @@ screen that needed one — see `## SolvePage` below for the
 It's the first screen needing *two* ranges and a board, so it departs
 from the other entry paths in a few ways:
 
-- **"Jump to a decision from a hand history"** (`lib/parseHandHistory.ts`'s
-  `parseHandHistoryToPostflopSetup`) fast-forwards positions/board/pot/
-  stack straight to whatever postflop decision point the paste reaches —
-  reading what a hand's actions already determined, not re-solving every
-  earlier street (see `docs/decisions.md`'s entry on why that's a cheap
-  addition rather than real multi-street solving, which stays out of
-  scope). A second entry point in the same file as the original Stage 4
-  `parseHandHistory` (unchanged, still backs `ImportPage`'s preflop
-  lookup) — they share header/seat parsing but do different jobs. Doesn't
-  touch either range: a hand history doesn't reveal villain's actual
-  cards, so those still come from the reference-range buttons below or
-  manual painting.
+- **Two ways to reach a decision point**, picked via a radio toggle:
+  - **Click through the hand (the default).** `lib/handBuilder.ts`
+    walks preflop -> flop -> turn -> river as real actions with real bb
+    sizes (not the solver's fixed menu — that's a backend-only
+    abstraction `solve.py` buckets a size onto at solve time, disclosed
+    via the response's `bucketed_actions`, not duplicated here) —
+    `components/StreetActions/StreetActions.tsx` renders one street's
+    action log plus fold/check/call/bet-or-raise/all-in controls for
+    whoever's turn it is. Blinds are assumed at 1bb/0.5bb, heads-up
+    style between exactly the two chosen positions (OOP posts 1bb, acts
+    last preflop/first postflop; IP posts 0.5bb, acts first
+    preflop/last postflop) — a deliberate simplification, not a real
+    6-max preflop order for an arbitrary 2-of-6 position pair. Preflop
+    supports repeated raises (3-bet, 4-bet, ...), not just one
+    raise/one call. An earlier street has to close (not fold) before
+    the next one unlocks; `pot_bb`/`effective_stack_bb` entering
+    whichever street the board's card count reaches are computed from
+    this, never typed in. A fold on any street ends the hand outright
+    — no later section renders, and "Solve" stays disabled. See
+    `docs/decisions.md`'s 2026-10-07 entry for the full design,
+    including the one real poker rule preserved (the small blind's
+    completing call doesn't close preflop action).
+  - **From a hand history** (`lib/parseHandHistory.ts`'s
+    `parseHandHistoryToPostflopSetup`) — the original, unchanged
+    shortcut: fast-forwards positions/board/pot/stack straight to
+    whatever postflop decision point a pasted hand reaches, reading
+    what already happened rather than re-solving every earlier street
+    (see `docs/decisions.md`'s entry on why that's cheap and stays out
+    of real multi-street solving's scope). Shares header/seat parsing
+    with the original Stage 4 `parseHandHistory` (unchanged, still
+    backs `ImportPage`) but does a different job. Kept as a genuinely
+    separate mode rather than merged into the click-through builder's
+    state — a pasted hand history already tells you pot/stack/board
+    directly.
+
+  Neither mode touches either range: a hand history doesn't reveal
+  villain's actual cards, and the click-through builder's job is pot/
+  stack bookkeeping, not range reconstruction — both still come from
+  the reference-range buttons below or manual painting.
 - **Two positions, two `RangeGrid`s.** `apps/web/src/lib/spot.ts`'s
   helpers only ever fill in hero's position/range; this screen defines
   its own convention instead (matching `apps/api/app/solve.py`'s
@@ -228,10 +271,15 @@ from the other entry paths in a few ways:
   Switching modes doesn't clear the other mode's input. See
   `docs/decisions.md`'s 2026-10-06 entries for why the text field
   shipped first and the picker came as an addition, not a replacement.
-- **An "already checked" toggle**, not a full action-history editor —
-  maps directly onto `solve.py`'s "empty or exactly one seeded check"
-  contract. Anything past that (mid-street betting already recorded)
-  isn't solvable yet, so there's no UI for it.
+- **The "from a hand history" mode keeps its original "already
+  checked" toggle**, not a full action-history editor — it only ever
+  seeds a single check, even though `solve.py`'s contract no longer
+  requires that (generalized to accept any non-terminal action prefix,
+  with any bet/raise bucketed onto the bet-size menu — now **Bet Small
+  25% / Bet Medium 75% / Bet Large 125% / All-in**, was 33%/66%/100% —
+  see `docs/decisions.md`'s 2026-10-07 entry). The click-through mode
+  doesn't have this limitation: it submits whatever real action
+  sequence was actually built on the target street.
 - **Results are a 13×13 chart** (`components/StrategyGrid/StrategyGrid.tsx`),
   not a table — each cell is a left-to-right gradient of that hand's
   action mix (fold cool-colored, check/call gold, bet sizes a deepening
@@ -245,18 +293,26 @@ from the other entry paths in a few ways:
   the response (not in range, or never sampled enough to report) renders
   as a flat neutral cell, not a color — see the caveat on per-hand
   precision below.
-- **A solve takes a few seconds** (it's running thousands of real MCCFR
-  iterations server-side, not a lookup) — the loading state says so
-  explicitly rather than looking stuck.
+- **A solve takes a few seconds, more for a wide-range flop** — it trains
+  server-side until the result is within 0.5% of the pot of a true
+  equilibrium, not a lookup. The loading state says so explicitly rather
+  than looking stuck, and the result shows the precision actually
+  reached (`LiveSolveResponse.exploitability_pct`, optional on the client
+  because an older deployed backend doesn't send it).
 
-**A real caveat, not just a UI one:** a wide realistic range (dozens of
-hand labels) creates tens of thousands of distinct info-sets, but a solve
-only runs a few thousand iterations total (`DEFAULT_ITERATIONS`,
-`apps/api/app/solve.py`) — individual fringe combos can end up with very
-few samples behind their displayed frequency. The CFR algorithm itself is
-validated against closed-form theory (`services/solver`'s regression
-tests), but that doesn't make every per-hand number in a wide-range
-result trustworthy yet; see `docs/decisions.md`'s 2026-10-07 entries.
+**Precision, now measured rather than caveated:** until 2026-10-07 the
+solver Monte-Carlo-sampled hole cards and a wide range's per-hand numbers
+were often noise (this section used to warn about exactly that). The
+range-vs-range solver that replaced it trains every combo on every
+iteration, so no hand is thinly sampled, and the precision line under the
+chart is a real global bound — see `docs/decisions.md`'s top entry.
+
+**Resilience to a backend that's behind:** Render deploys separately from
+this build, so `lib/api.ts`'s `solveSpot` normalizes newer response
+fields (e.g. `bucketed_actions` defaults to `[]`), and
+`components/ErrorBoundary` wraps every route in `App.tsx` — an unexpected
+response shape shows "Something went wrong / Try again" instead of the
+blank screen a missing field once caused on a real phone.
 
 Reuses `SpotBuilder.css`'s `spot-builder__*` classes for every generic
 piece (fields, status blocks, buttons), same as `TypeInPage`/`ImportPage`.

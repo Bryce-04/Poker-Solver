@@ -36,25 +36,76 @@ Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
 against the live API on a physical device. **`services/solver` now
 solves any single postflop street** — flop, turn, or river, heads-up,
-two ranges, the locked bet-size menu — `postflop_mccfr.py`, backed by a
-from-scratch hand evaluator and a range-to-combo sampler, checked
-against closed-form poker theory in `tests/test_postflop_mccfr.py` (flop/
-turn via a Monte Carlo board runout, `combos.py`'s `deal_runout`, checked
-against exact brute-force equity in `tests/test_runout_equity.py`). It's
+two ranges, the locked bet-size menu — with `range_cfr.py`: range-vs-range
+Discounted CFR (every combo trained every iteration, no hole-card
+sampling), terminal values from an exact precomputed equity matrix
+(`equity.py`, every runout enumerated), trained until exploitability is
+under 0.5% of the pot. It replaced the Monte Carlo trainer
+(`postflop_mccfr.py`, kept but unused) on 2026-10-07 after that was
+measured producing noise for realistic wide ranges — see
+`docs/decisions.md`'s top entry. Checked against closed-form poker theory
+(to within 1%), brute-force equity, and a regression test of the exact
+bug scenario (`tests/test_range_cfr.py`). It's
 wired up now too: `apps/api`'s `POST /spots/solve` (`app/solve.py`) calls
 into it synchronously and returns a real per-action-frequency strategy
 for whichever player's decision the request implies — see
 `docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
 convention on `Spot`, not a schema change: `positions_in_hand` needs two
-entries, `ranges` needs both). `apps/web` has a screen for it now too:
-`pages/SolvePage.tsx` ("Solve") — two positions, two `RangeGrid`s, a
-validated board text field (`lib/cards.ts`, a v1 ahead of a visual
-rank/suit picker — see `docs/decisions.md`), and a results table (not a
-chart — each hand's real per-action frequencies, not one weight).
+entries, `ranges` needs both). `apps/web` has a screen for it now too: `pages/SolvePage.tsx` ("Solve")
+— two positions, two `RangeGrid`s (each with a "Load reference range"
+button, open-chart-then-defend-chart fallback so every position pair
+has a one-click default instead of starting blank), a board enterable
+as validated text (`lib/cards.ts`) or by clicking cards
+(`components/CardPicker/CardPicker.tsx` — both converge on the same
+`ParseBoardResult`), a "paste a hand history" shortcut
+(`lib/parseHandHistory.ts`'s `parseHandHistoryToPostflopSetup`) that
+fast-forwards a pasted hand to whichever street it stops at and fills
+in board/pot/stack/positions from what actually happened (reading what
+happened, not solving it — not a step toward multi-street solving, see
+`docs/decisions.md`), and results shown as a 13×13 color-coded strategy
+chart (`components/StrategyGrid/StrategyGrid.tsx`), not a table, with
+the solve's measured precision (`exploitability_pct`) shown alongside.
 Multi-street solving (modeling betting across flop *and* turn *and*
-river in one tree, as opposed to one street at a time) is a separate,
-bigger future
-direction, not done.**
+river in one tree, as opposed to one street at a time) stays a separate,
+bigger future direction, not done — and the related open question of
+where a later street's range should come from is written up in
+`docs/plan.md`.
+
+**Shipped since**: the locked bet-size menu is now **Bet Small (25%) /
+Bet Medium (75%) / Bet Large (125%) / All-in** (was 33%/66%/100% pot),
+and `/spots/solve` seeds from any non-terminal action prefix on the
+current street — not just an empty street or a single check — so a
+solve can start right after a bet, a raise, or a short sequence (lossy
+size-bucketing onto the menu, disclosed via the response's
+`bucketed_actions` rather than hidden; an out-of-turn or already-
+terminal sequence 422s). On top of that, `SolvePage` gained a real
+click-through hand builder (`lib/handBuilder.ts`,
+`components/StreetActions/StreetActions.tsx`) as an alternative to
+pasting a hand history: distinct preflop/flop/turn/river sections, real
+actions with real bb sizes (not the fixed menu — that's only what the
+backend buckets a size onto at solve time), preflop supporting repeated
+raises (3-bet/4-bet, not just one raise/one call, under an assumed
+1bb/0.5bb blind structure), and `pot_bb`/`effective_stack_bb` computed
+from what was actually entered rather than typed in. An earlier street
+has to close (not fold) before the next one unlocks; "Solve" targets
+whichever street the board's card count reaches, as soon as nothing
+upstream is blocking it. The old "paste a hand history" shortcut
+(`lib/parseHandHistory.ts`'s `parseHandHistoryToPostflopSetup`) still
+exists as a separate, alternative setup mode, not replaced. See
+`docs/decisions.md`'s 2026-10-07 entries for both pieces' design.
+A phone "black screen" bug from the same day is fixed (a newer frontend
+crashed on a response field the older deployed backend didn't send yet,
+with no error boundary to catch it): `solveSpot` normalizes responses,
+`components/ErrorBoundary` wraps every route, and `solveSpot` has explicit
+CapacitorHttp timeouts again — see that decision entry.
+
+**Verified**: `pytest services/solver` (108 passed), the web suite (183
+passed), lint, and build green. **Not yet verified**: `pytest apps/api`
+against a real Postgres (no reachable DB in the working session — the
+route logic was exercised by calling `solve_spot` directly instead), and
+the new solver on Render (deploying needs this branch merged to `main`).
+All of this is on branch `handhistory-to-solve`, **uncommitted** as of
+this note.
 
 ## Commands
 
@@ -90,9 +141,8 @@ pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 
 cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
-cd services/solver && python -m poker_solver.postflop_mccfr  # the real solver demo
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
-pytest services/solver/tests/test_postflop_mccfr.py           # the real solver's closed-form regression tests
+pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
@@ -162,30 +212,33 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   poker has a *family* of equilibria (parameterized by alpha in [0, 1/3])
   — opening-action frequencies aren't a fixed point to assert on in
   tests; what's invariant is that the best hand always continues facing
-  a bet (see `test_kuhn_spike.py`). The real solver now exists:
-  `postflop_mccfr.py` (chance-sampled MCCFR for one postflop street —
-  flop, turn, or river — heads-up, the locked bet-size menu — same
-  regret-matching shape as `kuhn_spike.py`'s `KuhnCfrTrainer`), backed by
-  `evaluator.py` (a from-scratch hand evaluator), `combos.py`
-  (`HandRange`'s 169-type labels → concrete, board-aware card combos,
-  plus `deal_runout` for sampling the rest of the board on the flop/
-  turn), and `betting_round.py` (the betting action abstraction, as a
-  pure state machine — genuinely card-agnostic, which is why it needed
-  no changes at all to support flop/turn). Its own closed-form
-  convergence tests (`test_postflop_mccfr.py`) now cover the "does CFR
-  converge correctly" question `kuhn_spike.py` was there to answer first
-  — `kuhn_spike.py` is a reasonable deletion candidate at this point,
-  kept for now rather than deleted reflexively. See
-  `services/solver/README.md` for the module layout, why flop/turn
-  needed less new code than expected, and the one payoff-arithmetic
-  subtlety worth knowing about before touching `betting_round.py`'s
-  `terminal_utility`. `apps/api`'s `POST /spots/solve` (`app/solve.py`)
-  now calls into it — see `docs/decisions.md`'s 2026-10-06 entry for the
-  request contract and `aggregate_label_strategies` (rolls combo-level
-  strategies back up to 169-type labels, the one function `solve.py`
-  calls). `apps/web/src/pages/SolvePage.tsx` ("Solve") now consumes it;
-  multi-street solving (one tree spanning flop+turn+river, rather than
-  one street at a time) is a separate, bigger future direction.
+  a bet (see `test_kuhn_spike.py`). The live solver is `range_cfr.py`'s
+  `RangeCfrTrainer`: range-vs-range Discounted CFR for one postflop
+  street (flop, turn, or river), heads-up, the locked bet-size menu —
+  every combo of both ranges gets a strategy at every public node on
+  every iteration, weighted by reach probability, and nothing is
+  Monte-Carlo-sampled at all (runouts are enumerated exactly in
+  `equity.py`'s precomputed equity matrix). Backed by
+  `evaluator.py` (a from-scratch hand evaluator, plus `evaluate_seven`/
+  `evaluate_seven_batch` fast paths that must stay exactly equal to the
+  brute-force `evaluate_best` — `test_evaluator.py` checks that),
+  `combos.py` (`HandRange`'s 169-type labels → concrete, board-aware
+  combos), and `betting_round.py` (the betting abstraction as a pure,
+  card-agnostic state machine). Convergence is measured, not assumed:
+  `exploitability()` / `train_until()` — use them to compare any future
+  change to the update rule or iteration policy. `postflop_mccfr.py`
+  (the superseded Monte Carlo trainer) and `kuhn_spike.py` are no longer
+  used by `apps/api` — real deletion candidates, kept for now rather
+  than deleted reflexively. See `services/solver/README.md` for the
+  module layout and how the trainer is validated, and the
+  payoff-arithmetic subtlety worth knowing about before touching
+  `betting_round.py`'s `terminal_utility` (`range_cfr.py`'s
+  `_terminal_value` mirrors it). `apps/api`'s `POST /spots/solve`
+  (`app/solve.py`) calls `train_until` and `label_strategies` — see
+  `docs/decisions.md`'s 2026-10-06 entry for the request contract.
+  `apps/web/src/pages/SolvePage.tsx` ("Solve") consumes it; multi-street
+  solving (one tree spanning flop+turn+river, rather than one street at
+  a time) is a separate, bigger future direction.
 - **`apps/web`** (React + TypeScript + Vite) is the only consumer of the
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not
