@@ -8,7 +8,7 @@ no-op there). It never overrides an already-set env var.
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy import Column, DateTime, create_engine
+from sqlalchemy import Column, DateTime, Text, create_engine
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -50,3 +50,20 @@ class SpotRow(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     created_by = Column(UUID(as_uuid=True), nullable=True, index=True)
     data = Column(JSONB, nullable=False)
+
+
+class SavedSolveRow(Base):
+    """A solve a user chose to keep: the Spot they submitted plus the solver's
+    response, both stored whole as JSONB (the result shape is owned by
+    app/solve.py and may grow fields). Scoped to its owner -- created_by is
+    required, unlike SpotRow's legacy nullable column. Managed by Alembic
+    (migration 0003)."""
+
+    __tablename__ = "saved_solves"
+
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    created_by = Column(UUID(as_uuid=True), nullable=False, index=True)
+    label = Column(Text, nullable=True)
+    spot = Column(JSONB, nullable=False)
+    result = Column(JSONB, nullable=False)

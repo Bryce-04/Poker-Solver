@@ -13,6 +13,7 @@ from sqlalchemy import text
 from poker_solver_schema import __version__ as schema_version
 
 from .db import engine
+from .routes.solves import router as solves_router
 from .routes.spots import router as spots_router
 
 app = FastAPI(title="Poker Solver API", version="0.1.0")
@@ -35,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(spots_router)
+app.include_router(solves_router)
 
 
 @app.get("/health")

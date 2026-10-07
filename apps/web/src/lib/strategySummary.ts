@@ -1,3 +1,5 @@
+import type { Spot } from "@poker-solver/schema";
+
 // Fixed left-to-right order so every cell's segments line up the same way
 // (StrategyGrid) and summaries list actions consistently. Covers every
 // action betting_round.py's fixed menu can ever produce.
@@ -46,4 +48,17 @@ export function overallMix(strategy: Strategy): [string, number][] {
 /** "Check 38%, Bet Small (25%) 62%" -- the plain-English form of a mix. */
 export function formatMix(mix: [string, number][]): string {
   return mix.map(([a, p]) => `${ACTION_LABEL[a] ?? a} ${Math.round(p * 100)}%`).join(", ");
+}
+
+/** One-line description of a solved spot: "BB vs BTN · flop Ks Qh 9d · pot 2.5bb". */
+export function describeSpot(spot: Spot): string {
+  const seats = spot.positions_in_hand.join(" vs ");
+  const parts = [seats];
+  if (spot.board && spot.board.length > 0) {
+    parts.push(`${spot.current_street ?? "flop"} ${spot.board.join(" ")}`);
+  }
+  if (spot.pot_bb !== undefined && spot.pot_bb !== null) {
+    parts.push(`pot ${spot.pot_bb.toLocaleString()}bb`);
+  }
+  return parts.join(" · ");
 }

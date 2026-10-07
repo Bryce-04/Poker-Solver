@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Spot } from "@poker-solver/schema";
 import { listSpots } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { SavedSolves } from "../components/SavedSolves/SavedSolves";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
@@ -78,7 +79,12 @@ export function SavedSpotsPage() {
   }
 
   // Auth still resolving, or a fetch in flight -- both read as loading.
-  return <SavedSpotsList state={state} />;
+  return (
+    <>
+      <SavedSpotsList state={state} />
+      {signedInAs !== null && <SavedSolves account={signedInAs} />}
+    </>
+  );
 }
 
 function SavedSpotsList({ state }: { state: ListState }) {
