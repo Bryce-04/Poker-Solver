@@ -8,8 +8,14 @@ or a review approval is enough); flip to **accepted** then.
 
 ## 2026-10-07 — Hardening /spots/solve for Render's free tier: one solve at a time, a time budget, single-threaded BLAS
 
-**Status:** proposed — built and tested locally; root cause on Render not
-yet confirmed from its logs.
+**Status:** accepted — shipped in PR #22, measured on Render afterward:
+a wide-range river solve went from no response in 5+ minutes to **16s**,
+and the deep wide-range 4bb/96bb flop (the worst case) to **90s, fully
+converged** (175 iterations, 0.46% of the pot) — under the 100s budget
+and the phone's 150s timeout. That's ~10x slower than a laptop, exactly
+what 0.1 CPU predicts, so the extra slowdown was the thread
+oversubscription and/or pile-up these fixes address (Render's logs were
+never checked, so which of the two isn't pinned down).
 
 **Context.** Right after the new solver deployed (PR #21), a wide-range
 flop solve from the phone hit the app's 150s timeout ("couldn't reach the
