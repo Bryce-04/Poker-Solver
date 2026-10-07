@@ -211,6 +211,13 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: spot,
+      // CapacitorHttp's native default read timeout is far shorter than a
+      // real solve can take (measured: 60s+ on the deployed host for a
+      // wide range) -- without this, the app gives up and reports
+      // "network-error" while the solve is still running server-side.
+      // No other function in this module needs this; they're all fast.
+      connectTimeout: 20_000,
+      readTimeout: 150_000,
     });
   } catch {
     return { kind: "network-error" };
