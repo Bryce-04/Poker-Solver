@@ -184,6 +184,11 @@ export interface LiveSolveResponse {
   // range-vs-range CFR) doesn't send it, and Render deploys separately from
   // the web build -- so only show it when it's there.
   exploitability_pct?: number;
+  // False when the server's time budget (or iteration cap) cut training off
+  // before that target -- e.g. a wide flop on the slow deployed host. The
+  // answer is still real, just rougher, and the UI says so. Optional for
+  // the same deploy-lag reason as exploitability_pct.
+  converged?: boolean;
   position: Position;
   strategy: Record<string, Record<string, number>>;
   // Human-readable notes on any bet/raise in the submitted actions that
@@ -207,6 +212,9 @@ export type SolveSpotResult =
   | { kind: "solved"; data: LiveSolveResponse }
   | { kind: "invalid"; issues: SpotValidationIssue[] }
   | { kind: "rejected"; reason: string }
+  // 503: apps/api runs one solve at a time (a 0.1-CPU host can't usefully
+  // run two), so this means "someone else's solve is running," not broken.
+  | { kind: "busy" }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
@@ -252,6 +260,9 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
       return { kind: "rejected", reason: detail };
     }
     return { kind: "invalid", issues: parseValidationIssues(body) };
+  }
+  if (res.status === 503) {
+    return { kind: "busy" };
   }
   return { kind: "error", status: res.status };
 }

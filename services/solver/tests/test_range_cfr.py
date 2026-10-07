@@ -176,3 +176,14 @@ def test_train_until_respects_the_cap() -> None:
     trainer = _river_trainer()
     trainer.train_until(target_pct_of_pot=0.0, max_iterations=60, check_every=25)
     assert trainer.iterations == 60  # 25 + 25 + a final partial 10
+
+
+def test_train_until_stops_at_a_deadline_and_reports_honestly() -> None:
+    import time
+
+    trainer = _river_trainer()
+    reached = trainer.train_until(
+        target_pct_of_pot=0.0, max_iterations=10_000, deadline=time.perf_counter()
+    )
+    assert trainer.iterations == 1  # one iteration, then the (already past) deadline
+    assert reached > 0  # a real, un-converged number -- not a pretend success

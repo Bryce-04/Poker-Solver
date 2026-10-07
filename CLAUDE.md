@@ -99,13 +99,16 @@ with no error boundary to catch it): `solveSpot` normalizes responses,
 `components/ErrorBoundary` wraps every route, and `solveSpot` has explicit
 CapacitorHttp timeouts again — see that decision entry.
 
-**Verified**: `pytest services/solver` (108 passed), the web suite (183
-passed), lint, and build green. **Not yet verified**: `pytest apps/api`
-against a real Postgres (no reachable DB in the working session — the
-route logic was exercised by calling `solve_spot` directly instead), and
-the new solver on Render (deploying needs this branch merged to `main`).
-All of this is on branch `handhistory-to-solve`, **uncommitted** as of
-this note.
+The new solver is merged (PR #21) and deployed. **Open issue:** on
+Render's free tier (0.1 CPU) wide-range solves didn't finish within 5
+minutes, far slower than the CPU share alone explains. Mitigations built
+(single-threaded BLAS in the Dockerfile, one solve at a time with a 503
+"busy", a 100s server time budget returning `converged: false`) — see
+`docs/decisions.md`'s "Hardening /spots/solve" entry; check Render's logs
+(`solved in ...` lines, OOM/restarts) to confirm the cause. `pytest
+apps/api` still hasn't been run against a real Postgres (no DB in the
+working session; route logic was exercised by calling `solve_spot`
+directly).
 
 ## Commands
 

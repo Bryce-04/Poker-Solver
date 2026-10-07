@@ -209,6 +209,37 @@ describe("SolvePage -- click-through mode (the default)", () => {
     expect(await screen.findByText(/within 0\.44% of the pot/i)).toBeInTheDocument();
   });
 
+  it("says so when the server's time limit cut the solve short", async () => {
+    mockSolve.mockResolvedValue({
+      kind: "solved",
+      data: {
+        source: "live_solve",
+        iterations: 90,
+        exploitability_pct: 2.4,
+        converged: false,
+        position: "BTN",
+        strategy: {},
+        bucketed_actions: [],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+
+    expect(await screen.findByText(/hit its time limit/i)).toBeInTheDocument();
+  });
+
+  it("explains a busy solver instead of showing a generic error", async () => {
+    mockSolve.mockResolvedValue({ kind: "busy" });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user);
+    await user.click(screen.getByRole("button", { name: /^solve$/i }));
+
+    expect(await screen.findByText(/the solver is busy/i)).toBeInTheDocument();
+  });
+
   it("omits the precision line for an older backend that doesn't report it", async () => {
     mockSolve.mockResolvedValue({
       kind: "solved",

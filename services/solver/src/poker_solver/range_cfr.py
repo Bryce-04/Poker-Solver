@@ -29,6 +29,7 @@ equity matrix encodes exactly that.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 import numpy as np
@@ -252,26 +253,35 @@ class RangeCfrTrainer:
                 self._traverse(self._root, player, self.weights[player], opp)
 
     def train_until(
-        self, target_pct_of_pot: float, max_iterations: int, check_every: int = 25
+        self,
+        target_pct_of_pot: float,
+        max_iterations: int,
+        check_every: int = 25,
+        deadline: float | None = None,
     ) -> float:
         """Train until exploitability falls below `target_pct_of_pot` (% of
         the pot at the start of this street, seeded bets included), checking
         every `check_every` iterations, or until `max_iterations`. Returns
         the exploitability actually reached, as % of that pot.
 
-        Deliberately iteration-based, not wall-clock-based: the same
-        request always stops at the same iteration on any machine, so
-        results stay reproducible (and cacheable) between a fast laptop
-        and the slow deployed host. A check costs about one extra
-        iteration (two best-response passes)."""
+        Iteration-based by default, so the same request stops at the same
+        iteration on any machine. `deadline` (a time.perf_counter() value)
+        is the escape hatch for a host too slow to finish in time: training
+        stops after the first iteration past it, and the exploitability
+        returned says honestly how converged the result got. A check costs
+        about one extra iteration (two best-response passes)."""
         pot = self._root.pot_bb + self._root.contributed[0] + self._root.contributed[1]
-        pct = float("inf")
         while self.iterations < max_iterations:
-            self.train(min(check_every, max_iterations - self.iterations))
+            batch = min(check_every, max_iterations - self.iterations)
+            for _ in range(batch):
+                self.train(1)
+                if deadline is not None and time.perf_counter() >= deadline:
+                    return 100 * self.exploitability() / pot
             pct = 100 * self.exploitability() / pot
-            if pct < target_pct_of_pot:
-                break
-        return pct
+            if pct < target_pct_of_pot or self.iterations >= max_iterations:
+                return pct
+        # Only reached if already at max_iterations before starting.
+        return 100 * self.exploitability() / pot if self.iterations else float("inf")
 
     # --- reading results -----------------------------------------------
 

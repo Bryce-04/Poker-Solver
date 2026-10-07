@@ -29,6 +29,7 @@ type Outcome =
   | { kind: "solved"; data: LiveSolveResponse }
   | { kind: "invalid"; issues: SpotValidationIssue[] }
   | { kind: "rejected"; reason: string }
+  | { kind: "busy" }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
@@ -176,6 +177,9 @@ export function SolvePage() {
         return;
       case "rejected":
         setOutcome({ kind: "rejected", reason: result.reason });
+        return;
+      case "busy":
+        setOutcome({ kind: "busy" });
         return;
       case "network-error":
         setOutcome({ kind: "network-error" });
@@ -590,6 +594,16 @@ export function SolvePage() {
           </div>
         )}
 
+        {outcome.kind === "busy" && (
+          <div className="spot-builder__status-block spot-builder__status-block--error">
+            <p className="spot-builder__status-title">The solver is busy.</p>
+            <p>
+              Another solve is already running on the server &mdash; try again in
+              a minute.
+            </p>
+          </div>
+        )}
+
         {outcome.kind === "network-error" && (
           <div className="spot-builder__status-block spot-builder__status-block--error">
             <p className="spot-builder__status-title">Couldn&rsquo;t reach the API.</p>
@@ -619,6 +633,12 @@ export function SolvePage() {
               Within {outcome.data.exploitability_pct.toFixed(2)}% of the pot of a
               true equilibrium &mdash; the most a perfect opponent could gain
               against this strategy.
+            </p>
+          )}
+          {outcome.data.converged === false && (
+            <p className="spot-builder__hint">
+              The server hit its time limit before fully converging, so this is
+              rougher than usual &mdash; treat close frequencies loosely.
             </p>
           )}
           {outcome.data.bucketed_actions.length > 0 && (
