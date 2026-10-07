@@ -21,3 +21,8 @@ services:
       # file, so the Supabase connection string never touches the repo.
       - key: DATABASE_URL
         sync: false
+      # https://<project>.supabase.co -- apps/api verifies sign-in tokens
+      # against this project's public keys (see apps/api/app/auth.py). Not
+      # a secret, but set in the dashboard alongside DATABASE_URL.
+      - key: SUPABASE_URL
+        sync: false
