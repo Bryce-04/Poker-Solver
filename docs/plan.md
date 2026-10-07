@@ -30,8 +30,9 @@ deployed (Render); the Android build (Capacitor) has a real app icon/splash
 and runs end-to-end against the live API on a physical device. **Stage 5
 has grown past its initial river-only start**: `services/solver` now
 solves any single postflop street — flop, turn, or river — heads-up, two
-ranges, the locked bet-size menu, via chance-sampled Monte Carlo CFR,
-checked against closed-form poker theory, not just "did it run"
+ranges, the locked bet-size menu, via chance-sampled Monte Carlo CFR
+(since replaced -- see below), checked against closed-form poker theory,
+not just "did it run"
 (`postflop_mccfr.py`, `betting_round.py`, backed by a from-scratch hand
 evaluator and a 169-label-to-concrete-combo sampler with a board-runout
 sampler for flop/turn — see `services/solver/README.md`). It's wired up
@@ -48,8 +49,27 @@ results table showing real per-action frequencies per hand, not a
 single chart weight. This only ever solves one street's betting at a
 time — modeling a full flop→turn→river betting tree in one solve is a
 separate, bigger future direction (see "widening the solver" below), not
-something this does. Remaining: Stage 4 past its one-format MVP, Stage
-5's solve caching + eventually multi-street solving, and the rest of
+something this does. **Since then**, `SolvePage` grew a per-position
+"Load reference range" default, a 13×13 color-coded `StrategyGrid`
+replacing that results table, a halved `DEFAULT_ITERATIONS` (measured,
+not guessed), and a "paste a hand history" shortcut that fast-forwards
+to whatever street the paste stops at (see `docs/decisions.md`). **Shipped since then too:** the locked bet-size menu is now 25%/75%/
+125% pot + all-in (was 33%/66%/100%), `/spots/solve` seeds from any
+non-terminal action prefix, not just an empty street or one check, and
+`SolvePage` gained a real click-through hand builder as an alternative
+to pasting a hand history — distinct preflop (3-bet/4-bet support, not
+just one raise/one call)/flop/turn/river sections, pot/stack
+auto-computed from real entered actions plus assumed 1/0.5 blinds
+instead of typed in, "Solve" live wherever the walk actually stops (see
+`docs/decisions.md`'s 2026-10-07 entries). **And the solver itself was
+replaced** the same day: the chance-sampled Monte Carlo trainer was
+measured producing noise for realistic wide ranges (AA "jamming" 70%
+into a 4bb pot), so `services/solver` now solves with range-vs-range
+Discounted CFR over an exact equity matrix (`range_cfr.py`,
+`equity.py`), trained until it's within 0.5% of the pot of equilibrium —
+see `docs/decisions.md`'s top entry. Remaining: Stage 4 past its
+one-format MVP, Stage 5's solve caching + eventually multi-street
+solving (and the open range-narrowing question below), and the rest of
 Stage 6 (tags, search).
 
 ## The pitch
@@ -99,9 +119,13 @@ sides can't drift. Escape hatch: the CFR inner loop can move to Rust via
 PyO3 later if profiling says it's the bottleneck — not a day-one call.
 
 **Solver scope (Stage 5):** one postflop street, heads-up, a fixed
-bet-size menu (check, 33%/66%/100% pot, all-in). Small enough that Monte
-Carlo CFR converges in seconds on ordinary hardware — genuinely correct
-for what it covers, rather than an unverifiable multi-street abstraction.
+bet-size menu (check, 25%/75%/125% pot, all-in — resized from
+33%/66%/100% on 2026-10-07). Small enough that range-vs-range CFR
+converges to a measured precision in seconds on ordinary hardware —
+genuinely correct for what it covers, rather than an unverifiable
+multi-street abstraction. (Originally planned and first built as Monte
+Carlo CFR; that turned out not to converge for realistic wide ranges —
+see `docs/decisions.md`.)
 Widening this (more sizes, more streets, more players — see below) is a
 deliberate future direction, not part of Stage 5.
 
@@ -147,3 +171,35 @@ roughly this order of effort:
    caching since "identical spot" gets rarer.
 
 Not committed to a stage number yet — tracked here as a known direction.
+
+### Open question, raised 2026-10-07: without #2, where does a later street's range actually come from?
+
+Not just a nice-to-have — a real correctness/credibility gap in the
+product as it stands. Each street is solved against whatever range the
+user hands it (manually painted, or a preflop reference chart loaded
+as-is), with nothing narrowing that range based on what the *same two
+players* actually did on earlier streets in *this* solve. A real
+solver's river range is a *consequence* of the equilibrium strategy on
+the flop and turn; here it's an assumption the user supplies themselves
+— if it includes hands that would never have taken that exact line, the
+"solve" is optimized against a fictional opponent, not the real one.
+
+Full multi-street solving (item #2 above) would fix this correctly but
+stays out of scope for the stated reason (combinatorial blowup, needs
+card abstraction). A cheaper middle ground, not yet evaluated for
+feasibility: since each street's solve already produces a real
+equilibrium strategy (`aggregate_label_strategies`), use it to compute
+a **posterior range** — given the prior range and the solved strategy,
+what's the range conditional on the action actually taken (a Bayesian
+update, not a joint optimization) — and feed that into the next
+street's solve automatically, chaining single-street solves instead of
+jointly optimizing across streets. Not game-theoretically exact (no
+backward induction — each street's strategy doesn't account for what it
+sets up on the next one), but it would replace "the user guesses a
+river range" with "the river range is derived from what an equilibrium
+opponent on the turn would actually do," which is the actual complaint.
+Needs real evaluation before committing to it: how much it actually
+improves realism versus a full joint solve, what the UI/API shape for
+chaining solves would look like, and whether the per-combo range math
+(`services/solver/src/poker_solver/combos.py`) already has what a
+posterior-range computation would need or if that's new work too.

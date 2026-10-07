@@ -1,5 +1,6 @@
 import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
 import { AuthStatus } from "./components/AuthStatus/AuthStatus";
+import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 import { AuthProvider } from "./lib/auth";
 import { BuilderPage } from "./pages/BuilderPage";
 import { SavedSpotsPage } from "./pages/SavedSpotsPage";
@@ -55,13 +56,15 @@ function App() {
             <AuthStatus />
           </header>
           <main>
-            <Routes>
-              <Route path="/" element={<BuilderPage />} />
-              <Route path="/saved" element={<SavedSpotsPage />} />
-              <Route path="/type-in" element={<TypeInPage />} />
-              <Route path="/import" element={<ImportPage />} />
-              <Route path="/solve" element={<SolvePage />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<BuilderPage />} />
+                <Route path="/saved" element={<SavedSpotsPage />} />
+                <Route path="/type-in" element={<TypeInPage />} />
+                <Route path="/import" element={<ImportPage />} />
+                <Route path="/solve" element={<SolvePage />} />
+              </Routes>
+            </ErrorBoundary>
           </main>
         </div>
       </BrowserRouter>

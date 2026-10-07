@@ -21,8 +21,11 @@ deployed (Render); an Android build (Capacitor) has a real icon/splash and
 runs end-to-end against the live API on a physical device. Stage 5 has
 grown past its initial river-only start too: `services/solver` now
 solves any single postflop street (flop, turn, or river — heads-up, two
-ranges, the locked bet-size menu) via Monte Carlo CFR, checked against
-closed-form poker theory, and it's reachable now too: `apps/api`'s
+ranges, the locked bet-size menu) via range-vs-range Discounted CFR over
+an exact equity matrix, solved to within 0.5% of the pot of equilibrium
+and checked against closed-form poker theory (it replaced an earlier
+Monte Carlo trainer that was measured producing noise for wide ranges —
+see `docs/decisions.md`), and it's reachable now too: `apps/api`'s
 `POST /spots/solve` runs a real solve and returns a per-hand strategy,
 and the new **Solve** screen drives it end to end (two ranges, a board,
 a results table) — a visual board-card picker and modeling betting
@@ -36,7 +39,7 @@ apps/
   web/       React + TypeScript + Vite frontend
   api/       FastAPI: spot CRUD, auth glue, orchestrates the solver
 services/
-  solver/    Python MCCFR engine + equity calculator (Stage 5)
+  solver/    Python range-vs-range CFR engine + exact equity matrix (Stage 5)
 packages/
   schema/    Spot data model — Python source of truth, generated TS types
 infra/       docker-compose for local dev, deploy configs
@@ -60,7 +63,7 @@ cd apps/api && pip install -e ../../packages/schema -e ../../services/solver -e 
 pnpm dev:web
 
 # solver (separate terminal)
-cd services/solver && pip install -e ".[dev]" && python -m poker_solver.postflop_mccfr
+cd services/solver && pip install -e ".[dev]" && pytest tests/test_range_cfr.py
 ```
 
 `GET http://localhost:8000/health` should return

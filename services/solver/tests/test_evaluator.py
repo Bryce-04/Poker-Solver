@@ -112,3 +112,104 @@ def test_evaluate_best_uses_hole_cards_when_better() -> None:
     with_pair = evaluate_best(hand("9d 9h") + board)  # trips on the board
     without = evaluate_best(hand("4c 5d") + board)  # just board high card
     assert with_pair > without
+
+
+# --- evaluate_seven: a fast path that must agree with evaluate_best
+# exactly, since equity.py trusts it in place of the brute-force version.
+
+import random as _random
+
+from poker_solver.evaluator import evaluate_seven
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "As Ks Qs Js Ts 2d 3c",  # royal flush
+        "5h 4h 3h 2h Ah Kd Qc",  # steel wheel -- SF high is 5, not ace
+        "9h 8h 7h 6h 5h 4h 3h",  # seven-card straight flush: high 9
+        "Ah Kh Qh Jh 9h Ts 2c",  # flush AND a straight, not a straight flush
+        "Ac Ad Ah As Kc Kd 2s",  # quads; kicker from the pair, not a 2
+        "Kc Kd Kh 3c 3d 3h 2s",  # two sets of trips -> full house K over 3
+        "3c 3d 3h Ac Ad Kc Kd",  # trips + two pairs: 3s full of aces
+        "Ac Ad Kc Kd Qc Qd 2s",  # three pairs: kicker is the third pair's Q
+        "Ac Ad Ah 7c 4d 3h 2s",  # trips, two kickers
+        "Ac Ad 9c 7d 5h 3c 2s",  # pair, three kickers
+        "Ac Kd 9c 7d 5h 3c 2s",  # high card
+        "Ac 2d 3c 4d 5h 9c Ts",  # wheel straight
+        "6c 2d 3c 4d 5h Ac Ts",  # 6-high straight beats the wheel in the same cards
+        "Ah 9h 7h 5h 3h 2h Kc",  # six-card flush: top five only
+        "Kc Kd Kh Ks Ac Ad Ah",  # quads with trips aside: kicker A
+    ],
+)
+def test_evaluate_seven_matches_evaluate_best_on_edge_cases(text: str) -> None:
+    cards = hand(text)
+    assert evaluate_seven(cards) == evaluate_best(cards)
+
+
+def test_evaluate_seven_matches_evaluate_best_on_random_hands() -> None:
+    rng = _random.Random(0)
+    deck = list(range(52))
+    for _ in range(20_000):
+        cards = rng.sample(deck, 7)
+        assert evaluate_seven(cards) == evaluate_best(cards), cards
+
+
+def test_evaluate_seven_rejects_wrong_count() -> None:
+    with pytest.raises(ValueError):
+        evaluate_seven(hand("As Ks Qs Js Ts"))
+
+
+# --- evaluate_seven_batch: packed int scores that must equal
+# pack_strength(evaluate_best(...)) exactly, row for row.
+
+import numpy as _np
+
+from poker_solver.evaluator import evaluate_seven_batch, pack_strength
+
+_EDGE_CASES = [
+    "As Ks Qs Js Ts 2d 3c",
+    "5h 4h 3h 2h Ah Kd Qc",
+    "9h 8h 7h 6h 5h 4h 3h",
+    "Ah Kh Qh Jh 9h Ts 2c",
+    "Ac Ad Ah As Kc Kd 2s",
+    "Kc Kd Kh 3c 3d 3h 2s",
+    "3c 3d 3h Ac Ad Kc Kd",
+    "Ac Ad Kc Kd Qc Qd 2s",
+    "Ac Ad Ah 7c 4d 3h 2s",
+    "Ac Ad 9c 7d 5h 3c 2s",
+    "Ac Kd 9c 7d 5h 3c 2s",
+    "Ac 2d 3c 4d 5h 9c Ts",
+    "6c 2d 3c 4d 5h Ac Ts",
+    "Ah 9h 7h 5h 3h 2h Kc",
+    "Kc Kd Kh Ks Ac Ad Ah",
+]
+
+
+@pytest.mark.parametrize("text", _EDGE_CASES)
+def test_batch_matches_evaluate_best_on_edge_cases(text: str) -> None:
+    cards = hand(text)
+    holes = _np.array([cards[:2]])
+    assert evaluate_seven_batch(holes, cards[2:])[0] == pack_strength(evaluate_best(cards))
+
+
+def test_batch_matches_evaluate_best_on_random_boards_and_hands() -> None:
+    # Many hands per shared board, mirroring how equity.py actually calls it.
+    rng = _random.Random(1)
+    deck = list(range(52))
+    for _ in range(300):
+        board = rng.sample(deck, 5)
+        rest = [c for c in deck if c not in board]
+        holes = [tuple(rng.sample(rest, 2)) for _ in range(60)]
+        scores = evaluate_seven_batch(_np.array(holes), board)
+        for hole, score in zip(holes, scores):
+            assert score == pack_strength(evaluate_best(list(hole) + board)), (hole, board)
+
+
+def test_pack_strength_preserves_order() -> None:
+    rng = _random.Random(2)
+    deck = list(range(52))
+    strengths = [evaluate_best(rng.sample(deck, 7)) for _ in range(2_000)]
+    for a, b in zip(strengths, strengths[1:]):
+        assert (a < b) == (pack_strength(a) < pack_strength(b))
+        assert (a == b) == (pack_strength(a) == pack_strength(b))

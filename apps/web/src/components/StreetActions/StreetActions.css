@@ -1,0 +1,53 @@
+.street-actions__log {
+  list-style: none;
+  margin: 0 0 0.6rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.street-actions__log-item {
+  font-size: 0.9rem;
+  color: var(--text-strong);
+}
+
+.street-actions__status {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.street-actions__hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.street-actions__buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.street-actions__size-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.street-actions__size-field input {
+  width: 5rem;
+}
+
+.street-actions__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}

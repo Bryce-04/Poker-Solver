@@ -202,7 +202,7 @@ describe('solveSpot', () => {
     strategy: { AA: { check: 0.0, all_in: 1.0 } },
   }
 
-  it('POSTs the spot to /spots/solve', async () => {
+  it('POSTs the spot to /spots/solve with a long read timeout', async () => {
     mockResponse(200, solveBody)
 
     await solveSpot(spot)
@@ -212,11 +212,45 @@ describe('solveSpot', () => {
     expect(options.url).toMatch(/\/spots\/solve$/)
     expect(options.method).toBe('POST')
     expect(options.data).toEqual(spot)
+    // A real solve measured at 60s+ on the deployed host -- CapacitorHttp's
+    // native default is shorter than that, so this needs an explicit
+    // override (regression: see docs/decisions.md's 2026-10-07 "BUG"
+    // entry and the already-written fix-solve-client-timeout branch this
+    // restores).
+    expect(options.connectTimeout).toBe(20_000)
+    expect(options.readTimeout).toBe(150_000)
   })
 
   it('classifies a 2xx as { kind: "solved" } carrying the response body', async () => {
     mockResponse(200, solveBody)
-    await expect(solveSpot(spot)).resolves.toEqual({ kind: 'solved', data: solveBody })
+    await expect(solveSpot(spot)).resolves.toEqual({
+      kind: 'solved',
+      data: { ...solveBody, bucketed_actions: [] },
+    })
+  })
+
+  it('normalizes a missing bucketed_actions to an empty array -- a deployed backend older than the web build is a real, recurring state (Render and the web app deploy separately), not a hypothetical', async () => {
+    // solveBody above already omits bucketed_actions, matching exactly
+    // what the live API was still sending when this was a real bug: the
+    // field didn't exist yet, and SolvePage.tsx called
+    // `.bucketed_actions.length` with no null-check, throwing mid-render
+    // with no error boundary to catch it -- the whole screen went blank.
+    mockResponse(200, solveBody)
+    const result = await solveSpot(spot)
+    expect(result.kind).toBe('solved')
+    if (result.kind === 'solved') {
+      expect(result.data.bucketed_actions).toEqual([])
+    }
+  })
+
+  it('passes a real bucketed_actions array through unchanged once the backend sends one', async () => {
+    const notes = ["BB's 10bb bet -> bucketed to 25% pot (bet_small)"]
+    mockResponse(200, { ...solveBody, bucketed_actions: notes })
+    const result = await solveSpot(spot)
+    expect(result.kind).toBe('solved')
+    if (result.kind === 'solved') {
+      expect(result.data.bucketed_actions).toEqual(notes)
+    }
   })
 
   it('classifies a 422 with an array detail as { kind: "invalid" }', async () => {

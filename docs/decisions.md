@@ -6,6 +6,369 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — The solver is now range-vs-range Discounted CFR with exact equity; the Monte-Carlo trainer was producing noise
+
+**Status:** accepted — shipped 2026-10-07.
+
+**Context.** A real solve on a physical device (BB vs BTN, 4bb pot, 96bb
+stacks, flop) reported BB jamming ~85% of the time — absurd. Reproduced
+locally with the same reference-chart ranges (BB's 85-label defend range,
+BTN's 82-label open range — ~500 concrete combos each) and measured, not
+guessed: at the production setting (`DEFAULT_ITERATIONS = 4000`),
+`postflop_mccfr.py` reported AA jamming 70%, J9s 84%, K6s 8%. Raising
+iterations moved those toward sane values (K6s: 8.1% → 1.4% → 0.3% at
+4k/40k/200k) but still hadn't converged at 200k (7.5 min locally). A
+narrow, fully-converged control (overpair + air vs. a villain who never
+folds → correctly ~99% check) proved the betting/payoff math was right:
+the cause was the trainer sampling *one* hole-card combo per player per
+iteration, so each of ~500 combos was only visited on the rare
+iterations chance picked it — at 4,000 iterations, a handful of visits
+each, far too few for regret matching to settle. No iteration count both
+fixed that and stayed fast.
+
+**Decision.** Replace Monte-Carlo hole-card sampling with the standard
+range-vs-range approach every serious open-source solver uses (checked:
+TexasSolver, opensolver, the DCFR paper):
+- `services/solver/src/poker_solver/equity.py` (new) precomputes an exact
+  hero-combo × villain-combo equity matrix per board — every runout
+  enumerated (990 on the flop, 44 on the turn), never sampled. Sampling
+  was tried and rejected on measured error (~4% worst-hand equity error
+  vs the whole opposing range even at 500 runouts — shared runouts don't
+  average out). Shared-card pairs are NaN, never 0.
+- `evaluator.py` gained `evaluate_seven` (single-pass 7-card) and
+  `evaluate_seven_batch` (numpy, a whole range at once, packed-int
+  scores) — cross-checked for exact equality against the brute-force
+  `evaluate_best` on every category's edge cases plus 18,000+ random
+  hands. Took the exact flop matrix from impractical to ~2s.
+- `range_cfr.py` (new) trains every combo of both ranges at every node on
+  every iteration, weighted by reach probability, with terminal values
+  from the equity matrix. **Discounted CFR** (alpha 1.5, beta 0, gamma 2)
+  rather than the CFR+ the plan specified: measured head to head on the
+  bug scenario, DCFR reached 1.1% of the pot in exploitability at 100
+  iterations (CFR+: 2.4%) and 0.35% at 200 (CFR+: 1.2%).
+- `apps/api/app/solve.py` trains until exploitability is under 0.5% of
+  the pot (`TARGET_EXPLOITABILITY_PCT`), checked every 25 iterations,
+  capped at 250 (`MAX_ITERATIONS`) — replacing `DEFAULT_ITERATIONS`.
+  Iteration-based, not wall-clock, so results reproduce across machines.
+  The response now carries `exploitability_pct`, shown on `SolvePage`.
+
+**Results, same scenario.** AA jam 70% → 0.6%, J9s 84% → 0%, K6s 8% → 0%;
+AA now plays a sensible mixed strategy (check 31%, bet small/medium/large
+16/28/24%). Closed-form river theory (33 bluff-shoves 20%, KJo calls
+80%) is hit to within 0.2% at 100 iterations; the old trainer needed
+20,000 and a ±5% test tolerance. Local time to 0.5% of the pot with
+those wide ranges: deep flop ~12s, two-tone flop ~8s, turn ~4s, river
+~2s (old trainer: ~9s on every street, for noise).
+
+**Also found and fixed along the way:** `BettingRoundState.initial`
+recorded a seeded `prior_history` without applying it, so since the
+generalized-seeding change (entry below) a solve started after a seeded
+*bet* had wrong pot math — calling it cost nothing. It now replays the
+history (`test_betting_round.py`'s seeded-bet regression tests).
+
+**Consequences.** `postflop_mccfr.py` (and `kuhn_spike.py`) are no
+longer used by `apps/api` — kept intact as a known-good reference for
+now, real deletion candidates. Render's CPU is still much slower than a
+laptop, so a wide-range deep flop can still take a while on the phone;
+that's now a hosting limit on a correct answer, not an algorithm
+producing a wrong one. If it's still too slow after deploying, profile
+first: terminal matrix-vector products are ~half of training time
+(memory-bound), and batching an opponent node's terminal children into
+one matrix product is the next optimization; Rust (per `CLAUDE.md`'s
+escape hatch) only after that, on profiling evidence.
+
+---
+
+## 2026-10-07 — BUG (fixed): a slow solve on the phone eventually blacked out the whole screen
+
+**Status:** fixed 2026-10-07 — root cause confirmed, see "Resolved" below.
+
+**Symptom, as reported.** On a physical Android device, running a solve
+via the new click-through builder: the solve "was taking a while" (the
+already-known phone/Render slowness below), and **eventually the whole
+screen turned black and never showed the solve result** — not a
+graceful error message, an actual blank/black render with nothing to
+interact with. Separately but possibly related: solves on the phone are
+still taking 1+ minutes, "not even a remotely quick solve."
+
+**On the speed complaint — not new, still unresolved.** This is the
+same issue tracked in this file's 2026-10-07 `DEFAULT_ITERATIONS`
+entry and the session that produced it: Render hosting measured ~14x
+slower than local dev hardware for a solve, and the user explicitly
+declined the one free algorithmic lever (lowering `MAX_AGGRESSIVE_ACTIONS`)
+because it conflicts with wanting the solver to eventually cover more
+than single-raised pots. Nothing about today's click-through-builder
+work changes solve cost — confirming it's still slow on the phone isn't
+a regression, just a reminder this is still genuinely unsolved.
+
+**On the black screen — root cause not confirmed, but one concrete,
+verified gap found while documenting this.** `apps/web/src/lib/api.ts`'s
+`solveSpot` on **this branch (`handhistory-to-solve`) has no explicit
+`connectTimeout`/`readTimeout`** on its `CapacitorHttp.request` call —
+confirmed by reading the file directly. The fix for exactly that gap
+already exists, written and tested, on a **separate, unmerged branch**:
+`fix-solve-client-timeout` (commit `c0217e9`, "solveSpot: set an
+explicit client-side timeout long enough for a real solve" —
+`connectTimeout: 20_000`, `readTimeout: 150_000`), reported in an
+earlier session as giving a premature "Couldn't reach the API" without
+it. That branch was never merged before `handhistory-to-solve` was cut,
+so today's branch regressed back to having no explicit timeout at all.
+**This should be merged in regardless** — it's a real, already-diagnosed
+gap — but it may not fully explain *this* symptom: that earlier bug
+was a fast, clean failure (a prompt "network-error" message) from a
+timeout that fired too *early*, not a long hang ending in a blank
+screen with no error shown at all. Worth checking tomorrow whether
+merging it changes anything about the black-screen case specifically,
+rather than assuming it's the same bug.
+
+**Other hypotheses for the black screen itself, untested, worth
+checking before writing a fix:**
+- **No React error boundary exists anywhere in this app** (confirmed by
+  inspection — grep for "componentDidCatch"/"ErrorBoundary" turns up
+  nothing). If anything throws while rendering the solved result (e.g.
+  `StrategyGrid`, or the new `bucketed_actions` list in `SolvePage.tsx`,
+  hitting an unexpected shape in a very-late response), React unmounts
+  the tree with no fallback UI — which would plausibly look exactly like
+  "the whole screen turned black" against this app's dark theme, and
+  would explain "never showed me the solve" (data came back, something
+  broke rendering it) rather than a transport failure. Check `adb
+  logcat` captured at the time of a repro for a JS exception/stack
+  trace — that would confirm or rule this out directly.
+- The phone's screen locking/timing out during a 60s+ wait, and Android
+  suspending or killing the WebView's renderer process in the
+  background — also consistent with "turned black," and also checkable
+  via `adb logcat` (look for a renderer-process-gone / WebView crash
+  line) or by deliberately keeping the screen awake during a repro to
+  see if the symptom still occurs.
+
+**Consequences.** Next session: merge `fix-solve-client-timeout` into
+`handhistory-to-solve` (or `main`) regardless, since it's a confirmed
+real gap either way. Then reproduce the black screen specifically with
+`adb logcat` running, to tell these apart rather than guessing — an
+uncaught render exception and a killed renderer process need completely
+different fixes (an error boundary vs. something about how the long
+wait is handled), and treating one as the other would waste a session.
+
+**Resolved 2026-10-07:** the no-error-boundary hypothesis, with an exact
+trigger. Timed the deployed API directly with the same wide ranges: the
+solve *did* complete (~64s, HTTP 200) — but the live backend's response
+had no `bucketed_actions` field, because that `solve.py` change was only
+on the local, undeployed branch. The phone's build of `SolvePage.tsx`
+unconditionally read `outcome.data.bucketed_actions.length` → TypeError
+mid-render → with no error boundary, React unmounted to a blank (dark)
+screen. Fixed three ways: `lib/api.ts`'s `solveSpot` normalizes a missing
+`bucketed_actions` to `[]` at the one place responses are parsed (a
+regression test in `api.test.ts` reproduces the old backend's exact
+shape); a new `components/ErrorBoundary` wraps every route in `App.tsx`,
+so any future unexpected response shape degrades to a visible "Something
+went wrong / Try again" instead of a black screen; and the
+`fix-solve-client-timeout` branch's explicit `connectTimeout`/
+`readTimeout` was re-applied to `solveSpot` (with a test asserting
+both). Confirmed on the device afterward — the next solve rendered a
+result. The general lesson, recorded in `LiveSolveResponse`'s comments:
+Render deploys separately from the web build, so the frontend has to
+tolerate a backend that's behind it.
+
+---
+
+## 2026-10-07 — SolvePage's click-through hand builder: real actions/sizes, not the fixed menu; blinds assumed at 1/0.5
+
+**Status:** accepted — shipped 2026-10-07.
+
+**Context.** The user's own words: "I think we need to add functionality
+ui wise that splits the different streets, also the pot size being auto
+to 100 makes no sense along with the stack behind being 33 we need to
+change those values and allow the bet size from the raiser and the call
+to be auto added along with the blinds assuming they are 1/2 for now...
+I think we should be able to click through the hand to get where we want
+then solve when we so desire." The previous `SolvePage` had one flat
+form: a single "already checked" checkbox plus typed-in `pot_bb=100`/
+`effective_stack_bb=33` defaults with no connection to any real action.
+Directly unblocked by the same day's other entry (seeding a solve from
+any non-terminal action prefix, not just a check) — the builder needs
+that generalized contract to be useful for anything beyond a single
+check.
+
+**Decision 1 — real actions, not the engine's fixed menu, during
+setup.** `lib/handBuilder.ts`'s `BuilderAction` records real bb sizes
+("raises to X" total-this-street semantics, matching
+`parseHandHistory.ts`'s existing SET-not-ADD convention) rather than
+`bet_small`/`bet_medium`/`bet_large`/`all_in`. Only the *target* street
+(wherever "Solve" would act) gets submitted to `/spots/solve` at all —
+`apps/api/app/solve.py` already only reads `current_street`'s entries,
+so earlier streets' actions exist purely for this screen's own pot/stack
+bookkeeping and never leave the browser. The backend's own bucketing
+(the other 2026-10-07 entry) is what approximates a real size onto the
+fixed menu at solve time, disclosed via the response — the builder
+doesn't duplicate that logic.
+
+**Decision 2 — preflop is heads-up-simplified, not 6-max-accurate.**
+Modeled as exactly the two chosen positions, OOP posting 1bb (acts last
+preflop, first postflop) and IP posting 0.5bb (acts first preflop, last
+postflop) — the same heads-up relationship real two-handed poker has,
+reused rather than inventing a separate "who's SB" picker. This sidesteps
+genuinely modeling 6-max preflop action order for an arbitrary 2-of-6
+position pair, which the user's own "assume blinds are 1/2 for now"
+framing explicitly invited as a simplification. One real rule
+preserved: the small blind completing (calling) does not close
+preflop action — the big blind still gets an option (check, closing, or
+raise) — `computeStreetState`'s `isCompletingBlindCall` case, covered by
+`handBuilder.test.ts`.
+
+**Decision 3 — gate progression on closing, not on card count alone.**
+Picking board cards (unchanged `CardPicker`/text toggle) only *requests*
+how far to walk; `summarizeHand` actually stops at the first earlier
+street that folded or never closed, and that's what the UI keys "which
+street is live" off of (`components/StreetActions/StreetActions.tsx`
+renders the stopped-at street live, closed-and-passed streets as plain
+history, and shows one blocked message for the very next street rather
+than hiding everything). A fold on any street ends the hand outright —
+no later section renders, and "Solve" stays disabled.
+
+**Consequences.** Two setup modes now coexist on `SolvePage`: "Click
+through the hand" (new, now the default) and "From a hand history"
+(unchanged, the pre-existing paste shortcut) — kept as genuinely
+separate state rather than merged into one model, since a pasted hand
+history already tells you pot/stack/board directly and re-deriving that
+through a click-by-click replay would be pure overhead. No legality
+engine beyond turn-order and street-closing rules enforced client-side
+(e.g. no min-raise checking) — the backend's own `_replay_street_actions`
+remains the final authority on whether a submitted action is actually
+legal, same as it would be for a pasted hand history.
+
+---
+
+## 2026-10-07 — Bet-size menu resize, and letting a solve start from any point (not just a check)
+
+**Status:** accepted — shipped 2026-10-07, both decisions below.
+
+**Context.** Real device testing of `SolvePage` surfaced two concrete
+complaints. First, the locked bet-size menu (check / 33%/66%/100% pot /
+all-in — see the 2026-09-30 entry below) reads as arbitrary and was
+explicitly rejected ("that stupid thing it is at"). Second, `solve.py`'s
+seed contract — `current_street.actions` must be empty or exactly one
+check from `positions_in_hand[0]` — only lets a solve start on an
+untouched street, which blocks the real target: a click-through hand
+builder where you walk through actual betting (including bets/raises)
+and can solve from wherever you stop. Both are needed together: the
+builder needs an arbitrary seed point to be useful, and bucketing a real
+bet size onto 33/66/100 was already an awkward three-way split — a
+cleaner, more legible menu matters more once real bets start getting
+bucketed onto it instead of just a single opening check.
+
+**Decision 1 — new menu.** `services/solver/src/poker_solver/
+betting_round.py`'s `BET_SIZE_MENU` changes from `(0.33,"b33"),
+(0.66,"b66"),(1.0,"b100")` to `(0.25,"bet_small"),(0.75,"bet_medium"),
+(1.25,"bet_large")` (plus the existing `"all_in"`). Descriptive labels,
+not percentage codes, since they're user-facing now (the hand builder,
+`StrategyGrid`'s legend). `legal_actions`/`apply` already read the menu
+generically (`for frac, label in BET_SIZE_MENU`) — the engine itself
+needs exactly one constant changed. Ripples: `test_betting_round.py`'s
+and `test_postflop_mccfr.py`'s menu-collapse tests are tuned to the old
+numbers (e.g. `effective_stack_bb=33` chosen because 33%-pot exactly
+equalled the stack — redo with `effective_stack_bb=25` for the same
+trick against `bet_small`, and recompute the closed-form β*/c* for the
+new shove size); `StrategyGrid.tsx`'s `ACTION_ORDER`/`ACTION_COLOR_VAR`/
+`ACTION_LABEL` maps (keyed `b33`/`b66`/`b100` today); every doc naming
+"33%/66%/100% pot" as the locked menu (`CLAUDE.md`, root `README.md`,
+`docs/plan.md`, `services/solver/README.md`, `solve.py`'s own
+docstring).
+
+**Decision 2 — generalize the seed contract.** Replace the "empty or one
+check" special case in `apps/api/app/solve.py`'s `build_solve_config`
+with: replay the *entire* `current_street.actions` list through
+`BettingRoundState` (already a pure state machine), mapping each
+recorded `BettingAction` to one of the engine's own labels — check/call/
+fold map directly, a bet/raise/all-in gets bucketed to the menu entry
+numerically closest to `size_bb` (or `size_pct_pot × pot-before`) as a
+fraction of the pot right before that action, or forced to `"all_in"` if
+it's within float tolerance of the acting player's remaining stack.
+Reject (422, same `InvalidSolveRequest` path) if an action is out of
+turn, isn't legal at that point, or if the replayed sequence is already
+terminal (fold, or the street's action is closed — nothing left to
+solve). This *subsumes* the old empty/one-check cases as the smallest
+possible prefixes, so no separate special-casing survives. The response
+gains a note on which actions got bucketed and to what (e.g. "BTN's bet
+→ bet_large, closest to 125% pot") — the approximation is disclosed, not
+silent, matching this project's established convention (same spirit as
+`StrategyGrid`'s neutral-cell-for-missing-data choice, the 2026-10-07
+entry below).
+
+**Consequences.** This was backend-only and independently testable (same
+no-UI-needed approach `solve.py` was originally verified with) —
+deliberately scoped apart from the click-through builder UI itself,
+which is a real UI project in its own right and is now the active,
+separate pass. That UI will additionally need: preflop support for
+multiple raises (3-bet/4-bet), not just one raise/one call, and
+`pot_bb`/`effective_stack_bb` computed from actual entered actions plus
+flat 1/2 blinds instead of typed in (today's `SolvePage` defaults —
+`pot_bb=100`, `effective_stack_bb=33` as bare `useState` initial values
+with no derivation — are being removed as part of that follow-up, not
+this one).
+
+**Resolved 2026-10-07:** shipped. `BET_SIZE_MENU` resized (one line in
+`betting_round.py`), `solve.py` gained `_replay_street_actions`/
+`_bucket_bet_action` and a `bucketed_actions` list in the response
+(threaded into `apps/web/src/lib/api.ts`'s `LiveSolveResponse`),
+`StrategyGrid.tsx`'s label maps renamed, both solver test files'
+closed-form numbers recomputed (shove=25 instead of 33, since 25%-pot
+now collapses the menu the same way 33%-pot used to), and 5 new cases
+added to `apps/api/tests/test_solve_route.py` (seeded bet, out-of-turn,
+already-terminal, a 2-action bet+raise prefix, missing size). Verified:
+`pytest services/solver` (55 passed), the web suite (146 passed), lint,
+and build all green; `solve.py`'s own logic was additionally exercised
+directly (calling `build_solve_config` with no FastAPI/DB involved)
+since this environment had no reachable Postgres to run `pytest
+apps/api`'s session-scoped migration fixture — that route-level run is
+still owed for real confirmation.
+
+---
+
+## 2026-10-07 — Hand-history fast-forward instead of real multi-street solving
+
+**Status:** accepted
+
+**Context.** Confirmed with the user: real multi-street solving (one tree
+connecting flop→turn→river decisions, not one isolated street) is out of
+scope. It's a combinatorial-blowup problem, not just a slower version of
+what exists — a single wide-range *street* already creates ~42,000 info
+sets and strains the current engine (see the 2026-10-07
+`DEFAULT_ITERATIONS` entry); a full 3-street tree means solving a
+turn-sized problem for every non-fold way the flop could end, then a
+river-sized problem for every non-fold way the turn could end.
+Real solvers handle this with card abstraction (bucketing similar hands
+to shrink the tree) — genuine research-level engineering, not a
+reasonable scope addition here. But the underlying need was real: getting
+to "the river decision in this hand" shouldn't require manually
+re-solving every earlier street by hand.
+
+**Decision.** `lib/parseHandHistory.ts` gains a second entry point,
+`parseHandHistoryToPostflopSetup`, alongside the original Stage 4
+`parseHandHistory` (unchanged, still backs `ImportPage`). It fast-forwards
+through every street present in a pasted hand history and hands
+`SolvePage` the board/pot/effective-stack/OOP-IP/already-checked state at
+wherever the paste stops — reading what already happened, not
+solving/computing it, which is a fundamentally cheaper problem than
+multi-street solving and doesn't touch the engine at all. Deliberately
+does not return ranges (a hand history doesn't reveal villain's actual
+holdings) — those still come from the existing reference-range buttons or
+manual painting. Honest-refusal on anything that doesn't fit cleanly
+(doesn't reach the flop, more than 2 players still live, the target
+street already has betting past a single opening check), same convention
+the original parser already uses.
+
+**Consequences.** This is explicitly additive, not a step toward or away
+from real multi-street solving — if that gets built later, nothing here
+needs to be reworked; it shares no code with the betting-engine side
+(`services/solver`) at all. Scope boundaries worth knowing: antes are
+folded into the pot total like any other contribution rather than
+modeled specially; side-pot math from unequal-stack all-ins isn't
+modeled precisely (the existing single-symmetric-effective-stack
+simplification is used regardless); run-it-twice and straddles aren't
+recognized.
+
+---
+
 ## 2026-10-07 — Solve results are a 13×13 color chart, not a table; per-hand precision flagged as unverified at current sample sizes
 
 **Status:** accepted
@@ -45,11 +408,22 @@ done: the response doesn't currently carry a per-hand sample count to
 render that distinction). Worth a follow-up if wide-range solves are a
 primary use case rather than an edge case.
 
+**Resolved 2026-10-07:** the implausible number was real noise, and the
+precision gap is now closed at the root rather than labeled — see the
+"range-vs-range Discounted CFR" entry at the top. Every combo is trained
+on every iteration (no sampling, so no thin cells), and the response
+carries a real global precision measure (`exploitability_pct`) instead
+of a per-hand sample count.
+
 ---
 
 ## 2026-10-07 — DEFAULT_ITERATIONS halved to 4,000; real timing logged instead of guessed at
 
-**Status:** accepted
+**Status:** superseded 2026-10-07 — `DEFAULT_ITERATIONS` no longer exists;
+`solve.py` now trains to an exploitability target with the range-vs-range
+trainer (see the entry at the top). Halving iterations here made solves
+faster but, as measured later, the 4,000-iteration results were mostly
+noise for wide ranges.
 
 **Context.** A real solve on a physical device was reported as taking
 over a minute. Measured (not guessed) locally first: 8,000 iterations on

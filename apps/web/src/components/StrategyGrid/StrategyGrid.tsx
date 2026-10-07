@@ -9,15 +9,23 @@ import "./StrategyGrid.css";
 // color (leaving the hand is categorically different from escalating it),
 // not just "the lightest red". Covers every action betting_round.py's
 // fixed menu can ever produce, so no fallback-color case is needed.
-const ACTION_ORDER = ["fold", "check", "call", "b33", "b66", "b100", "all_in"] as const;
+const ACTION_ORDER = [
+  "fold",
+  "check",
+  "call",
+  "bet_small",
+  "bet_medium",
+  "bet_large",
+  "all_in",
+] as const;
 
 const ACTION_COLOR_VAR: Record<string, string> = {
   fold: "--strategy-fold",
   check: "--strategy-passive",
   call: "--strategy-passive",
-  b33: "--strategy-bet-small",
-  b66: "--strategy-bet-mid",
-  b100: "--strategy-bet-big",
+  bet_small: "--strategy-bet-small",
+  bet_medium: "--strategy-bet-mid",
+  bet_large: "--strategy-bet-big",
   all_in: "--strategy-allin",
 };
 
@@ -25,9 +33,9 @@ const ACTION_LABEL: Record<string, string> = {
   fold: "Fold",
   check: "Check",
   call: "Call",
-  b33: "Bet 33%",
-  b66: "Bet 66%",
-  b100: "Bet 100%",
+  bet_small: "Bet Small (25%)",
+  bet_medium: "Bet Medium (75%)",
+  bet_large: "Bet Large (125%)",
   all_in: "All-in",
 };
 
