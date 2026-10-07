@@ -111,9 +111,46 @@ Monte-Carlo equity test (`test_runout_equity.py`).
 
 ---
 
-## 2026-09-30 — Frontend sends Authorization: Bearer &lt;Supabase JWT&gt; ahead of backend enforcement
+## 2026-10-06 — /spots requires sign-in, scoped per user; the spots table moves to Alembic
 
 **Status:** proposed
+
+**Context.** Stage 6's backend half: `GET /spots` returned every row to
+everyone. Making it per-user needed a real `created_by` column on
+`SpotRow` -- the first schema change since persistence shipped -- and
+`Base.metadata.create_all` never adds a column to a table that already
+exists, so it couldn't carry that change to the deployed Supabase database.
+
+**Decision.**
+- `POST` and `GET /spots` both require `Authorization: Bearer <Supabase
+  access token>`; missing or invalid is a 401. `/spots/reference-strategy`
+  and `/health` stay open. Verification (`apps/api/app/auth.py`) checks the
+  signature against the project's public JWKS keys (ES256 -- no shared
+  secret, only `SUPABASE_URL`), plus expiry, `aud = "authenticated"`, and
+  the project's issuer. Supabase being unreachable is a 503, not a 401.
+- `created_by` is always the token's user id, never the request body;
+  `GET /spots` filters on it.
+- The 3 rows saved before auth have no owner. They're left in place, not
+  deleted or backfilled -- listed for no one.
+- The `spots` table is managed by Alembic (`apps/api/migrations`).
+  `0001` is a baseline that skips creation if the table exists, so the
+  deployed database is adopted without a manual `alembic stamp`. Deploys
+  run `alembic upgrade head` before uvicorn starts.
+
+**Consequences.** Saved spots are actually private now. A signed-out
+`SavedSpotsPage` shows only its sign-in notice instead of fetching.
+Render needs `SUPABASE_URL` set (see `render.yaml`) or `/spots` requests
+fail. Future `spots` schema changes are Alembic revisions, not model edits
+alone.
+
+---
+
+## 2026-09-30 — Frontend sends Authorization: Bearer &lt;Supabase JWT&gt; ahead of backend enforcement
+
+**Status:** accepted — confirmed 2026-10-06: `apps/api` reads exactly this
+header and verifies it as a Supabase access token (see the 2026-10-06
+entry above); a real sign-in → save → list round trip worked unchanged, no
+`authHeaders()` change needed.
 
 **Context.** Stage 6 auth UI (Supabase email/password sign-in, `apps/web`
 only) ships before the backend lane's JWT verification lands in

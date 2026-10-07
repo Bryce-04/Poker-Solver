@@ -14,10 +14,9 @@ format, rule-based, not freeform — same philosophy as Stage 3). The app
 has a design-token visual pass (light + dark) and is routed into five
 screens (Builder / Saved / Type in / Import / Solve). Saved spots is wired
 end-to-end to `apps/api`'s `POST`/`GET /spots` (Postgres via Supabase).
-Stage 6 auth has a frontend start — Supabase sign-in, session state, an
-`Authorization` header on save/list calls, save buttons gated on being
-signed in — but saved spots stay an unscoped shared list until the
-backend lane verifies that header and filters per user. `apps/api` is
+Stage 6 auth works end to end for saved spots — Supabase sign-in in the
+app, and `apps/api` verifying the sign-in token and returning only your
+own saved spots. `apps/api` is
 deployed (Render); an Android build (Capacitor) has a real icon/splash and
 runs end-to-end against the live API on a physical device. Stage 5 has
 grown past its initial river-only start too: `services/solver` now

@@ -18,16 +18,20 @@ matched chart is shown (Builder, Type in, Import) — adjust before saving,
 not just view. The whole app has a design-token visual pass (light +
 dark, `index.css`) and is routed into four screens (Builder / Saved /
 Type in / Import). Saved spots is wired end-to-end: `apps/api` persists
-Spots as JSONB (`app/db.py`'s `SpotRow`, no migration tool yet -- the
-schema can still move) behind `POST`/`GET /spots`, matching the contract
-`apps/web/src/lib/api.ts` was built against (see `docs/decisions.md`).
-Stage 6 auth has a frontend start: Supabase email/password sign-in,
-session state, and an `Authorization` header on save/list calls
-(`apps/web/src/lib/auth.tsx`, `lib/supabase.ts`, the header's
-`AuthStatus` component); the save button on all three entry screens
-gates on being signed in. Not done yet: `apps/api` verifying that header
-and scoping `GET /spots` per user — until that lands, saved spots stay a
-shared list regardless of who's signed in. `apps/api` is deployed on
+Spots as JSONB (`app/db.py`'s `SpotRow`) behind `POST`/`GET /spots`,
+matching the contract `apps/web/src/lib/api.ts` was built against (see
+`docs/decisions.md`). Stage 6 auth works for saved spots. Frontend:
+Supabase email/password sign-in, session state, and an `Authorization`
+header on save/list calls (`apps/web/src/lib/auth.tsx`, `lib/supabase.ts`,
+the header's `AuthStatus` component); the save button on all three entry
+screens gates on being signed in. Backend: `apps/api`
+verifies that header as a Supabase JWT (`app/auth.py`'s `current_user_id`
+dependency, checked against the project's public JWKS keys -- only
+`SUPABASE_URL` needed, no secret), `POST`/`GET /spots` require it, and
+`GET /spots` only returns the caller's own spots (`SpotRow.created_by`).
+Rows saved before auth have no owner and are deliberately left in place,
+listed for no one. The `spots` table is managed by Alembic
+(`apps/api/migrations`), not `create_all`. `apps/api` is deployed on
 Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
 against the live API on a physical device. **`services/solver` now
@@ -92,11 +96,27 @@ pytest services/solver/tests/test_postflop_mccfr.py           # the real solver'
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
-every test module) creates the engine at import time. Either run the
-local Postgres below, or point `.env`'s `DATABASE_URL` at Supabase (see
-`.env.example`). `db.py` loads `.env` itself via `python-dotenv` for bare
+every test module) creates the engine at import time. **Run the tests
+against the local Postgres below, never Supabase**: the persistence tests
+`TRUNCATE spots`, and `db.py` loads the repo-root `.env` (which may point
+at Supabase) unless `DATABASE_URL` is already set — so set it explicitly:
+```
+DATABASE_URL=postgresql+psycopg://poker_solver:poker_solver_dev@localhost:5432/poker_solver pytest apps/api
+```
+The test session runs `alembic upgrade head` itself (`tests/conftest.py`)
+and signs its own tokens with a throwaway key, so tests need no Supabase
+access. `db.py` loads `.env` itself via `python-dotenv` for bare
 `uvicorn --reload` runs; docker-compose and Render set the real env var
 directly, so that's a no-op there.
+
+Schema changes to the `spots` table go through Alembic, from `apps/api`:
+edit `SpotRow` in `app/db.py`, then `alembic revision --autogenerate -m
+"..."`, review the generated file, and `alembic upgrade head`. `alembic
+check` confirms models and migrations agree. Deploys (the Dockerfile's
+CMD, docker-compose) run `alembic upgrade head` before starting uvicorn.
+Running the API locally (`uvicorn`) does not migrate — run `alembic
+upgrade head` first. Requests to `/spots` (save/list) need `SUPABASE_URL`
+set, for token verification.
 
 ### Local Postgres
 ```
@@ -173,8 +193,10 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   Screens live in `apps/web/src/pages/`; `apps/web/src/lib/api.ts` is the
   single fetch chokepoint (never throws — callers switch on a result's
   `kind` instead of try/catch), currently backing the reference-strategy
-  lookup plus `saveSpot`/`listSpots`, the latter two built against an
-  assumed `apps/api` contract ahead of that endpoint shipping — see
+  lookup plus `saveSpot`/`listSpots` (both send the Supabase access
+  token as `Authorization: Bearer`, which `apps/api` requires). Those two
+  were built against an assumed `apps/api` contract ahead of the
+  endpoints and the token check shipping, since confirmed — see
   `docs/decisions.md`.
 - Effective stack is modeled as a single symmetric number
   (`Spot.effective_stack_bb`) rather than per-seat, matching the
@@ -183,4 +205,6 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
 - `Spot.created_by` and the `User` model exist now (Stage 1) even though
   no auth/login UI ships until Stage 6 — this was a deliberate fix versus
   the original plan, to avoid retrofitting ownership onto existing rows
-  later. Don't remove `created_by` as "unused."
+  later. Don't remove `created_by` as "unused" — `apps/api` now sets it
+  from the verified token on every save (and mirrors it into the
+  `SpotRow.created_by` column that `GET /spots` filters on).

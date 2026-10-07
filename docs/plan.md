@@ -22,10 +22,10 @@ is wired end-to-end: `apps/api` persists `Spot`s (Postgres via Supabase)
 behind `POST`/`GET /spots` (see `docs/decisions.md`). Stage 6's frontend
 half is done too: Supabase email/password sign-in, session state, and an
 `Authorization: Bearer <token>` header on save/list calls, with the save
-button on all three entry screens gating on being signed in — sent ahead
-of the backend lane actually checking it (`docs/decisions.md`'s
-2026-09-30 entry), so saved spots are still a shared list until `apps/api`
-verifies the header and scopes `GET /spots` per user. `apps/api` is
+button on all three entry screens gating on being signed in — and the
+backend half now verifies that header (Supabase JWT, checked against the
+project's public keys) and scopes `POST`/`GET /spots` per user, with the
+`spots` table moved under Alembic migrations. `apps/api` is
 deployed (Render); the Android build (Capacitor) has a real app icon/splash
 and runs end-to-end against the live API on a physical device. **Stage 5
 has grown past its initial river-only start**: `services/solver` now
@@ -41,17 +41,16 @@ whichever player's decision the request implies — see
 `docs/decisions.md`'s 2026-10-06 entry for the request contract (a new
 `Spot` convention — two ranges, not one — rather than a schema change).
 `apps/web` has a screen for it now too: the new **Solve** tab
-(`pages/SolvePage.tsx`) — two positions, two ranges, a board (a v1
-validated text field, `lib/cards.ts` — a visual rank/suit picker is
-deliberately deferred further, see `docs/decisions.md`'s 2026-10-06
-entry), and a results table showing real per-action frequencies per
-hand, not a single chart weight. This only ever solves one street's
-betting at a time — modeling a full flop→turn→river betting tree in one
-solve is a separate, bigger future direction (see "widening the solver"
-below), not something this does. Remaining: Stage 4 past its one-format
-MVP, Stage 5's visual board picker + solve caching + eventually
-multi-street solving, and Stage 6's backend half (JWT verification,
-per-user scoping).
+(`pages/SolvePage.tsx`) — two positions, two ranges, a board (click
+cards via `components/CardPicker/CardPicker.tsx`, or type them via
+`lib/cards.ts` — see `docs/decisions.md`'s 2026-10-06/07 entries), and a
+results table showing real per-action frequencies per hand, not a
+single chart weight. This only ever solves one street's betting at a
+time — modeling a full flop→turn→river betting tree in one solve is a
+separate, bigger future direction (see "widening the solver" below), not
+something this does. Remaining: Stage 4 past its one-format MVP, Stage
+5's solve caching + eventually multi-street solving, and the rest of
+Stage 6 (tags, search).
 
 ## The pitch
 

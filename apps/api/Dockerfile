@@ -6,4 +6,6 @@ COPY packages/schema ./packages/schema
 COPY apps/api ./apps/api
 WORKDIR /app/apps/api
 RUN pip install --no-cache-dir -e ../../packages/schema -e .
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Migrate first, then serve -- so every deploy brings the database schema
+# up to date before any request can hit it. See apps/api/migrations.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
