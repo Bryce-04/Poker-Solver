@@ -5,7 +5,7 @@ original seven-stage pitch, the two decisions locked in before scaffolding,
 and what ships in each stage. (Full designed version: ask in the team
 channel for the artifact link if you want the formatted read.)
 
-**Status (2026-09-30):** Stage 1 and 2 done. Stage 3 (`parseSpotText.ts`)
+**Status (2026-10-06):** Stage 1 and 2 done. Stage 3 (`parseSpotText.ts`)
 recognizes the same two situations the button builder does, widened past
 its original literal two-phrasing MVP with synonyms (seat names like
 "button"/"cutoff", "raises" as well as "opens", "big blinds" spelled out)
@@ -27,18 +27,20 @@ of the backend lane actually checking it (`docs/decisions.md`'s
 verifies the header and scopes `GET /spots` per user. `apps/api` is
 deployed (Render); the Android build (Capacitor) has a real app icon/splash
 and runs end-to-end against the live API on a physical device. **Stage 5
-has a real start**: `services/solver` now has a genuine river-only MCCFR
-engine (`river_mccfr.py` — heads-up, a fixed 5-card board, two ranges,
-the locked bet-size menu, solved via chance-sampled Monte Carlo CFR and
-checked against closed-form poker theory, not just "did it run"), backed
-by a from-scratch hand evaluator (`evaluator.py`) and a
-169-label-to-concrete-combo sampler (`combos.py`) — see
-`services/solver/README.md`. Not yet wired to `apps/api`, no frontend
-for it, and flop/turn aren't solvable yet (they need a runout — dealing
-the rest of the board — which this doesn't do). Remaining: Stage 4 past
-its one-format MVP, Stage 5's flop/turn runout + API route + frontend
-board picker, and Stage 6's backend half (JWT verification, per-user
-scoping).
+has grown past its initial river-only start**: `services/solver` now
+solves any single postflop street — flop, turn, or river — heads-up, two
+ranges, the locked bet-size menu, via chance-sampled Monte Carlo CFR,
+checked against closed-form poker theory, not just "did it run"
+(`postflop_mccfr.py`, `betting_round.py`, backed by a from-scratch hand
+evaluator and a 169-label-to-concrete-combo sampler with a board-runout
+sampler for flop/turn — see `services/solver/README.md`). Still not
+wired to `apps/api`, no frontend for it, and this only ever solves one
+street's betting at a time — modeling a full flop→turn→river betting
+tree in one solve is a separate, bigger future direction (see "widening
+the solver" below), not something this does. Remaining: Stage 4 past its
+one-format MVP, Stage 5's API route + frontend board picker (+ eventually
+multi-street solving), and Stage 6's backend half (JWT verification,
+per-user scoping).
 
 ## The pitch
 
@@ -123,9 +125,12 @@ Once Stage 5's narrow scope is validated and cached in production, in
 roughly this order of effort:
 
 1. **More bet sizes** — cheap; same MCCFR, bigger action space per node.
-2. **More streets** (flop→turn→river) — the big one. Tree size grows
-   combinatorially; needs card abstraction (bucketing similar hands) to
-   stay solvable in reasonable time, not just more compute.
+2. **Multi-street solving** — one tree spanning flop→turn→river betting
+   in a single solve, instead of one street at a time (any single street
+   is already solvable — see `services/solver/README.md`). The big one.
+   Tree size grows combinatorially; needs card abstraction (bucketing
+   similar hands) to stay solvable in reasonable time, not just more
+   compute.
 3. **3+ players** — CFR's convergence guarantees weaken outside heads-up;
    realistically last.
 4. **Arbitrary bet sizing** — architecturally simple, but hurts solve

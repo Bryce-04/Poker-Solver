@@ -12,7 +12,7 @@ high to low:
 
 This brute-forces the 21 5-card subsets of a 7-card hand rather than using
 a lookup table -- simple and obviously correct. Fine for this engine's
-scope: river_mccfr.py evaluates each player's hand once per iteration and
+scope: postflop_mccfr.py evaluates each player's hand once per iteration and
 reuses it, not once per tree node.
 """
 

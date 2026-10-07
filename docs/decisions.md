@@ -6,6 +6,39 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-06 — Solver modules renamed river_* -> generalized names when flop/turn landed
+
+**Status:** accepted
+
+**Context.** `river_game.py`/`river_mccfr.py` (and their `River*` classes)
+were named for the river-only MVP. Adding flop/turn support turned out to
+need almost no changes to the betting-logic module — it was already
+card-agnostic, pure pot/action bookkeeping — which meant the "river"
+naming no longer described what the code did or didn't know about.
+
+**Decision.** Renamed `river_game.py` -> `betting_round.py`
+(`RiverState` -> `BettingRoundState`) and `river_mccfr.py` ->
+`postflop_mccfr.py` (`RiverSpotConfig`/`RiverMccfrTrainer` ->
+`PostflopSpotConfig`/`PostflopMccfrTrainer`), done immediately rather
+than deferred, since nothing outside `services/solver` depended on the
+old names yet (no `apps/api` route, no frontend) — the rename was fully
+contained and cheap before that stopped being true.
+
+**Consequences.** `PostflopSpotConfig.board` now accepts 3 (flop), 4
+(turn), or 5 (river) cards; `PostflopMccfrTrainer.train` samples a board
+runout (`combos.py`'s new `deal_runout`) alongside hole cards when the
+board isn't already complete. See `services/solver/README.md` for why
+this came out as a small addition rather than a rewrite, and for the
+testing wrinkle it introduced: a runout-dependent equilibrium is much
+harder to hand-verify in closed form than the river case (the opponent's
+own hand strength also varies by runout), so the flop/turn regression
+tests check one-sided dominance on a *locked* hand instead (same style as
+`kuhn_spike.py`'s own non-unique-equilibrium test), and the real rigor
+for the runout-sampling mechanism itself lives in a separate exact-vs-
+Monte-Carlo equity test (`test_runout_equity.py`).
+
+---
+
 ## 2026-09-30 — Frontend sends Authorization: Bearer &lt;Supabase JWT&gt; ahead of backend enforcement
 
 **Status:** proposed

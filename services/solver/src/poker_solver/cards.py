@@ -2,7 +2,7 @@
 
 A card is a plain int 0-51 (`rank_index*4 + suit_index`), not a dataclass --
 fast and hashable, which matters once MCCFR is sampling and comparing
-thousands of hands a second (see river_mccfr.py). This module is the only
+thousands of hands a second (see postflop_mccfr.py). This module is the only
 place that knows about that encoding; everything downstream treats a card
 as an opaque comparable/hashable value and only ever gets one from
 `parse_card` or `FULL_DECK`.

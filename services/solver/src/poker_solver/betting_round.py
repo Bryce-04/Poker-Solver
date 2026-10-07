@@ -1,7 +1,11 @@
-"""The river-only action abstraction: legal actions, state transitions,
-terminal detection, and payoff arithmetic for a single street of heads-up
-betting on an already-fixed board. Pure game mechanics -- no CFR, no hand
-evaluation (callers supply each player's precomputed showdown strength).
+"""The action abstraction for one street of heads-up betting: legal
+actions, state transitions, terminal detection, and payoff arithmetic.
+Pure game mechanics -- no cards, no CFR, no hand evaluation (callers
+supply each player's precomputed showdown strength). That's deliberate:
+this module has no idea whether it's being used for the flop, turn, or
+river -- postflop_mccfr.py decides that by how many board cards it hands
+the caller and whether it samples a runout before showdown. Nothing here
+changed when flop/turn support was added; it was already card-agnostic.
 
 Locked scope (docs/plan.md): fixed bet-size menu (check / 33% / 66% / 100%
 pot / all-in), heads-up, symmetric effective stacks.
@@ -24,7 +28,7 @@ AGGRESSIVE_LABELS = frozenset({label for _, label in BET_SIZE_MENU} | {"all_in"}
 
 
 @dataclass(frozen=True)
-class RiverState:
+class BettingRoundState:
     pot_bb: float  # dead money from earlier streets
     stack_bb: float  # each player's starting stack for this street
     contributed: tuple[float, float]  # each player's money put in *this* street
@@ -39,7 +43,7 @@ class RiverState:
         stack_bb: float,
         first_to_act: int = 0,
         prior_history: tuple[str, ...] = (),
-    ) -> RiverState:
+    ) -> BettingRoundState:
         """prior_history seeds an already-taken action (e.g. an OOP check
         before the solve's subgame starts) without it counting toward this
         street's raise cap. Assumes prior_history contains no bet/raise --
@@ -88,7 +92,7 @@ class RiverState:
         # shouldn't appear twice alongside the explicit "all_in" entry.
         return base + tuple(dict.fromkeys(sized))
 
-    def apply(self, action: str) -> RiverState:
+    def apply(self, action: str) -> BettingRoundState:
         to_act, other = self.to_act, 1 - self.to_act
         contributed = list(self.contributed)
         num_aggressive = self.num_aggressive_actions
@@ -112,7 +116,7 @@ class RiverState:
                 contributed[to_act] += min(amount, remaining)
             num_aggressive += 1
 
-        return RiverState(
+        return BettingRoundState(
             pot_bb=self.pot_bb,
             stack_bb=self.stack_bb,
             contributed=(contributed[0], contributed[1]),
@@ -142,9 +146,9 @@ class RiverState:
         folder's street contribution" is a tempting-looking bug: it still
         runs, but makes bluffing strictly dominated (a successful bluff
         would net 0 instead of the dead pot), silently collapsing the
-        subgame to degenerate check/fold. See test_river_game.py's fold
-        payoff test and river_mccfr.py's closed-form regression test, which
-        exist specifically to catch this class of mistake.
+        subgame to degenerate check/fold. See test_betting_round.py's fold
+        payoff test and postflop_mccfr.py's closed-form regression test,
+        which exist specifically to catch this class of mistake.
         """
         total_pot = self.pot_bb + self.contributed[0] + self.contributed[1]
         if self.history[-1] == "fold":
