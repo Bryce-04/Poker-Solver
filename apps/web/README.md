@@ -192,6 +192,18 @@ screen that needed one — see `## SolvePage` below for the
 It's the first screen needing *two* ranges and a board, so it departs
 from the other entry paths in a few ways:
 
+- **"Jump to a decision from a hand history"** (`lib/parseHandHistory.ts`'s
+  `parseHandHistoryToPostflopSetup`) fast-forwards positions/board/pot/
+  stack straight to whatever postflop decision point the paste reaches —
+  reading what a hand's actions already determined, not re-solving every
+  earlier street (see `docs/decisions.md`'s entry on why that's a cheap
+  addition rather than real multi-street solving, which stays out of
+  scope). A second entry point in the same file as the original Stage 4
+  `parseHandHistory` (unchanged, still backs `ImportPage`'s preflop
+  lookup) — they share header/seat parsing but do different jobs. Doesn't
+  touch either range: a hand history doesn't reveal villain's actual
+  cards, so those still come from the reference-range buttons below or
+  manual painting.
 - **Two positions, two `RangeGrid`s.** `apps/web/src/lib/spot.ts`'s
   helpers only ever fill in hero's position/range; this screen defines
   its own convention instead (matching `apps/api/app/solve.py`'s

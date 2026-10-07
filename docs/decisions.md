@@ -6,6 +6,51 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — Hand-history fast-forward instead of real multi-street solving
+
+**Status:** accepted
+
+**Context.** Confirmed with the user: real multi-street solving (one tree
+connecting flop→turn→river decisions, not one isolated street) is out of
+scope. It's a combinatorial-blowup problem, not just a slower version of
+what exists — a single wide-range *street* already creates ~42,000 info
+sets and strains the current engine (see the 2026-10-07
+`DEFAULT_ITERATIONS` entry); a full 3-street tree means solving a
+turn-sized problem for every non-fold way the flop could end, then a
+river-sized problem for every non-fold way the turn could end.
+Real solvers handle this with card abstraction (bucketing similar hands
+to shrink the tree) — genuine research-level engineering, not a
+reasonable scope addition here. But the underlying need was real: getting
+to "the river decision in this hand" shouldn't require manually
+re-solving every earlier street by hand.
+
+**Decision.** `lib/parseHandHistory.ts` gains a second entry point,
+`parseHandHistoryToPostflopSetup`, alongside the original Stage 4
+`parseHandHistory` (unchanged, still backs `ImportPage`). It fast-forwards
+through every street present in a pasted hand history and hands
+`SolvePage` the board/pot/effective-stack/OOP-IP/already-checked state at
+wherever the paste stops — reading what already happened, not
+solving/computing it, which is a fundamentally cheaper problem than
+multi-street solving and doesn't touch the engine at all. Deliberately
+does not return ranges (a hand history doesn't reveal villain's actual
+holdings) — those still come from the existing reference-range buttons or
+manual painting. Honest-refusal on anything that doesn't fit cleanly
+(doesn't reach the flop, more than 2 players still live, the target
+street already has betting past a single opening check), same convention
+the original parser already uses.
+
+**Consequences.** This is explicitly additive, not a step toward or away
+from real multi-street solving — if that gets built later, nothing here
+needs to be reworked; it shares no code with the betting-engine side
+(`services/solver`) at all. Scope boundaries worth knowing: antes are
+folded into the pot total like any other contribution rather than
+modeled specially; side-pot math from unequal-stack all-ins isn't
+modeled precisely (the existing single-symmetric-effective-stack
+simplification is used regardless); run-it-twice and straddles aren't
+recognized.
+
+---
+
 ## 2026-10-07 — Solve results are a 13×13 color chart, not a table; per-hand precision flagged as unverified at current sample sizes
 
 **Status:** accepted

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
 import { fetchReferenceStrategy, solveSpot } from "../lib/api";
@@ -253,5 +253,66 @@ describe("SolvePage", () => {
     expect(
       await screen.findByText(/no reference chart covers bb opening, or defending vs btn/i),
     ).toBeInTheDocument();
+  });
+
+  it("fills positions/board/pot/stack from a pasted hand history, leaving ranges untouched", async () => {
+    const hh = `PokerStars Hand #3:  Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/01 12:00:00 ET
+Table 'Atlas' 6-max Seat #1 is the button
+Seat 1: Dave ($100 in chips)
+Seat 2: Eve ($100 in chips)
+Seat 3: Hero ($100 in chips)
+Seat 4: Alice ($100 in chips)
+Seat 5: Grace ($100 in chips)
+Seat 6: Frank ($100 in chips)
+Eve: posts small blind $0.50
+Hero: posts big blind $1
+*** HOLE CARDS ***
+Dealt to Hero [7h 7s]
+Alice: folds
+Grace: folds
+Frank: folds
+Dave: raises $2 to $3
+Eve: folds
+Hero: calls $2
+*** FLOP *** [2h 7d Jc]
+Hero: checks
+`;
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    // fireEvent.change, not user.type -- the hand history's "[7h 7s]"
+    // brackets collide with userEvent's special-key syntax (e.g. "{enter}"),
+    // and this is pasting a block of text, not simulating keystrokes anyway.
+    fireEvent.change(screen.getByLabelText(/paste a hand history/i), { target: { value: hh } });
+    await user.click(screen.getByRole("button", { name: /^load from hand history$/i }));
+
+    expect(screen.getByLabelText(/out of position/i)).toHaveValue("BB");
+    expect(screen.getByLabelText(/^in position$/i)).toHaveValue("BTN");
+    expect(screen.getByLabelText(/^pot \(bb\)$/i)).toHaveValue(6.5);
+    expect(screen.getByLabelText(/effective stack/i)).toHaveValue(97);
+    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(
+      screen.getByRole("gridcell", { name: /jack of clubs/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // Ranges are deliberately left alone -- a hand history doesn't reveal
+    // villain's actual cards. ("pressed" isn't a role-querying option RTL
+    // supports for "gridcell", so check the attribute directly.)
+    for (const grid of rangeGrids()) {
+      const pressedCells = within(grid)
+        .getAllByRole("gridcell")
+        .filter((cell) => cell.getAttribute("aria-pressed") === "true");
+      expect(pressedCells).toHaveLength(0);
+    }
+  });
+
+  it("shows the parser's reason when a hand history can't be loaded", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+
+    await user.type(screen.getByLabelText(/paste a hand history/i), "not a real hand history");
+    await user.click(screen.getByRole("button", { name: /^load from hand history$/i }));
+
+    expect(await screen.findByText(/table size and button seat/i)).toBeInTheDocument();
   });
 });

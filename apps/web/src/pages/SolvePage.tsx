@@ -4,6 +4,7 @@ import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { boardFromCards, parseBoardText } from "../lib/cards";
 import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
+import { parseHandHistoryToPostflopSetup } from "../lib/parseHandHistory";
 import {
   fetchReferenceStrategy,
   solveSpot,
@@ -71,6 +72,35 @@ export function SolvePage() {
   const [oopChartState, setOopChartState] = useState<ChartLoadState>({ kind: "idle" });
   const [ipChartState, setIpChartState] = useState<ChartLoadState>({ kind: "idle" });
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  const [handHistoryText, setHandHistoryText] = useState("");
+  const [handHistoryError, setHandHistoryError] = useState<string | null>(null);
+
+  /**
+   * Fast-forwards the board/pot/stack/positions fields straight to a
+   * postflop decision point recorded in a pasted hand history, instead of
+   * manually re-solving every earlier street -- reading what already
+   * happened is a much cheaper problem than solving it. Ranges are left
+   * untouched: a hand history doesn't reveal villain's actual holdings,
+   * so those still come from "Load <position>'s opening range" or manual
+   * painting. See docs/decisions.md's entry on why this doesn't attempt
+   * real multi-street solving.
+   */
+  function loadFromHandHistory() {
+    const result = parseHandHistoryToPostflopSetup(handHistoryText);
+    if (result.kind === "unrecognized") {
+      setHandHistoryError(result.reason);
+      return;
+    }
+    setHandHistoryError(null);
+    const { setup } = result;
+    setOopPosition(setup.oopPosition);
+    setIpPosition(setup.ipPosition);
+    setEffectiveStackBb(setup.effectiveStackBb);
+    setPotBb(setup.potBb);
+    setBoardMode("pick");
+    setPickedCards(setup.board);
+    setOopAlreadyChecked(setup.oopAlreadyChecked);
+  }
 
   const board = boardMode === "pick" ? boardFromCards(pickedCards) : parseBoardText(boardText);
   const positionsAreValid = oopPosition !== ipPosition;
@@ -180,6 +210,29 @@ export function SolvePage() {
   return (
     <div className="spot-builder">
       <form className="spot-builder__form" onSubmit={handleSubmit}>
+        <section className="spot-builder__section">
+          <h2 className="spot-builder__legend">Jump to a decision from a hand history</h2>
+          <label className="spot-builder__field">
+            Paste a hand history
+            <textarea
+              className="spot-builder__hh-input"
+              rows={4}
+              value={handHistoryText}
+              onChange={(e) => setHandHistoryText(e.target.value)}
+              placeholder="Paste up through the point just before the decision you want to look at"
+            />
+          </label>
+          <button type="button" className="spot-builder__reset" onClick={loadFromHandHistory}>
+            Load from hand history
+          </button>
+          {handHistoryError && <p className="spot-builder__field-error">{handHistoryError}</p>}
+          <p className="spot-builder__hint">
+            Fills in positions, board, pot, and stack from what actually
+            happened in the hand -- not ranges, since a hand history doesn&rsquo;t
+            reveal villain&rsquo;s actual cards.
+          </p>
+        </section>
+
         <section className="spot-builder__section">
           <h2 className="spot-builder__legend">Players</h2>
 
