@@ -89,12 +89,12 @@ describe("SolvePage", () => {
     );
 
     expect(await screen.findByText(/BTN.s strategy/i)).toBeInTheDocument();
-    // "AA" also appears as a range-grid cell label -- scope to the results
-    // table specifically.
-    const table = within(screen.getByRole("table"));
-    expect(table.getByText("AA")).toBeInTheDocument();
-    expect(table.getByText("95%")).toBeInTheDocument();
-    expect(table.getByText("5%")).toBeInTheDocument();
+    // "AA" is also a cell label in both range-building grids -- the
+    // StrategyGrid cell's aria-label is its own distinct "AA: ..." format,
+    // so this scopes to it without an ambiguous-match error.
+    expect(
+      screen.getByRole("gridcell", { name: /^AA: Check 5%, All-in 95%$/i }),
+    ).toBeInTheDocument();
   });
 
   it("submits the same Spot shape via the typed-board mode", async () => {

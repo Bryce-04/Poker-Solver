@@ -40,6 +40,18 @@
   --range-in-contrast: #ffffff;
   --range-line: #ffffff;
 
+  /* Strategy grid (SolvePage's live-solve result): one color per action,
+     warm-to-dark by aggression (passive gold -> deepening red -> near-black
+     jam), fold broken out as its own cool color since it's categorically
+     different (leaving the hand) rather than "the lightest red". See
+     StrategyGrid.css. */
+  --strategy-fold: #6b7a99;
+  --strategy-passive: #d9a441;
+  --strategy-bet-small: #e8776b;
+  --strategy-bet-mid: #d94f3d;
+  --strategy-bet-big: #b9342a;
+  --strategy-allin: #7a1f1f;
+
   /* Back-compat aliases for names older CSS still references. */
   --text-h: var(--text-strong);
   --code-bg: var(--surface-2);
@@ -94,6 +106,13 @@
     --range-in: #46b06a;
     --range-in-contrast: #0f1a12;
     --range-line: #1b1b23;
+
+    --strategy-fold: #8b9bbd;
+    --strategy-passive: #f0b93d;
+    --strategy-bet-small: #f0897c;
+    --strategy-bet-mid: #e8654f;
+    --strategy-bet-big: #d4483a;
+    --strategy-allin: #9c3a3a;
 
     --shadow-sm:
       0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);

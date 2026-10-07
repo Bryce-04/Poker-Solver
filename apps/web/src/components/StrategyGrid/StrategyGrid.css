@@ -1,0 +1,48 @@
+/* The 13x13 grid itself reuses RangeGrid.css's .range-grid/__row/__cell/
+   __label classes directly (same shrink-to-fit-on-mobile sizing, same
+   hover/focus rings) -- only the legend, label-chip, and detail line are
+   new here. */
+
+.strategy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 30rem;
+}
+
+.strategy-grid__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.strategy-grid__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.strategy-grid__swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 2px;
+  flex: none;
+}
+
+/* A small translucent chip behind the hand label so it stays legible
+   over any gradient -- cheaper and more robust than per-cell light/dark
+   text-color switching by dominant action. */
+.strategy-grid__label-chip {
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  color: var(--text-strong);
+}
+
+.strategy-grid__detail {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  min-height: 1.2em;
+}

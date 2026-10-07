@@ -6,6 +6,47 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — Solve results are a 13×13 color chart, not a table; per-hand precision flagged as unverified at current sample sizes
+
+**Status:** accepted
+
+**Context.** The original results display was a scrolling HTML table
+(one row per hand, one column per action) -- unreadable at a glance, and
+nothing like how real solvers present a range. Separately, a specific
+number surfaced during testing (a wide-range BB spot showing a bottom-
+range hand jamming ~25% on a dry ace-high board) read as implausible.
+
+**Decision 1 -- chart, not table.** New `components/StrategyGrid/`
+(`apps/web/README.md`'s `## SolvePage` section has the full design):
+a 13x13 grid reusing `RangeGrid.css`'s classes directly, each cell a
+left-to-right gradient of that hand's action mix, built from a new
+palette of theme-aware CSS custom properties (`--strategy-*`, `index.css`)
+rather than hardcoded hex. Modeled on a GTO-trainer-style reference image
+the project owner shared, adapted to this app's own palette rather than
+copied directly.
+
+**Decision 2 -- name the precision gap instead of papering over it.**
+Investigated the implausible-looking number rather than just reassuring
+that it's fine: the CFR algorithm itself is validated (closed-form
+regression tests in `services/solver`), but a wide range creates tens of
+thousands of distinct info-sets (see the 2026-10-07 `DEFAULT_ITERATIONS`
+entry) against only a few thousand total iterations -- individual fringe
+combos can be reporting a frequency built on a handful of samples, not a
+converged value. `StrategyGrid` renders a hand missing from the response
+(never sampled enough for `aggregate_label_strategies` to report it) as a
+visibly flat neutral cell rather than a color, so the gap is visible
+rather than hidden, and `apps/web/README.md` now states this limitation
+directly instead of implying every displayed number is trustworthy.
+
+**Consequences.** No code fix for the precision issue itself yet --
+that needs either more iterations (slower), a smarter sampling scheme, or
+labeling low-sample-count cells distinctly from well-sampled ones (not
+done: the response doesn't currently carry a per-hand sample count to
+render that distinction). Worth a follow-up if wide-range solves are a
+primary use case rather than an edge case.
+
+---
+
 ## 2026-10-07 — DEFAULT_ITERATIONS halved to 4,000; real timing logged instead of guessed at
 
 **Status:** accepted

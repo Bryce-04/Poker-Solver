@@ -12,6 +12,7 @@ import {
 } from "../lib/api";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { CardPicker } from "../components/CardPicker/CardPicker";
+import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -41,13 +42,6 @@ function streetForBoardLength(length: number): Street {
   return "river";
 }
 
-/** Every hand at one decision point shares the same legal actions, so the
- * first hand's keys are the table's columns. Empty if nothing in either
- * submitted range ever got sampled (board blocks every combo, etc). */
-function actionColumns(strategy: Record<string, Record<string, number>>): string[] {
-  const firstHand = Object.keys(strategy)[0];
-  return firstHand ? Object.keys(strategy[firstHand]) : [];
-}
 
 /**
  * Stage 5's live-solve screen: a real MCCFR solve (apps/api's
@@ -436,32 +430,7 @@ export function SolvePage() {
               &mdash; try more iterations or a narrower board/range combination.
             </p>
           ) : (
-            <div className="solve-page__table-wrap">
-              <table className="solve-page__table">
-                <thead>
-                  <tr>
-                    <th>Hand</th>
-                    {actionColumns(outcome.data.strategy).map((action) => (
-                      <th key={action}>{action}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.keys(outcome.data.strategy)
-                    .sort()
-                    .map((hand) => (
-                      <tr key={hand}>
-                        <td>{hand}</td>
-                        {actionColumns(outcome.data.strategy).map((action) => (
-                          <td key={action}>
-                            {Math.round((outcome.data.strategy[hand][action] ?? 0) * 100)}%
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
+            <StrategyGrid strategy={outcome.data.strategy} />
           )}
         </div>
       )}

@@ -220,19 +220,34 @@ from the other entry paths in a few ways:
   maps directly onto `solve.py`'s "empty or exactly one seeded check"
   contract. Anything past that (mid-street betting already recorded)
   isn't solvable yet, so there's no UI for it.
-- **Results are a table, not a chart.** Each hand in the deciding
-  player's range is a row; each legal action at that decision is a
-  column. Unlike every `ReferenceStrategyResult`/`HandRange` elsewhere in
-  the app (one weight per hand), this is a genuine distribution over
-  multiple actions per hand — `LiveSolveResponse.strategy` in `lib/api.ts`.
+- **Results are a 13×13 chart** (`components/StrategyGrid/StrategyGrid.tsx`),
+  not a table — each cell is a left-to-right gradient of that hand's
+  action mix (fold cool-colored, check/call gold, bet sizes a deepening
+  red ramp, all-in darkest), tap a cell for its exact breakdown below the
+  grid. Reuses `RangeGrid.css`'s grid/cell classes directly (same
+  shrink-to-fit-on-mobile sizing) with the fill set per-cell via an inline
+  gradient instead of the weight-based `color-mix`. Unlike every
+  `ReferenceStrategyResult`/`HandRange` elsewhere in the app (one weight
+  per hand), this is a genuine distribution over multiple actions per
+  hand — `LiveSolveResponse.strategy` in `lib/api.ts`. A hand missing from
+  the response (not in range, or never sampled enough to report) renders
+  as a flat neutral cell, not a color — see the caveat on per-hand
+  precision below.
 - **A solve takes a few seconds** (it's running thousands of real MCCFR
   iterations server-side, not a lookup) — the loading state says so
   explicitly rather than looking stuck.
 
+**A real caveat, not just a UI one:** a wide realistic range (dozens of
+hand labels) creates tens of thousands of distinct info-sets, but a solve
+only runs a few thousand iterations total (`DEFAULT_ITERATIONS`,
+`apps/api/app/solve.py`) — individual fringe combos can end up with very
+few samples behind their displayed frequency. The CFR algorithm itself is
+validated against closed-form theory (`services/solver`'s regression
+tests), but that doesn't make every per-hand number in a wide-range
+result trustworthy yet; see `docs/decisions.md`'s 2026-10-07 entries.
+
 Reuses `SpotBuilder.css`'s `spot-builder__*` classes for every generic
-piece (fields, status blocks, buttons), same as `TypeInPage`/`ImportPage`;
-`SolvePage.css` only adds the results-table styling, which nothing else
-needed before this.
+piece (fields, status blocks, buttons), same as `TypeInPage`/`ImportPage`.
 
 ## RangeGrid
 
