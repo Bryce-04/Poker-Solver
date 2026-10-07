@@ -29,6 +29,7 @@ services:
     volumes:
       - ../apps/api:/app/apps/api
       - ../packages/schema:/app/packages/schema
+      - ../services/solver:/app/services/solver
 
   solver:
     build:
