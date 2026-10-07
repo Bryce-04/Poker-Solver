@@ -1,0 +1,44 @@
+# Builds apps/api's Docker image and publishes it to GitHub's container
+# registry (ghcr.io), where Azure Container Apps pulls it from. Using ghcr.io
+# instead of Azure Container Registry keeps hosting free: a public package
+# here costs nothing, while ACR's cheapest tier is ~$5/month.
+#
+# Tags: `latest` and the commit SHA. Deploy a specific build to Azure with
+#   az containerapp update -n poker-solver-api -g poker-solver \
+#     --image ghcr.io/bryce-04/poker-solver-api:<sha>
+name: API image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/api/**
+      - services/solver/**
+      - packages/schema/**
+      - .github/workflows/api-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          # Repo root as context -- the Dockerfile copies packages/schema and
+          # services/solver alongside apps/api (see its header comment).
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/bryce-04/poker-solver-api:latest
+            ghcr.io/bryce-04/poker-solver-api:${{ github.sha }}

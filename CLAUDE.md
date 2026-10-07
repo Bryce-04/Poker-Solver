@@ -105,9 +105,13 @@ free tier in PR #22 (single-threaded BLAS, one solve at a time with a 503
 on Render after: wide-range river 16s, worst-case deep wide flop 90s —
 both fully converged, under the phone's 150s timeout. If that's still too
 slow, a host with a full CPU (e.g. Cloud Run) would be ~10x faster — see
-`docs/decisions.md`'s "Hardening /spots/solve" entry. `pytest apps/api`
-still hasn't been run against a real Postgres (no DB in the working
-session; route logic was exercised by calling `solve_spot` directly).
+`docs/decisions.md`'s "Hardening /spots/solve" entry. CI
+(`.github/workflows/ci.yml`) runs `pytest apps/api` against a real
+Postgres service on every PR and push to `main` — it passed for PRs #21
+and #22, so a local session without a database isn't a verification gap.
+`.github/workflows/api-image.yml` publishes the API image to
+`ghcr.io/bryce-04/poker-solver-api` on every API-affecting merge, for
+hosting on Azure Container Apps (Azure for Students) — in progress.
 
 ## Commands
 
