@@ -99,16 +99,15 @@ with no error boundary to catch it): `solveSpot` normalizes responses,
 `components/ErrorBoundary` wraps every route, and `solveSpot` has explicit
 CapacitorHttp timeouts again — see that decision entry.
 
-The new solver is merged (PR #21) and deployed. **Open issue:** on
-Render's free tier (0.1 CPU) wide-range solves didn't finish within 5
-minutes, far slower than the CPU share alone explains. Mitigations built
-(single-threaded BLAS in the Dockerfile, one solve at a time with a 503
-"busy", a 100s server time budget returning `converged: false`) — see
-`docs/decisions.md`'s "Hardening /spots/solve" entry; check Render's logs
-(`solved in ...` lines, OOM/restarts) to confirm the cause. `pytest
-apps/api` still hasn't been run against a real Postgres (no DB in the
-working session; route logic was exercised by calling `solve_spot`
-directly).
+The new solver is merged (PR #21) and deployed, hardened for Render's
+free tier in PR #22 (single-threaded BLAS, one solve at a time with a 503
+"busy", a 100s server time budget returning `converged: false`). Measured
+on Render after: wide-range river 16s, worst-case deep wide flop 90s —
+both fully converged, under the phone's 150s timeout. If that's still too
+slow, a host with a full CPU (e.g. Cloud Run) would be ~10x faster — see
+`docs/decisions.md`'s "Hardening /spots/solve" entry. `pytest apps/api`
+still hasn't been run against a real Postgres (no DB in the working
+session; route logic was exercised by calling `solve_spot` directly).
 
 ## Commands
 
