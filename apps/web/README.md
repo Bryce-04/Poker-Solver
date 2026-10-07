@@ -17,10 +17,10 @@ mounted **editable** everywhere a matched chart is shown (Builder,
 Type-in, Import) — adjust weights before "Save this spot" persists them,
 not a read-only display. Saved spots (the Saved screen, and the save
 button on the three entry screens) is wired to `apps/api`'s
-`POST`/`GET /spots`. Stage 6 auth (see `## Auth` below) has a frontend
-start: Supabase sign-in, session state, and a "sign in to save spots"
-gate on all three save buttons — the backend half (verifying the token,
-scoping saved spots per user) hasn't landed yet.
+`POST`/`GET /spots`. Stage 6 auth (see `## Auth` below) works for saved
+spots: Supabase sign-in, session state, a "sign in to save spots" gate
+on all three save buttons, and `apps/api` verifying the token and
+returning only the signed-in user's own spots.
 
 ## Commands
 
@@ -83,8 +83,8 @@ switch on `.kind` instead of try/catch.
 | Function | Backs | `kind`s |
 |---|---|---|
 | `fetchReferenceStrategy(spot)` | `POST /spots/reference-strategy` | `match` (2xx, `.data` is a `ReferenceStrategyResponse`) / `no-match` (404) / `invalid` (422, `.issues`) / `network-error` / `error` (`.status`) |
-| `saveSpot(spot)` | `POST /spots` | `saved` (2xx, `.spot` echoes the server-assigned `id`/`created_at`) / `invalid` / `network-error` / `error` |
-| `listSpots()` | `GET /spots` | `ok` (`.spots: Spot[]`) / `network-error` / `error` |
+| `saveSpot(spot)` | `POST /spots` | `saved` (2xx, `.spot` echoes the server-assigned `id`/`created_at`/`created_by`) / `invalid` / `network-error` / `error` (401 when not signed in) |
+| `listSpots()` | `GET /spots` | `ok` (`.spots: Spot[]`, the caller's own only) / `network-error` / `error` (401 when not signed in) |
 
 `ReferenceStrategyResponse` mirrors `apps/api/app/routes/spots.py`'s response
 dict and is the one shared seam — coordinate with whoever owns `apps/api`
@@ -117,14 +117,15 @@ Capacitor app doesn't have.
 
 `saveSpot`/`listSpots` (`lib/api.ts`) attach
 `Authorization: Bearer <token>` when a session exists, omitted (not
-blocked client-side) otherwise — sent ahead of `apps/api` actually
-verifying it, per `docs/decisions.md`'s 2026-09-30 entry. Separately,
+blocked client-side) otherwise. `apps/api` verifies it and returns 401
+without it (`docs/decisions.md`'s 2026-09-30 and 2026-10-06 entries).
+Separately,
 the save button on all three entry screens (Builder, Type in, Import)
 shows "Sign in to save spots" and skips the API call entirely when
 signed out, via each page's own `useAuth()` check. `SavedSpotsPage`
-shows a signed-out notice but still renders whatever `GET /spots`
-returns underneath it, since the backend doesn't filter per-user yet —
-full per-user scoping is the backend lane's job.
+shows only a signed-out notice when signed out (it doesn't call `GET
+/spots`, which requires sign-in), and fetches the signed-in user's own
+spots — refetching when the account changes.
 
 ## Android (Capacitor)
 
