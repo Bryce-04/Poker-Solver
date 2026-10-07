@@ -1,4 +1,5 @@
 import type { BettingAction, Position, Street } from "@poker-solver/schema";
+import { POSITIONS } from "./positions";
 
 // Backs SolvePage's click-through hand builder: walk preflop then flop then
 // turn then river as a sequence of real actions (not the solver's
@@ -41,6 +42,48 @@ export interface StreetContext {
    * start at 0. */
   initialContributed?: Partial<Record<Position, number>>;
   isPreflop?: boolean;
+  /** Preflop only: the amount a player must put in just to stay in (the big
+   * blind). A player who hasn't posted a blind -- UTG, BTN, etc. -- has to
+   * match this in full, not just the other player's contribution. */
+  minCallBb?: number;
+}
+
+const SMALL_BLIND_BB = 0.5;
+const BIG_BLIND_BB = 1;
+
+/** The blind a seat posts before any action: BB 1, SB 0.5, everyone else 0. */
+function blindFor(position: Position): number {
+  if (position === "BB") return BIG_BLIND_BB;
+  if (position === "SB") return SMALL_BLIND_BB;
+  return 0;
+}
+
+/** Preflop's starting context for two chosen seats, using the real blinds:
+ * each player starts with only the blind their own seat posts, blinds
+ * posted by seats not in the hand are dead money already in the pot (the
+ * other seats are assumed to have folded), and the earlier seat in
+ * preflop order (UTG ... BTN, SB, BB) acts first. */
+export function preflopContext(
+  oopPosition: Position,
+  ipPosition: Position,
+  startingStackBb: number,
+): StreetContext {
+  const inHand = [oopPosition, ipPosition];
+  const deadMoneyBb = (["SB", "BB"] as Position[])
+    .filter((p) => !inHand.includes(p))
+    .reduce((sum, p) => sum + blindFor(p), 0);
+  const firstToAct =
+    POSITIONS.indexOf(oopPosition) <= POSITIONS.indexOf(ipPosition) ? oopPosition : ipPosition;
+  return {
+    oopPosition,
+    ipPosition,
+    potBeforeBb: deadMoneyBb,
+    stackBeforeBb: startingStackBb,
+    firstToAct,
+    initialContributed: { [oopPosition]: blindFor(oopPosition), [ipPosition]: blindFor(ipPosition) },
+    isPreflop: true,
+    minCallBb: BIG_BLIND_BB,
+  };
 }
 
 export interface StreetState {
@@ -83,7 +126,10 @@ export function computeStreetState(ctx: StreetContext, actions: BuilderAction[])
     if (entry.action === "fold") {
       folded = entry.position;
     } else if (entry.action === "call") {
-      contributed[entry.position] = contributed[other(ctx, entry.position)];
+      contributed[entry.position] = Math.max(
+        contributed[other(ctx, entry.position)],
+        ctx.minCallBb ?? 0,
+      );
     } else if (entry.action === "all_in") {
       contributed[entry.position] = ctx.stackBeforeBb;
     } else if (entry.action === "bet" || entry.action === "raise") {
@@ -93,11 +139,14 @@ export function computeStreetState(ctx: StreetContext, actions: BuilderAction[])
     toAct = other(ctx, entry.position);
   }
 
-  // Heads-up preflop's one wrinkle: the small blind "calling" to complete
-  // just matches the big blind -- it doesn't close the street, since the
-  // big blind hasn't had a turn yet (they posted involuntarily).
+  // Preflop's one wrinkle: a limp (calling the big blind) doesn't close the
+  // street when the other player IS the big blind -- they posted
+  // involuntarily and still get an option to check or raise.
   const isCompletingBlindCall =
-    !!ctx.isPreflop && actions.length === 1 && actions[0].action === "call";
+    !!ctx.isPreflop &&
+    actions.length === 1 &&
+    actions[0].action === "call" &&
+    other(ctx, actions[0].position) === "BB";
 
   // A check closes the round unless it's literally the street's first
   // action (the other player still needs their turn) -- this also
@@ -110,16 +159,23 @@ export function computeStreetState(ctx: StreetContext, actions: BuilderAction[])
     (last === "call" && !isCompletingBlindCall) ||
     (last === "check" && actions.length > 1);
 
-  const facingBet = contributed[ctx.oopPosition] !== contributed[ctx.ipPosition];
-  const toCallBb = facingBet ? Math.abs(contributed[toAct] - contributed[other(ctx, toAct)]) : 0;
+  // What the player to act has to match: the largest contribution so far,
+  // or (preflop) at least the big blind even if nobody has posted it.
+  const highestBb = Math.max(
+    contributed[ctx.oopPosition],
+    contributed[ctx.ipPosition],
+    ctx.minCallBb ?? 0,
+  );
+  const facingBet = contributed[toAct] < highestBb;
+  const toCallBb = facingBet ? highestBb - contributed[toAct] : 0;
   const potNowBb = ctx.potBeforeBb + contributed[ctx.oopPosition] + contributed[ctx.ipPosition];
-  const bothAtZero = contributed[ctx.oopPosition] === 0 && contributed[ctx.ipPosition] === 0;
+  const noWagerYet = highestBb === 0;
 
   return {
     toAct,
     facingBet,
     toCallBb,
-    aggressiveLabel: bothAtZero ? "bet" : "raise",
+    aggressiveLabel: noWagerYet ? "bet" : "raise",
     potNowBb,
     remainingBb: {
       [ctx.oopPosition]: ctx.stackBeforeBb - contributed[ctx.oopPosition],
@@ -151,8 +207,8 @@ export interface HandSummary {
 
 /** Walks preflop -> flop -> turn -> river in order, carrying pot/stack
  * forward through whichever streets are already closed, and stopping at
- * the street the board's card count implies. Heads-up blinds (1bb/0.5bb)
- * are assumed -- see CLAUDE.md's "assume 1/2 blinds for now" note. */
+ * the street the board's card count implies. Blinds are 0.5/1bb; each
+ * seat posts only its own (see preflopContext). */
 export function summarizeHand(
   oopPosition: Position,
   ipPosition: Position,
@@ -176,15 +232,15 @@ export function summarizeHand(
 
   for (const street of STREET_ORDER) {
     const isPreflop = street === "preflop";
-    const ctx: StreetContext = {
-      oopPosition,
-      ipPosition,
-      potBeforeBb: potBb,
-      stackBeforeBb: stackBb,
-      firstToAct: isPreflop ? ipPosition : oopPosition,
-      initialContributed: isPreflop ? { [oopPosition]: 1, [ipPosition]: 0.5 } : undefined,
-      isPreflop,
-    };
+    const ctx: StreetContext = isPreflop
+      ? preflopContext(oopPosition, ipPosition, startingStackBb)
+      : {
+          oopPosition,
+          ipPosition,
+          potBeforeBb: potBb,
+          stackBeforeBb: stackBb,
+          firstToAct: oopPosition,
+        };
     const state = computeStreetState(ctx, streets[street]);
     targetStreet = street;
     targetState = state;

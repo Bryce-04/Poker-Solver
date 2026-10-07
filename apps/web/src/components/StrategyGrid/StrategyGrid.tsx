@@ -1,23 +1,9 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { HAND_GRID } from "../../lib/hands";
+import { ACTION_LABEL, ACTION_ORDER } from "../../lib/strategySummary";
 import "../RangeGrid/RangeGrid.css";
 import "./StrategyGrid.css";
-
-// Fixed left-to-right order so every cell's segments line up the same way,
-// and a stable warm-to-dark ramp by aggression -- fold is its own cool
-// color (leaving the hand is categorically different from escalating it),
-// not just "the lightest red". Covers every action betting_round.py's
-// fixed menu can ever produce, so no fallback-color case is needed.
-const ACTION_ORDER = [
-  "fold",
-  "check",
-  "call",
-  "bet_small",
-  "bet_medium",
-  "bet_large",
-  "all_in",
-] as const;
 
 const ACTION_COLOR_VAR: Record<string, string> = {
   fold: "--strategy-fold",
@@ -27,16 +13,6 @@ const ACTION_COLOR_VAR: Record<string, string> = {
   bet_medium: "--strategy-bet-mid",
   bet_large: "--strategy-bet-big",
   all_in: "--strategy-allin",
-};
-
-const ACTION_LABEL: Record<string, string> = {
-  fold: "Fold",
-  check: "Check",
-  call: "Call",
-  bet_small: "Bet Small (25%)",
-  bet_medium: "Bet Medium (75%)",
-  bet_large: "Bet Large (125%)",
-  all_in: "All-in",
 };
 
 function orderedEntries(hand: Record<string, number>): [string, number][] {

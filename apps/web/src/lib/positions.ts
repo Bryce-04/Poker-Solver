@@ -13,3 +13,15 @@ export const SIX_MAX_POSITIONS: Position[] = ["UTG", "HJ", "CO", "BTN", "SB", "B
 // Seats that can be first to act in an unopened pot (everyone but the big
 // blind, who is never "unopened" -- the blind is already in).
 export const OPENABLE_POSITIONS: Position[] = SIX_MAX_POSITIONS.filter((p) => p !== "BB");
+
+// Postflop action order: the small blind acts first, the button last. This is
+// a rotation of POSITIONS (the preflop order, UTG ... BTN, SB, BB).
+export const POSTFLOP_ORDER: Position[] = ["SB", "BB", "UTG", "UTG1", "LJ", "HJ", "CO", "BTN"];
+
+/** Given the two seats in a heads-up pot (either order), which is out of
+ * position (acts first after the flop) and which is in position. */
+export function assignPostflopSeats(a: Position, b: Position): { oop: Position; ip: Position } {
+  return POSTFLOP_ORDER.indexOf(a) <= POSTFLOP_ORDER.indexOf(b)
+    ? { oop: a, ip: b }
+    : { oop: b, ip: a };
+}

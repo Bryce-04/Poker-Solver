@@ -6,6 +6,32 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-07 — Click-through builder: each seat posts its own blind (corrects "Decision 2" below)
+
+**Status:** accepted.
+
+**Context.** Reported on the Solve page: UTG vs BB, UTG's "Call" cost 0.5bb
+instead of the real 1bb. The earlier heads-up simplification (the entry
+"SolvePage's click-through hand builder", Decision 2) always made the
+in-position player the small blind (0.5bb posted, first to act), which is
+only true for SB-vs-BB. For any other pair the in-position seat was credited
+a blind it never posted, so its call was 0.5bb short and the pot too small.
+
+**Decision.** `lib/handBuilder.ts`'s `preflopContext` models the real
+blinds (0.5/1bb) for whichever two seats are picked: each starts with only
+its own seat's blind; blinds posted by seats *not* in the hand are dead money
+already in the pot (the other seats are assumed folded); the earlier seat in
+preflop order (UTG … BTN, SB, BB) acts first; a call must match at least the
+big blind. The big blind's option still follows a limp, but only when the
+other player really is the BB.
+
+**Consequences.** Pots entering the flop are 0.5bb larger than before for
+pairs where SB isn't in the hand (e.g. BTN vs BB limp/check: 2.5bb, not 2bb)
+— that dead small blind is what real 6-max solvers include. Pasted hand
+histories are unaffected (they read the real pot).
+
+---
+
 ## 2026-10-07 — Hardening /spots/solve for Render's free tier: one solve at a time, a time budget, single-threaded BLAS
 
 **Status:** accepted — shipped in PR #22, measured on Render afterward:

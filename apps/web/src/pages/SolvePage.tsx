@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
-import { SIX_MAX_POSITIONS } from "../lib/positions";
+import { SIX_MAX_POSITIONS, assignPostflopSeats } from "../lib/positions";
 import { boardFromCards, parseBoardText } from "../lib/cards";
 import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
 import { parseHandHistoryToPostflopSetup } from "../lib/parseHandHistory";
-import { STREET_ORDER, summarizeHand, toBettingActions } from "../lib/handBuilder";
+import { STREET_ORDER, preflopContext, summarizeHand, toBettingActions } from "../lib/handBuilder";
 import type { BuilderAction } from "../lib/handBuilder";
 import {
   fetchReferenceStrategy,
@@ -17,6 +17,8 @@ import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { CardPicker } from "../components/CardPicker/CardPicker";
 import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
 import { StreetActions } from "../components/StreetActions/StreetActions";
+import { Step } from "../components/Step/Step";
+import { formatMix, overallMix } from "../lib/strategySummary";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -78,15 +80,28 @@ const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
  */
 export function SolvePage() {
   const [setupMode, setSetupMode] = useState<SetupMode>("click");
-  const [oopPosition, setOopPosition] = useState<Position>("BB");
-  const [ipPosition, setIpPosition] = useState<Position>("BTN");
+  // The two heads-up seats, in whichever order they were picked -- who is
+  // out of position / in position is derived from them, never chosen.
+  const [seatA, setSeatA] = useState<Position>("BB");
+  const [seatB, setSeatB] = useState<Position>("BTN");
+  const { oop: oopPosition, ip: ipPosition } = assignPostflopSeats(seatA, seatB);
   const [boardMode, setBoardMode] = useState<BoardMode>("pick");
   const [boardText, setBoardText] = useState("");
   const [pickedCards, setPickedCards] = useState<string[]>([]);
-  const [oopRange, setOopRange] = useState<HandRange>({});
-  const [ipRange, setIpRange] = useState<HandRange>({});
-  const [oopChartState, setOopChartState] = useState<ChartLoadState>({ kind: "idle" });
-  const [ipChartState, setIpChartState] = useState<ChartLoadState>({ kind: "idle" });
+  // Ranges and "Load typical range" status are kept per SEAT, not per role,
+  // so changing the other player never leaves a range on the wrong player.
+  const [ranges, setRanges] = useState<Partial<Record<Position, HandRange>>>({});
+  const [chartStates, setChartStates] = useState<Partial<Record<Position, ChartLoadState>>>({});
+  const oopRange = ranges[oopPosition] ?? {};
+  const ipRange = ranges[ipPosition] ?? {};
+  const oopChartState = chartStates[oopPosition] ?? { kind: "idle" as const };
+  const ipChartState = chartStates[ipPosition] ?? { kind: "idle" as const };
+  function setRangeFor(position: Position, range: HandRange) {
+    setRanges((prev) => ({ ...prev, [position]: range }));
+  }
+  function setChartStateFor(position: Position, state: ChartLoadState) {
+    setChartStates((prev) => ({ ...prev, [position]: state }));
+  }
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
 
   // Click-through mode's own state: a true starting stack (before any
@@ -97,6 +112,9 @@ export function SolvePage() {
   // didn't make sense).
   const [startingStackBb, setStartingStackBb] = useState(100);
   const [streets, setStreets] = useState<Record<Street, BuilderAction[]>>(EMPTY_STREETS);
+  // Actions stepped back over (via Back or a street's own Undo), newest
+  // last -- what "Forward" re-applies. Any fresh action clears it.
+  const [redoStack, setRedoStack] = useState<{ street: Street; action: BuilderAction }[]>([]);
 
   // Paste mode's own state -- unchanged from before this street-by-street
   // builder existed: a hand history directly tells you pot/stack/board at
@@ -116,8 +134,8 @@ export function SolvePage() {
     }
     setHandHistoryError(null);
     const { setup } = result;
-    setOopPosition(setup.oopPosition);
-    setIpPosition(setup.ipPosition);
+    setSeatA(setup.oopPosition);
+    setSeatB(setup.ipPosition);
     setPastedStackBb(setup.effectiveStackBb);
     setPastedPotBb(setup.potBb);
     setBoardMode("pick");
@@ -131,6 +149,7 @@ export function SolvePage() {
     board.kind === "ok" ? board.cards.length : boardMode === "pick" ? pickedCards.length : 0;
   const positionsAreValid = oopPosition !== ipPosition;
 
+  const preflop = preflopContext(oopPosition, ipPosition, startingStackBb);
   const handSummary = summarizeHand(oopPosition, ipPosition, startingStackBb, streets, boardLength);
 
   const potBb = setupMode === "click" ? handSummary.potBb : pastedPotBb;
@@ -250,33 +269,99 @@ export function SolvePage() {
     });
   }
 
+  /** Back to a blank page: every input, both ranges, and any result. */
+  function resetAll() {
+    setSetupMode("click");
+    setSeatA("BB");
+    setSeatB("BTN");
+    setBoardMode("pick");
+    setBoardText("");
+    setPickedCards([]);
+    setRanges({});
+    setChartStates({});
+    setOutcome({ kind: "idle" });
+    setStartingStackBb(100);
+    setStreets(EMPTY_STREETS);
+    setRedoStack([]);
+    setHandHistoryText("");
+    setHandHistoryError(null);
+    setPastedPotBb(0);
+    setPastedStackBb(0);
+    setOopAlreadyChecked(false);
+    setPasteLoaded(false);
+  }
+
   function setStreetActions(street: Street, actions: BuilderAction[]) {
+    const before = streets[street];
+    if (actions.length > before.length) {
+      setRedoStack([]); // a new action forks the hand -- the old "future" is gone
+    } else if (actions.length < before.length) {
+      const removed = before.slice(actions.length).reverse();
+      setRedoStack((prev) => [...prev, ...removed.map((action) => ({ street, action }))]);
+    }
     setStreets((prev) => ({ ...prev, [street]: actions }));
   }
+
+  /** Steps the whole hand back one action, across street boundaries. */
+  function goBack() {
+    const street = [...STREET_ORDER].reverse().find((st) => streets[st].length > 0);
+    if (street) setStreetActions(street, streets[street].slice(0, -1));
+  }
+
+  function goForward() {
+    const next = redoStack[redoStack.length - 1];
+    if (!next) return;
+    setRedoStack((prev) => prev.slice(0, -1));
+    setStreets((prev) => ({ ...prev, [next.street]: [...prev[next.street], next.action] }));
+  }
+
+  const hasActions = STREET_ORDER.some((st) => streets[st].length > 0);
+
+  const missing: string[] = [];
+  if (!positionsAreValid) missing.push("Pick two different positions.");
+  if (setupMode === "paste" && !pasteLoaded) {
+    missing.push("Load a hand history in step 1.");
+  } else if (setupMode === "click" && handSummary.blockedReason !== null) {
+    missing.push("Finish the action on the earlier streets in step 1.");
+  }
+  if (boardLength < 3) missing.push("Pick at least 3 board cards (the flop) in step 2.");
+  else if (board.kind !== "ok") missing.push("Fix the board in step 2.");
+  if (Object.keys(oopRange).length === 0) missing.push(`Add hands to ${oopPosition}'s range in step 3.`);
+  if (Object.keys(ipRange).length === 0) missing.push(`Add hands to ${ipPosition}'s range in step 3.`);
+
+  const spotSummary =
+    board.kind === "ok"
+      ? `${oopPosition} vs ${ipPosition} · ${currentStreet} ${board.cards.join(" ")} · pot ${potBb.toLocaleString()}bb`
+      : `${oopPosition} vs ${ipPosition}`;
 
   return (
     <div className="spot-builder">
       <form className="spot-builder__form" onSubmit={handleSubmit}>
-        <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">Jump to a decision</h2>
-          <label className="spot-builder__field spot-builder__field--radio">
-            <input
-              type="radio"
-              name="setup-mode"
-              checked={setupMode === "click"}
-              onChange={() => setSetupMode("click")}
-            />
-            Click through the hand
-          </label>
-          <label className="spot-builder__field spot-builder__field--radio">
-            <input
-              type="radio"
-              name="setup-mode"
-              checked={setupMode === "paste"}
-              onChange={() => setSetupMode("paste")}
-            />
-            From a hand history
-          </label>
+        <Step
+          number={1}
+          title="The hand"
+          subtitle="Who is playing, and how the hand got to this point."
+        >
+          <div className="solve-page__segmented" role="radiogroup" aria-label="How to set up the hand">
+            <label className="solve-page__segment" data-active={setupMode === "click"}>
+              <input
+                type="radio"
+                name="setup-mode"
+                checked={setupMode === "click"}
+                onChange={() => setSetupMode("click")}
+              />
+              Click through the hand
+            </label>
+            <label className="solve-page__segment" data-active={setupMode === "paste"}>
+              <input
+                type="radio"
+                name="setup-mode"
+                checked={setupMode === "paste"}
+                onChange={() => setSetupMode("paste")}
+              />
+              From a hand history
+            </label>
+          </div>
 
           {setupMode === "paste" && (
             <>
@@ -303,24 +388,23 @@ export function SolvePage() {
           )}
           {setupMode === "click" && (
             <p className="spot-builder__hint">
-              Set the positions and starting stack below, then click through
-              the hand street by street -- pot and effective stack are
-              computed from what you enter, not typed in.
+              Choose the two players and the starting stack, then enter what
+              happened on each street. Pot and remaining stack are worked out
+              for you.
             </p>
           )}
-        </section>
-
-        <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">Players</h2>
 
           <label className="spot-builder__field">
-            Out of position (acts first postflop)
+            Player 1
             <select
-              value={oopPosition}
-              onChange={(e) => setOopPosition(e.target.value as Position)}
+              value={seatA}
+              onChange={(e) => {
+                setSeatA(e.target.value as Position);
+                setRedoStack([]);
+              }}
             >
               {SIX_MAX_POSITIONS.map((p) => (
-                <option key={p} value={p}>
+                <option key={p} value={p} disabled={p === seatB}>
                   {p}
                 </option>
               ))}
@@ -328,31 +412,42 @@ export function SolvePage() {
           </label>
 
           <label className="spot-builder__field">
-            In position
+            Player 2
             <select
-              value={ipPosition}
-              onChange={(e) => setIpPosition(e.target.value as Position)}
+              value={seatB}
+              onChange={(e) => {
+                setSeatB(e.target.value as Position);
+                setRedoStack([]);
+              }}
             >
               {SIX_MAX_POSITIONS.map((p) => (
-                <option key={p} value={p}>
+                <option key={p} value={p} disabled={p === seatA}>
                   {p}
                 </option>
               ))}
             </select>
           </label>
-          {!positionsAreValid && (
+          {!positionsAreValid ? (
             <p className="spot-builder__field-error">The two positions must differ.</p>
+          ) : (
+            <p className="spot-builder__hint">
+              {oopPosition} is out of position (acts first after the flop).{" "}
+              {ipPosition} is in position (acts last).
+            </p>
           )}
 
           {setupMode === "click" && (
             <label className="spot-builder__field">
-              Starting effective stack (bb)
+              Starting stack (bb)
               <input
                 type="number"
                 min={0}
                 step="any"
                 value={startingStackBb}
-                onChange={(e) => setStartingStackBb(Number(e.target.value))}
+                onChange={(e) => {
+                  setStartingStackBb(Number(e.target.value));
+                  setRedoStack([]);
+                }}
               />
             </label>
           )}
@@ -367,87 +462,109 @@ export function SolvePage() {
               {oopPosition} already checked &mdash; solve {ipPosition}&rsquo;s decision
             </label>
           )}
-        </section>
 
-        {setupMode === "click" &&
-          STREET_ORDER.map((street, idx) => {
-            const minCards = idx === 0 ? 0 : idx + 2; // preflop=always, flop=3, turn=4, river=5
-            if (boardLength < minCards) return null;
-            const targetIdx = STREET_ORDER.indexOf(handSummary.targetStreet);
-            // Reached: this street already closed and we've moved past it
-            // -- show its log as history, not live controls. Current:
-            // this is exactly where the walk stopped. Blocked: the very
-            // next street after where the walk stopped (shown once, with
-            // why); anything further out just isn't rendered yet.
-            if (idx > targetIdx + 1) return null;
-            const status = idx < targetIdx ? "reached" : idx === targetIdx ? "current" : "blocked";
+          {setupMode === "click" && (
+            <div className="solve-page__history">
+              <button
+                type="button"
+                className="spot-builder__reset"
+                onClick={goBack}
+                disabled={!hasActions}
+                aria-label="Back one action"
+              >
+                &larr; Back
+              </button>
+              <button
+                type="button"
+                className="spot-builder__reset"
+                onClick={goForward}
+                disabled={redoStack.length === 0}
+                aria-label="Forward one action"
+              >
+                Forward &rarr;
+              </button>
+            </div>
+          )}
 
-            return (
-              <section className="spot-builder__section" key={street}>
-                <h2 className="spot-builder__legend">
-                  {street.charAt(0).toUpperCase() + street.slice(1)}
-                </h2>
-                {street === "preflop" && status === "current" && (
-                  <p className="spot-builder__hint">
-                    Blinds assumed at 1bb/0.5bb. {ipPosition} (small blind)
-                    acts first.
-                  </p>
-                )}
-                {status === "blocked" ? (
-                  <p className="spot-builder__field-error">{handSummary.blockedReason}</p>
-                ) : (
-                <StreetActions
-                  street={street}
-                  ctx={
-                    street === "preflop"
-                      ? {
-                          oopPosition,
-                          ipPosition,
-                          potBeforeBb: 0,
-                          stackBeforeBb: startingStackBb,
-                          firstToAct: ipPosition,
-                          initialContributed: { [oopPosition]: 1, [ipPosition]: 0.5 },
-                          isPreflop: true,
-                        }
-                      : {
-                          oopPosition,
-                          ipPosition,
-                          potBeforeBb: status === "current" ? handSummary.potBb : 0,
-                          stackBeforeBb:
-                            status === "current" ? handSummary.effectiveStackBb : startingStackBb,
-                          firstToAct: oopPosition,
-                        }
-                  }
-                  actions={streets[street]}
-                  onChange={(next) => setStreetActions(street, next)}
-                  disabled={status === "reached"}
-                />
-                )}
-              </section>
-            );
-          })}
+          {setupMode === "click" &&
+            STREET_ORDER.map((street, idx) => {
+              const minCards = idx === 0 ? 0 : idx + 2; // preflop=always, flop=3, turn=4, river=5
+              if (boardLength < minCards) return null;
+              const targetIdx = STREET_ORDER.indexOf(handSummary.targetStreet);
+              // Reached: this street already closed and we've moved past it
+              // -- show its log as history, not live controls. Current:
+              // this is exactly where the walk stopped. Blocked: the very
+              // next street after where the walk stopped (shown once, with
+              // why); anything further out just isn't rendered yet.
+              if (idx > targetIdx + 1) return null;
+              const status = idx < targetIdx ? "reached" : idx === targetIdx ? "current" : "blocked";
 
-        <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">Board</h2>
+              return (
+                <section className="spot-builder__section solve-page__street" key={street}>
+                  <h3 className="spot-builder__legend">
+                    {street.charAt(0).toUpperCase() + street.slice(1)}
+                  </h3>
+                  {street === "preflop" && status === "current" && (
+                    <p className="spot-builder__hint">
+                      Blinds 0.5/1bb. {preflop.firstToAct} acts first.
+                      {preflop.potBeforeBb > 0 &&
+                        ` ${preflop.potBeforeBb}bb of blinds from seats not in this hand is already in the pot.`}
+                    </p>
+                  )}
+                  {status === "blocked" ? (
+                    <p className="spot-builder__field-error">{handSummary.blockedReason}</p>
+                  ) : (
+                    <StreetActions
+                      street={street}
+                      ctx={
+                        street === "preflop"
+                          ? preflop
+                          : {
+                              oopPosition,
+                              ipPosition,
+                              potBeforeBb: status === "current" ? handSummary.potBb : 0,
+                              stackBeforeBb:
+                                status === "current"
+                                  ? handSummary.effectiveStackBb
+                                  : startingStackBb,
+                              firstToAct: oopPosition,
+                            }
+                      }
+                      actions={streets[street]}
+                      onChange={(next) => setStreetActions(street, next)}
+                      disabled={status === "reached"}
+                    />
+                  )}
+                </section>
+              );
+            })}
+        </Step>
 
-          <label className="spot-builder__field spot-builder__field--radio">
-            <input
-              type="radio"
-              name="board-mode"
-              checked={boardMode === "pick"}
-              onChange={() => setBoardMode("pick")}
-            />
-            Pick cards
-          </label>
-          <label className="spot-builder__field spot-builder__field--radio">
-            <input
-              type="radio"
-              name="board-mode"
-              checked={boardMode === "text"}
-              onChange={() => setBoardMode("text")}
-            />
-            Type it
-          </label>
+        <Step
+          number={2}
+          title="The board"
+          subtitle="The community cards: 3 for the flop, 4 for the turn, 5 for the river."
+        >
+          <div className="solve-page__segmented" role="radiogroup" aria-label="How to enter the board">
+            <label className="solve-page__segment" data-active={boardMode === "pick"}>
+              <input
+                type="radio"
+                name="board-mode"
+                checked={boardMode === "pick"}
+                onChange={() => setBoardMode("pick")}
+              />
+              Pick cards
+            </label>
+            <label className="solve-page__segment" data-active={boardMode === "text"}>
+              <input
+                type="radio"
+                name="board-mode"
+                checked={boardMode === "text"}
+                onChange={() => setBoardMode("text")}
+              />
+              Type it
+            </label>
+          </div>
 
           {boardMode === "pick" ? (
             <CardPicker value={pickedCards} onChange={setPickedCards} />
@@ -497,59 +614,100 @@ export function SolvePage() {
               </label>
             </>
           )}
-        </section>
+        </Step>
 
-        <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">{oopPosition}&rsquo;s range</h2>
-          <div className="solve-page__chart-load">
-            <button
-              type="button"
-              className="spot-builder__reset"
-              onClick={() =>
-                loadReferenceRange(oopPosition, ipPosition, setOopRange, setOopChartState)
-              }
-              disabled={oopChartState.kind === "loading"}
-            >
-              {oopChartState.kind === "loading"
-                ? "Loading…"
-                : `Load ${oopPosition}'s opening range`}
-            </button>
-            {oopChartState.kind === "unavailable" && (
-              <span className="spot-builder__save-status spot-builder__save-status--warn">
-                {oopChartState.reason}
+        <Step
+          number={3}
+          title="The ranges"
+          subtitle="The hands each player could realistically have. Tap or drag on the grid to add or remove hands."
+        >
+          <section className="spot-builder__section">
+            <h3 className="spot-builder__legend">{oopPosition}&rsquo;s range</h3>
+            <div className="solve-page__chart-load">
+              <button
+                type="button"
+                className="spot-builder__reset"
+                onClick={() =>
+                  loadReferenceRange(
+                    oopPosition,
+                    ipPosition,
+                    (r) => setRangeFor(oopPosition, r),
+                    (st) => setChartStateFor(oopPosition, st),
+                  )
+                }
+                disabled={oopChartState.kind === "loading"}
+              >
+                {oopChartState.kind === "loading"
+                  ? "Loading…"
+                  : `Load ${oopPosition}'s typical range`}
+              </button>
+              <span className="spot-builder__hint">
+                {Object.keys(oopRange).length} of 169 hand types selected
               </span>
-            )}
-          </div>
-          <RangeGrid value={oopRange} onChange={setOopRange} />
-        </section>
+              {oopChartState.kind === "unavailable" && (
+                <span className="spot-builder__save-status spot-builder__save-status--warn">
+                  {oopChartState.reason}
+                </span>
+              )}
+            </div>
+            <RangeGrid value={oopRange} onChange={(r) => setRangeFor(oopPosition, r)} />
+          </section>
 
-        <section className="spot-builder__section">
-          <h2 className="spot-builder__legend">{ipPosition}&rsquo;s range</h2>
-          <div className="solve-page__chart-load">
-            <button
-              type="button"
-              className="spot-builder__reset"
-              onClick={() =>
-                loadReferenceRange(ipPosition, oopPosition, setIpRange, setIpChartState)
-              }
-              disabled={ipChartState.kind === "loading"}
-            >
-              {ipChartState.kind === "loading"
-                ? "Loading…"
-                : `Load ${ipPosition}'s opening range`}
-            </button>
-            {ipChartState.kind === "unavailable" && (
-              <span className="spot-builder__save-status spot-builder__save-status--warn">
-                {ipChartState.reason}
+          <section className="spot-builder__section">
+            <h3 className="spot-builder__legend">{ipPosition}&rsquo;s range</h3>
+            <div className="solve-page__chart-load">
+              <button
+                type="button"
+                className="spot-builder__reset"
+                onClick={() =>
+                  loadReferenceRange(
+                    ipPosition,
+                    oopPosition,
+                    (r) => setRangeFor(ipPosition, r),
+                    (st) => setChartStateFor(ipPosition, st),
+                  )
+                }
+                disabled={ipChartState.kind === "loading"}
+              >
+                {ipChartState.kind === "loading"
+                  ? "Loading…"
+                  : `Load ${ipPosition}'s typical range`}
+              </button>
+              <span className="spot-builder__hint">
+                {Object.keys(ipRange).length} of 169 hand types selected
               </span>
-            )}
-          </div>
-          <RangeGrid value={ipRange} onChange={setIpRange} />
-        </section>
+              {ipChartState.kind === "unavailable" && (
+                <span className="spot-builder__save-status spot-builder__save-status--warn">
+                  {ipChartState.reason}
+                </span>
+              )}
+            </div>
+            <RangeGrid value={ipRange} onChange={(r) => setRangeFor(ipPosition, r)} />
+          </section>
+        </Step>
 
-        <button type="submit" disabled={!canSubmit || outcome.kind === "loading"}>
-          Solve
-        </button>
+        <Step
+          number={4}
+          title="Solve"
+          subtitle="The solver works out the best mix of actions for the player to act."
+        >
+          <p className="solve-page__summary">{spotSummary}</p>
+          {missing.length > 0 && (
+            <ul className="solve-page__missing">
+              {missing.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          )}
+          <div className="solve-page__actions">
+            <button type="submit" disabled={!canSubmit || outcome.kind === "loading"}>
+              Solve
+            </button>
+            <button type="button" className="spot-builder__reset" onClick={resetAll}>
+              Reset
+            </button>
+          </div>
+        </Step>
       </form>
 
       <div className="spot-builder__status" role="status" aria-live="polite">
@@ -608,9 +766,15 @@ export function SolvePage() {
           <div className="spot-builder__status-block spot-builder__status-block--error">
             <p className="spot-builder__status-title">Couldn&rsquo;t reach the API.</p>
             <p>
-              Is <code>apps/api</code> running? Start it with{" "}
-              <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+              Check your connection and try again. The server may also be
+              waking up &mdash; give it a minute.
             </p>
+            {import.meta.env.DEV && (
+              <p>
+                Dev: is <code>apps/api</code> running? Start it with{" "}
+                <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+              </p>
+            )}
           </div>
         )}
 
@@ -628,25 +792,23 @@ export function SolvePage() {
             Live solve ({outcome.data.iterations.toLocaleString()} iterations)
             &mdash; {outcome.data.position}&rsquo;s strategy:
           </p>
-          {outcome.data.exploitability_pct !== undefined && (
-            <p className="spot-builder__hint">
-              Within {outcome.data.exploitability_pct.toFixed(2)}% of the pot of a
-              true equilibrium &mdash; the most a perfect opponent could gain
-              against this strategy.
+          {Object.keys(outcome.data.strategy).length > 0 && (
+            <p className="solve-page__headline">
+              {outcome.data.position} to act. Averaged over the hands in this range:{" "}
+              {formatMix(overallMix(outcome.data.strategy))}.
             </p>
           )}
+          <p className="spot-builder__hint">
+            How to read this: each square is a starting hand, colored by how often
+            the solver takes each action with it. A square with several colors
+            means the solver mixes between those actions on purpose, so
+            opponents can&rsquo;t read it. Tap a square for the exact numbers.
+          </p>
           {outcome.data.converged === false && (
             <p className="spot-builder__hint">
               The server hit its time limit before fully converging, so this is
               rougher than usual &mdash; treat close frequencies loosely.
             </p>
-          )}
-          {outcome.data.bucketed_actions.length > 0 && (
-            <ul className="spot-builder__hint">
-              {outcome.data.bucketed_actions.map((note, idx) => (
-                <li key={idx}>{note}</li>
-              ))}
-            </ul>
           )}
           {Object.keys(outcome.data.strategy).length === 0 ? (
             <p className="spot-builder__hint">
@@ -656,6 +818,23 @@ export function SolvePage() {
           ) : (
             <StrategyGrid strategy={outcome.data.strategy} />
           )}
+          <details className="solve-page__details">
+            <summary>Details</summary>
+            {outcome.data.exploitability_pct !== undefined && (
+              <p className="spot-builder__hint">
+                Within {outcome.data.exploitability_pct.toFixed(2)}% of the pot of a
+                true equilibrium &mdash; the most a perfect opponent could gain
+                against this strategy.
+              </p>
+            )}
+            {outcome.data.bucketed_actions.length > 0 && (
+              <ul className="spot-builder__hint">
+                {outcome.data.bucketed_actions.map((note, idx) => (
+                  <li key={idx}>{note}</li>
+                ))}
+              </ul>
+            )}
+          </details>
         </div>
       )}
     </div>

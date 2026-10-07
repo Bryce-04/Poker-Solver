@@ -84,8 +84,8 @@ click-through hand builder (`lib/handBuilder.ts`,
 pasting a hand history: distinct preflop/flop/turn/river sections, real
 actions with real bb sizes (not the fixed menu — that's only what the
 backend buckets a size onto at solve time), preflop supporting repeated
-raises (3-bet/4-bet, not just one raise/one call, under an assumed
-1bb/0.5bb blind structure), and `pot_bb`/`effective_stack_bb` computed
+raises (3-bet/4-bet, not just one raise/one call, with each seat
+posting its own 0.5/1bb blind and the other seats' blinds as dead money), and `pot_bb`/`effective_stack_bb` computed
 from what was actually entered rather than typed in. An earlier street
 has to close (not fold) before the next one unlocks; "Solve" targets
 whichever street the board's card count reaches, as soon as nothing

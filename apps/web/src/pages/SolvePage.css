@@ -12,3 +12,77 @@
   gap: 0.6rem;
   margin-bottom: 0.6rem;
 }
+
+.solve-page__segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.solve-page__segment {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.solve-page__segment[data-active="true"] {
+  background: var(--accent-subtle);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+/* The real radio stays in the DOM (keyboard + screen reader), the pill is the visible control. */
+.solve-page__segment input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.solve-page__segment:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+.solve-page__street {
+  padding: 0.75rem 0 0;
+}
+
+.solve-page__summary {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.solve-page__missing {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.solve-page__headline {
+  margin: 0 0 0.4rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.solve-page__details {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.solve-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.solve-page__history {
+  display: flex;
+  gap: 0.5rem;
+}

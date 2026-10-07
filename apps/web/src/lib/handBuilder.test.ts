@@ -1,4 +1,4 @@
-import { computeStreetState, summarizeHand, toBettingActions } from "./handBuilder";
+import { computeStreetState, preflopContext, summarizeHand, toBettingActions } from "./handBuilder";
 import type { BuilderAction, StreetContext } from "./handBuilder";
 
 const PREFLOP_CTX: StreetContext = {
@@ -148,7 +148,7 @@ describe("summarizeHand", () => {
     );
     expect(summary.targetStreet).toBe("flop");
     expect(summary.blockedReason).toBeNull();
-    expect(summary.potBb).toBe(6); // 3 + 3
+    expect(summary.potBb).toBe(6.5); // 3 + 3 + 0.5 (SB's dead blind)
     expect(summary.effectiveStackBb).toBe(97);
     expect(summary.targetState.toAct).toBe("BB");
   });
@@ -215,7 +215,7 @@ describe("summarizeHand", () => {
     );
     expect(summary.targetStreet).toBe("river");
     expect(summary.blockedReason).toBeNull();
-    expect(summary.potBb).toBe(6); // 2 (blinds) + 2 + 2 (turn bet/call)
+    expect(summary.potBb).toBe(6.5); // 2.5 (limped pot incl. dead SB) + 2 + 2 (turn bet/call)
     expect(summary.effectiveStackBb).toBe(97); // 99 after preflop/flop, minus the 2bb turn call
     expect(summary.targetState.toAct).toBe("BTN");
     expect(summary.targetState.isTerminal).toBe(false);
@@ -232,5 +232,77 @@ describe("toBettingActions", () => {
       { position: "BB", street: "flop", action: "bet", size_bb: 5 },
       { position: "BTN", street: "flop", action: "call" },
     ]);
+  });
+});
+
+describe("preflopContext -- real blinds for any seat pair", () => {
+  const call: BuilderAction = { position: "UTG", action: "call" };
+
+  it("UTG vs BB: UTG faces the full 1bb, SB's 0.5bb is dead money", () => {
+    const ctx = preflopContext("BB", "UTG", 100);
+    expect(ctx.firstToAct).toBe("UTG");
+    expect(ctx.potBeforeBb).toBe(0.5);
+
+    const start = computeStreetState(ctx, []);
+    expect(start.toAct).toBe("UTG");
+    expect(start.facingBet).toBe(true);
+    expect(start.toCallBb).toBe(1);
+    expect(start.potNowBb).toBe(1.5);
+  });
+
+  it("UTG limp then BB check closes: pot 2.5, stack 99", () => {
+    const ctx = preflopContext("BB", "UTG", 100);
+    const afterLimp = computeStreetState(ctx, [call]);
+    expect(afterLimp.isTerminal).toBe(false); // BB still has the option
+    expect(afterLimp.toAct).toBe("BB");
+    expect(afterLimp.facingBet).toBe(false);
+
+    const closed = computeStreetState(ctx, [call, { position: "BB", action: "check" }]);
+    expect(closed.isTerminal).toBe(true);
+    expect(closed.potAfterBb).toBe(2.5);
+    expect(closed.stackAfterBb).toBe(99);
+  });
+
+  it("UTG raises to 3, BB calls: pot 6.5", () => {
+    const ctx = preflopContext("BB", "UTG", 100);
+    const closed = computeStreetState(ctx, [
+      { position: "UTG", action: "raise", toBb: 3 },
+      { position: "BB", action: "call" },
+    ]);
+    expect(closed.isTerminal).toBe(true);
+    expect(closed.potAfterBb).toBe(6.5);
+    expect(closed.stackAfterBb).toBe(97);
+  });
+
+  it("BTN vs BB: BTN is no longer credited a small blind", () => {
+    const ctx = preflopContext("BB", "BTN", 100);
+    expect(computeStreetState(ctx, []).toCallBb).toBe(1);
+    expect(ctx.potBeforeBb).toBe(0.5);
+  });
+
+  it("SB vs BB: SB acts first, completing costs 0.5, BB then has the option", () => {
+    const ctx = preflopContext("SB", "BB", 100);
+    expect(ctx.firstToAct).toBe("SB");
+    expect(ctx.potBeforeBb).toBe(0);
+
+    const start = computeStreetState(ctx, []);
+    expect(start.toCallBb).toBe(0.5);
+    const afterComplete = computeStreetState(ctx, [{ position: "SB", action: "call" }]);
+    expect(afterComplete.isTerminal).toBe(false);
+    expect(afterComplete.toAct).toBe("BB");
+  });
+
+  it("UTG vs BTN: both blinds are dead (1.5bb), a limp and a call close the action", () => {
+    const ctx = preflopContext("UTG", "BTN", 100);
+    expect(ctx.potBeforeBb).toBe(1.5);
+    expect(ctx.firstToAct).toBe("UTG");
+    expect(computeStreetState(ctx, []).toCallBb).toBe(1);
+
+    const closed = computeStreetState(ctx, [
+      { position: "UTG", action: "call" },
+      { position: "BTN", action: "call" },
+    ]);
+    expect(closed.isTerminal).toBe(true);
+    expect(closed.potAfterBb).toBe(3.5);
   });
 });

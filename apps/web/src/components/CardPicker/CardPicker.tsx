@@ -1,9 +1,9 @@
 import { RANKS } from "../../lib/hands";
 import "./CardPicker.css";
 
-/** s/h/d/c, top to bottom -- a natural "deck" reading order, and matches
- * the schema's own suit-letter casing (lowercase). */
-const SUITS = ["s", "h", "d", "c"] as const;
+/** s/h/c/d, top to bottom -- alternating black and red so same-color rows
+ * never touch. Matches the schema's own suit-letter casing (lowercase). */
+const SUITS = ["s", "h", "c", "d"] as const;
 
 const SUIT_SYMBOL: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
 const SUIT_NAME: Record<string, string> = {
