@@ -49,8 +49,10 @@ describe('<App />', () => {
     const user = userEvent.setup()
     render(<App />)
 
+    // Signed out (see the auth mock above), so Saved shows its sign-in
+    // notice rather than fetching -- GET /spots requires sign-in.
     await user.click(screen.getByRole('link', { name: /saved/i }))
-    expect(await screen.findByText(/no saved spots yet/i)).toBeInTheDocument()
+    expect(await screen.findByText(/not signed in/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: /type in/i }))
     expect(screen.getByText(/describe the spot/i)).toBeInTheDocument()

@@ -7,17 +7,15 @@ import { useAuth } from "../lib/auth";
 vi.mock("../lib/api", () => ({ listSpots: vi.fn() }));
 const mockList = vi.mocked(listSpots);
 
-// No <AuthProvider> wraps this render, so useAuth() falls back to its
-// context default ("loading") unless a test opts into a real mock -- the
-// existing tests below don't care about auth state, only the new
-// signed-out one does.
+// Signed in by default -- the page only fetches once signed in, since
+// GET /spots requires it. The auth-specific tests at the bottom override it.
 vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
 const mockUseAuth = vi.mocked(useAuth);
 
 beforeEach(() => {
   mockList.mockReset();
   mockUseAuth.mockReset();
-  mockUseAuth.mockReturnValue({ status: "loading", email: null });
+  mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
 });
 
 const unopenedSpot = {
@@ -63,12 +61,37 @@ describe("SavedSpotsPage", () => {
     expect(screen.getByText(/500/)).toBeInTheDocument();
   });
 
-  it("shows a signed-out notice, without hiding the (unfiltered) list underneath", async () => {
+  it("shows only a signed-out notice, without calling the API", () => {
     mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
-    mockList.mockResolvedValue({ kind: "ok", spots: [unopenedSpot] });
     render(<SavedSpotsPage />);
 
     expect(screen.getByText(/not signed in/i)).toBeInTheDocument();
+    expect(mockList).not.toHaveBeenCalled();
+  });
+
+  it("waits for auth to resolve before fetching", () => {
+    mockUseAuth.mockReturnValue({ status: "loading", email: null });
+    render(<SavedSpotsPage />);
+
+    expect(screen.getByText(/loading saved spots/i)).toBeInTheDocument();
+    expect(mockList).not.toHaveBeenCalled();
+  });
+
+  it("fetches once the user signs in on this screen, and again on an account switch", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    mockList.mockResolvedValue({ kind: "ok", spots: [unopenedSpot] });
+    const { rerender } = render(<SavedSpotsPage />);
+    expect(mockList).not.toHaveBeenCalled();
+
+    mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
+    rerender(<SavedSpotsPage />);
     expect(await screen.findByText(/BTN.*100bb, unopened pot/)).toBeInTheDocument();
+    expect(mockList).toHaveBeenCalledTimes(1);
+
+    mockList.mockResolvedValue({ kind: "ok", spots: [vsRaiseSpot] });
+    mockUseAuth.mockReturnValue({ status: "signed-in", email: "villain@example.com" });
+    rerender(<SavedSpotsPage />);
+    expect(await screen.findByText(/BB.*40bb, facing a raise from CO/)).toBeInTheDocument();
+    expect(mockList).toHaveBeenCalledTimes(2);
   });
 });
