@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { HandRange } from "@poker-solver/schema";
 import {
+  comboColumns,
   comboSlots,
   comboWeights,
   indexRange,
@@ -65,7 +66,10 @@ export function ComboEditor({ hand, value, onChange, brush = 1, deadCards = [] }
         </button>
       </div>
 
-      <div className="combo-editor__grid">
+      <div
+        className="combo-editor__grid"
+        style={{ gridTemplateColumns: `repeat(${comboColumns(hand)}, 1fr)` }}
+      >
         {comboSlots(hand).map(({ combo: key, high, low }, i) => {
           if (key === null) return <span key={i} className="combo-editor__gap" aria-hidden="true" />;
           const weight = weights[key] ?? 0;

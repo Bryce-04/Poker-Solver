@@ -1,4 +1,6 @@
 import {
+  comboColumns,
+  comboSlots,
   canonicalComboKey,
   comboLabel,
   comboWeights,
@@ -81,5 +83,31 @@ describe("combo-aware range writes", () => {
 
   it("emptying every combo removes the hand type", () => {
     expect(setComboWeight({ AhKh: 1 }, "AKs", "AhKh", 0)).toEqual({});
+  });
+});
+
+describe("suit layout", () => {
+  it("lays out suited hands in one row, pairs in two rows of three, offsuit as a 4x4 with a blank diagonal", () => {
+    const suited = comboSlots("AKs");
+    expect(suited).toHaveLength(4);
+    expect(suited.every((s) => s.combo !== null)).toBe(true);
+    expect(comboColumns("AKs")).toBe(4);
+
+    const pair = comboSlots("QQ");
+    expect(pair).toHaveLength(6);
+    expect(comboColumns("QQ")).toBe(3);
+
+    const offsuit = comboSlots("AKo");
+    expect(offsuit).toHaveLength(16);
+    expect(offsuit.filter((s) => s.combo === null)).toHaveLength(4);
+    expect(comboColumns("AKo")).toBe(4);
+  });
+
+  it("lists every combo of a hand exactly once", () => {
+    for (const hand of ["AA", "AKs", "AKo"]) {
+      const keys = comboSlots(hand).flatMap((s) => (s.combo ? [s.combo] : []));
+      expect(new Set(keys)).toEqual(new Set(labelCombos(hand)));
+      expect(keys).toHaveLength(labelCombos(hand).length);
+    }
   });
 });

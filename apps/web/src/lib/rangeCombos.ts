@@ -74,14 +74,21 @@ export function labelCombos(label: string): string[] {
   return out;
 }
 
-/** One square of the 4x4 suit layout shared by the range editor and the
- * strategy view: rows are the higher card's suit, columns the lower card's.
- * `combo` is null for squares that hand type can't occupy (a pair uses the
- * upper triangle, suited hands the diagonal, offsuit everything off it). */
+/** One square of the suit layout shared by the range editor and the strategy
+ * view. `combo` is null for a blank square (offsuit hands only: the diagonal
+ * of the 4x4, where the two suits would be the same). */
 export interface ComboSlot {
   combo: string | null;
   high: string;
   low: string;
+}
+
+/** Columns of the suit layout: suited hands are one row of four, pairs two
+ * rows of three, offsuit hands a 4x4 (rows are the higher card's suit,
+ * columns the lower card's) with its diagonal left blank. */
+export function comboColumns(label: string): number {
+  if (label.length === 2) return 3;
+  return 4;
 }
 
 export function comboSlots(label: string): ComboSlot[] {
@@ -92,8 +99,13 @@ export function comboSlots(label: string): ComboSlot[] {
     SUITS.forEach((colSuit, c) => {
       const high = label[0] + rowSuit;
       const low = label[1] + colSuit;
-      const applicable = isPair ? c > r : suited ? r === c : r !== c;
-      slots.push({ combo: applicable ? comboKey(high, low) : null, high, low });
+      if (isPair) {
+        if (c > r) slots.push({ combo: comboKey(high, low), high, low });
+      } else if (suited) {
+        if (r === c) slots.push({ combo: comboKey(high, low), high, low });
+      } else {
+        slots.push({ combo: r !== c ? comboKey(high, low) : null, high, low });
+      }
     }),
   );
   return slots;

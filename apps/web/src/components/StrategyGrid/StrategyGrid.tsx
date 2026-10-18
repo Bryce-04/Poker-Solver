@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { HAND_GRID } from "../../lib/hands";
 import { ACTION_LABEL, ACTION_ORDER } from "../../lib/strategySummary";
 import type { HandRange } from "@poker-solver/schema";
-import { comboSlots, comboWeights, handMass, indexRange } from "../../lib/rangeCombos";
+import { comboColumns, comboSlots, comboWeights, handMass, indexRange } from "../../lib/rangeCombos";
 import "../RangeGrid/RangeGrid.css";
 import "./StrategyGrid.css";
 
@@ -90,7 +90,10 @@ function SuitStrategy({
   const differs = comboSlots(hand).some(({ combo }) => combo !== null && combo in comboStrategy);
   return (
     <div className="suit-strategy" role="group" aria-label={`${hand} by suit`}>
-      <div className="suit-strategy__grid">
+      <div
+        className="suit-strategy__grid"
+        style={{ gridTemplateColumns: `repeat(${comboColumns(hand)}, 1fr)` }}
+      >
         {comboSlots(hand).map(({ combo, high, low }, i) => {
           if (combo === null) return <span key={i} className="suit-strategy__gap" aria-hidden="true" />;
           const blocked = dead.has(high) || dead.has(low);
