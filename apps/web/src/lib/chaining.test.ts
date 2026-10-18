@@ -83,6 +83,10 @@ describe("buildNarrowSpot", () => {
 describe("unlikelyLineWarning", () => {
   it("is quiet for a line both players take, loud for one nobody does", () => {
     expect(unlikelyLineWarning("flop", { BB: 0.9, BTN: 0.2 })).toBeNull();
+    // 3.4% is the real case that motivated the threshold: a 2bb flop bet the
+    // equilibrium makes 3.4% of the time gave a "range" of mixing leftovers.
+    expect(unlikelyLineWarning("flop", { BB: 0.4, BTN: 0.034 })).toContain("BTN (3.4%)");
+    expect(unlikelyLineWarning("flop", { BB: 0.4, BTN: 0.15 })).toBeNull();
     const warning = unlikelyLineWarning("flop", { BB: 0.0001, BTN: 0.5 });
     expect(warning).toContain("BB (0.0%)");
     expect(warning).not.toContain("BTN");

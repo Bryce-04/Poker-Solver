@@ -115,6 +115,39 @@ over leaving the tail in because a full multi-street solve will need pruning
 anyway (the tail compounds across chained streets); the threshold is a
 constant (`TRIM_BELOW_FRACTION_OF_MAX`) to tune against real solves.
 
+**Update, same day — "the solve jams too many hands" (investigated, three fixes).**
+Reported on the phone: BTN facing a 2bb bet into 12.5bb on Q♠J♥7♥3♥ (flush
+just arrived), after narrowing both ranges by a flop of check / BTN bets 2bb /
+call, jammed a lot of hands (65s 95% all-in, K9o, Q9o...). Reproduced exactly
+from the reference charts (BTN `btn_open_100bb`, BB `bb_defend_vs_btn_open_100bb`;
+same 392/131 hand-type counts as the phone). Findings, measured:
+
+- The turn spot itself is fine: with the FULL ranges BTN folds 8%, calls 59%,
+  raises 12%+19%, and never jams (65s: raise medium 57% / large 40%, all-in 0%).
+  The jamming came from the narrowed range.
+- The narrowed range came from a line the equilibrium barely plays: on that
+  flop BTN's 2bb bet (bucketed to 25% pot) is taken by 3.4% of its range
+  (`line_probability`), and the hands that take it are mostly leftover mixing
+  (24 hand types sit at 0.5-5% bet_small, the noise floor of an average
+  strategy) rather than a coherent betting range. Our 1% guard let it through;
+  the guard is now 10% (`chaining.ts`'s `MIN_LINE_PROBABILITY`), with a message
+  that says why. The narrow step now refuses lines like this one.
+- The result chart overstated junk hands: 65s's "95% all-in" was one combo
+  (6♠5♠) at ~1% of the top hand's weight, drawn like a core hand, and the
+  headline averaged hand TYPES equally (37% all-in) where the range-weighted
+  share is 23%. `StrategyGrid` now takes the solved `range`: hands fade by
+  how much of the range they are and say so when tapped, and `overallMix` is
+  weighted by `handMass` (combos' worth in the range).
+- Bug in the suit view: it drew suits that aren't in the range as if they
+  played the hand's strategy (and said "every suit plays the same"). They are
+  now marked "not in the range".
+
+Still true and not fixed: a narrowed range is only as good as the street
+solve's rarely-reached nodes, and the average strategy there is noisy;
+chaining by a line the equilibrium plays often (BB's check-check here is
+~59%) is reliable, a rare line is not. A full multi-street solve would not
+have this problem, which is another reason it is the real fix.
+
 **Not done yet.** Previously: the UI step ("use narrowed range" feeding the next
 street), and running `pytest apps/api` against Postgres (none available this
 session; `narrow_ranges` was called directly).

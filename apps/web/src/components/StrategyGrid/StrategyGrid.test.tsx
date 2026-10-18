@@ -51,3 +51,36 @@ describe("StrategyGrid suit view", () => {
     expect(within(suits).getAllByRole("img", { name: /on the board/ })).toHaveLength(3);
   });
 });
+
+describe("StrategyGrid with the solved range", () => {
+  it("fades a hand that is barely in the range, and says how much of the range it is", async () => {
+    const user = userEvent.setup();
+    render(
+      <StrategyGrid
+        strategy={{ AA: { check: 1 }, KK: { all_in: 1 } }}
+        range={{ AA: 1, KK: 0.05 }}
+      />,
+    );
+    const aa = screen.getByRole("gridcell", { name: /^AA:/ });
+    const kk = screen.getByRole("gridcell", { name: /^KK:/ });
+    expect(Number(aa.style.opacity)).toBeCloseTo(1);
+    expect(Number(kk.style.opacity)).toBeLessThan(0.4);
+
+    await user.click(kk);
+    expect(screen.getByText(/5% as much of the range as its heaviest hand/)).toBeInTheDocument();
+  });
+
+  it("shows suit combos that are not in the range as not in the range", async () => {
+    const user = userEvent.setup();
+    // Only the spade combo of 65s is in the range -- the other three suits
+    // must not be drawn as if they played the hand's strategy.
+    render(
+      <StrategyGrid strategy={{ "65s": { all_in: 1 } }} range={{ "6s5s": 0.013 }} />,
+    );
+    await user.click(screen.getByRole("gridcell", { name: /^65s:/ }));
+
+    const suits = screen.getByRole("group", { name: "65s by suit" });
+    expect(within(suits).getAllByRole("img", { name: /not in the range/ })).toHaveLength(3);
+    expect(within(suits).getByRole("img", { name: /^6s5s: All-in 100%/ })).toBeInTheDocument();
+  });
+});

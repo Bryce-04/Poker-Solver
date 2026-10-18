@@ -61,10 +61,14 @@ export function buildNarrowSpot(input: NarrowSpotInput): Spot {
   };
 }
 
-/** A line the equilibrium (almost) never plays leaves nothing real to narrow
- * to -- the server's ranges for it are numerical noise. Below this share of a
- * player's range taking their side of the line, refuse to build on it. */
-export const MIN_LINE_PROBABILITY = 0.01;
+/** A line the equilibrium rarely plays leaves nothing reliable to narrow to:
+ * the few hands that take it do so mostly through leftover mixing noise, and
+ * they end up looking like a real range. Measured on a wet flop, a 2bb bet
+ * the equilibrium made 3.4% of the time produced a range of mixed-strength
+ * hands whose turn jams didn't survive using the full ranges instead. Below
+ * this share of a player's range taking their side of the line, refuse to
+ * build on it. */
+export const MIN_LINE_PROBABILITY = 0.1;
 
 /** Null when the line is plausible for both players; otherwise a sentence
  * saying who would (almost) never do that. */
@@ -77,8 +81,9 @@ export function unlikelyLineWarning(
     .map(([position, p]) => `${position} (${(p * 100).toFixed(1)}%)`);
   if (unlikely.length === 0) return null;
   return (
-    `In an equilibrium solve of the ${street}, ${unlikely.join(" and ")} almost never ` +
-    `takes the line you entered, so there is no real range left to carry forward. ` +
+    `In an equilibrium solve of the ${street}, ${unlikely.join(" and ")} rarely takes ` +
+    `the line you entered (the percentage is how much of that range does), so the ` +
+    `narrowed range would be mostly leftover noise rather than a real range. ` +
     `Keep the ranges as they are, or change the ${street} action.`
   );
 }

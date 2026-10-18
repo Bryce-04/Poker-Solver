@@ -157,6 +157,19 @@ export function totalCombos(index: RangeIndex): number {
   return total;
 }
 
+/** Hand type -> how many combos' worth of it are in the range (its mean
+ * combo weight times its combo count). Only hand types with any weight. */
+export function handMass(index: RangeIndex): Record<string, number> {
+  const labels = new Set([...Object.keys(index.labels), ...index.overrides.keys()]);
+  const mass: Record<string, number> = {};
+  for (const label of labels) {
+    const weights = Object.values(comboWeights(index, label));
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    if (total > 0) mass[label] = total;
+  }
+  return mass;
+}
+
 /** How many concrete combos carry any weight at all -- as opposed to
  * totalCombos, which adds the weights up (so 300 combos at 3% each is "9"). */
 export function liveComboCount(index: RangeIndex): number {

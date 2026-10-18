@@ -26,6 +26,7 @@ import {
   unlikelyLineWarning,
 } from "../lib/chaining";
 import { formatMix, overallMix } from "../lib/strategySummary";
+import { handMass, indexRange } from "../lib/rangeCombos";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -35,7 +36,9 @@ type SetupMode = "click" | "paste";
 type Outcome =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "solved"; data: LiveSolveResponse }
+  // `range` is the deciding player's range as it was when solved, so the
+  // result can fade hands that are barely in it (later edits don't move it).
+  | { kind: "solved"; data: LiveSolveResponse; range: HandRange }
   | { kind: "invalid"; issues: SpotValidationIssue[] }
   | { kind: "rejected"; reason: string }
   | { kind: "busy" }
@@ -228,7 +231,11 @@ export function SolvePage() {
     const result = await solveSpot(spot);
     switch (result.kind) {
       case "solved":
-        setOutcome({ kind: "solved", data: result.data });
+        setOutcome({
+          kind: "solved",
+          data: result.data,
+          range: result.data.position === oopPosition ? oopRange : ipRange,
+        });
         return;
       case "invalid":
         setOutcome({ kind: "invalid", issues: result.issues });
@@ -958,8 +965,9 @@ export function SolvePage() {
           </p>
           {Object.keys(outcome.data.strategy).length > 0 && (
             <p className="solve-page__headline">
-              {outcome.data.position} to act. Averaged over the hands in this range:{" "}
-              {formatMix(overallMix(outcome.data.strategy))}.
+              {outcome.data.position} to act. Across the whole range, counting each hand
+              by how much of the range it is:{" "}
+              {formatMix(overallMix(outcome.data.strategy, handMass(indexRange(outcome.range))))}.
             </p>
           )}
           <p className="spot-builder__hint">
@@ -984,6 +992,7 @@ export function SolvePage() {
               strategy={outcome.data.strategy}
               comboStrategy={outcome.data.combo_strategy}
               deadCards={board.kind === "ok" ? board.cards : []}
+              range={outcome.range}
             />
           )}
           <details className="solve-page__details">

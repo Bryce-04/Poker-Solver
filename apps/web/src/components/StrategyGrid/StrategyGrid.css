@@ -94,3 +94,8 @@
 .suit-strategy__cards [data-suit="d"] {
   color: var(--danger);
 }
+
+.suit-strategy__combo[data-out] {
+  opacity: 0.45;
+  border-style: dashed;
+}

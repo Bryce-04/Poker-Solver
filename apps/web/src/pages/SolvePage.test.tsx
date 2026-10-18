@@ -718,7 +718,7 @@ describe("SolvePage -- narrowing ranges by earlier action", () => {
 
     await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/BB \(0\.0%\) almost never/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/BB \(0\.0%\) rarely takes/);
     expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toBeInTheDocument();
   });
 
