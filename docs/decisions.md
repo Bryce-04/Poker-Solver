@@ -6,6 +6,46 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-18 — 3-bet / 4-bet ranges and loading ranges from the preflop line
+
+**Status:** proposed.
+
+**Context.** Postflop solves started from per-seat guesses: "load BB's typical
+range" is a single-raised-pot range whatever actually happened preflop, so a
+3-bet pot was solved with the wrong ranges for both players. The existing
+defend charts are one combined continue range (call + 3-bet) with no split.
+
+**Decision.** `preflop_ranges.py` adds, for each of the nine pairs the defend
+charts cover (100bb only), the defender's 3-bet range, the opener's call and
+4-bet ranges against it, and the defender's call range against a 4-bet; the
+defender's flat range is *derived* (defend chart minus 3-bet) so the existing
+charts stay the single source of truth. `POST /spots/preflop-ranges` reads a
+preflop line and returns both players' ranges by role (open+call, 3-bet pot,
+4-bet pot); the Solve page's button calls it with the clicked-through preflop
+action. Constructed by principle, as the existing charts are (the user chose
+this over importing a source or solving preflop), and labeled approximate.
+
+**Why a line-reading route instead of more `reference-strategy` charts.**
+`reference-strategy` answers "what range for ONE seat in this exact Spot";
+a postflop solve needs the pair of ranges that are consistent with each
+other, and which seat gets which range depends on the whole line. The
+invariants (3-bet within defend, calls and 4-bets within the open range,
+disjoint) are tested so a hand-edited range can't give a player hands they
+couldn't have reached that node with.
+
+**Limits.** 100bb only; no limped or 5-bet pots; one weight per hand (no
+mixed frequencies, so a hand is either always 3-bet or never); not solver
+output. Frequencies were sanity-checked (3-bets 3-12%, 4-bets 2-3%, openers
+continue 42-62% of their range vs a 3-bet), not validated against a solve.
+
+**Testing note.** `pytest apps/api` normally needs Postgres, but tests that
+don't touch the database run fine without it:
+`DATABASE_URL=postgresql+psycopg://x:x@localhost:5432/x pytest --noconftest
+tests/test_preflop_ranges.py tests/test_solve_route.py ...` (the engine is
+lazy; `--noconftest` skips the session fixture that runs Alembic).
+
+---
+
 ## 2026-10-18 — Range chaining, step 1: `posterior_ranges` + `POST /spots/narrow`
 
 **Status:** proposed (backend only; no UI yet).

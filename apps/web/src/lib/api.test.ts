@@ -1,6 +1,13 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { fetchReferenceStrategy, listSpots, narrowRanges, saveSpot, solveSpot } from './api'
+import {
+  fetchPreflopRanges,
+  fetchReferenceStrategy,
+  listSpots,
+  narrowRanges,
+  saveSpot,
+  solveSpot,
+} from './api'
 import { getAccessToken } from './auth'
 
 // authHeaders() (api.ts) calls this directly -- mock it rather than the
@@ -324,5 +331,44 @@ describe('narrowRanges', () => {
     await expect(narrowRanges(spot)).resolves.toEqual({ kind: 'busy' })
     requestMock.mockRejectedValue(new Error('network unreachable'))
     await expect(narrowRanges(spot)).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('fetchPreflopRanges', () => {
+  const body = {
+    source: 'reference_chart',
+    line: 'three_bet',
+    description: 'BTN opens, BB 3-bets, BTN calls',
+    chart_source: 'approximate',
+    ranges: { BB: { AA: 1 }, BTN: { JJ: 1 } },
+  }
+
+  it('POSTs the line to /spots/preflop-ranges and returns the ranges', async () => {
+    mockResponse(200, body)
+    await expect(fetchPreflopRanges(spot)).resolves.toEqual({ kind: 'ok', data: body })
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url).toMatch(/\/spots\/preflop-ranges$/)
+    expect(options.method).toBe('POST')
+    expect(options.data).toEqual(spot)
+  })
+
+  it('treats a 404 as unsupported, keeping the server\'s own reason', async () => {
+    mockResponse(404, { detail: 'a limped pot has no chart yet -- set the ranges by hand.' })
+    await expect(fetchPreflopRanges(spot)).resolves.toEqual({
+      kind: 'unsupported',
+      reason: 'a limped pot has no chart yet -- set the ranges by hand.',
+    })
+  })
+
+  it('classifies 422, other statuses and network failures', async () => {
+    mockResponse(422, { detail: 'the preflop line must end with a call (a closed street).' })
+    await expect(fetchPreflopRanges(spot)).resolves.toEqual({
+      kind: 'invalid',
+      reason: 'the preflop line must end with a call (a closed street).',
+    })
+    mockResponse(500, { detail: 'boom' })
+    await expect(fetchPreflopRanges(spot)).resolves.toEqual({ kind: 'error', status: 500 })
+    requestMock.mockRejectedValue(new Error('network unreachable'))
+    await expect(fetchPreflopRanges(spot)).resolves.toEqual({ kind: 'network-error' })
   })
 })

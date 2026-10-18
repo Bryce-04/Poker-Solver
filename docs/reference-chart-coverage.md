@@ -73,6 +73,39 @@ effective"*) — safe to show verbatim.
 
 ## Deliberately still out of Stage 2
 
-3-bet-pot charts (facing a 4-bet), limped pots, multiway, stack buckets
+limped pots, 5-bet pots, 3-bet/4-bet charts below 100bb, multiway, stack buckets
 other than 100/40bb, and full-ring seats. Tracked in the
 `reference_charts.py` module docstring and `find_matching_chart`'s TODO.
+
+## 3-bet and 4-bet pots (`POST /spots/preflop-ranges`)
+
+Added 2026-10-18. A separate route from `reference-strategy`: it takes a
+preflop *line* (`positions_in_hand` = the two seats, `actions` = the preflop
+betting, closed by a call) and returns **both** players' ranges for the
+postflop spot it leads to. Data and logic live in
+[`apps/api/app/preflop_ranges.py`](../apps/api/app/preflop_ranges.py); the
+Solve page's "Load both ranges from the preflop action" button uses it.
+
+| Line | Opener gets | Defender gets |
+|------|-------------|---------------|
+| open, call | open range | **flat** range (the defend chart minus the 3-bet) |
+| open, 3-bet, call | **call-vs-3-bet** range | **3-bet** range |
+| open, 3-bet, 4-bet, call | **4-bet** range | **call-vs-4-bet** range |
+
+- **Pairs covered:** the same nine (opener, defender) pairs as the defend
+  charts: UTG–BB, HJ–BTN, HJ–BB, CO–BTN, CO–SB, CO–BB, BTN–SB, BTN–BB, SB–BB.
+- **100bb only** (80–120bb). 40bb has no 3-bet/4-bet charts yet.
+- **Not covered → 404** with a reason: limped pots, 5-bet pots, a seat pair
+  with no chart, any other stack depth. A line that doesn't make sense (not
+  closed by a call, a fold, a seat raising its own raise) → 422.
+- **Approximate, constructed by principle** like every other chart here
+  (value 3-bets from the top, bluffs from suited aces and connectors,
+  tighter against earlier seats), not solver output; one weight (1.0) per hand.
+  Rough frequencies: 3-bets 3-12% of hands, 4-bets 2-3%, an opener continues
+  against a 3-bet with 42-62% of its open range.
+- **Invariants** enforced in `apps/api/tests/test_preflop_ranges.py`: a 3-bet
+  range sits inside the defend chart; call-vs-3-bet and 4-bet sit inside the
+  open range and don't overlap; call-vs-4-bet sits inside the 3-bet range;
+  flat + 3-bet = the defend chart exactly. Edit a range and these tell you if
+  a player ended up with hands they couldn't have reached that node with.
+- Hands that **5-bet jam** are simply absent from call-vs-4-bet.

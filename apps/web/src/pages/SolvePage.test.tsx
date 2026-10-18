@@ -1,13 +1,15 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
-import { fetchReferenceStrategy, narrowRanges, solveSpot } from "../lib/api";
+import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, solveSpot } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   solveSpot: vi.fn(),
   fetchReferenceStrategy: vi.fn(),
   narrowRanges: vi.fn(),
+  fetchPreflopRanges: vi.fn(),
 }));
+const mockPreflopRanges = vi.mocked(fetchPreflopRanges);
 const mockNarrow = vi.mocked(narrowRanges);
 const mockSolve = vi.mocked(solveSpot);
 const mockFetchReference = vi.mocked(fetchReferenceStrategy);
@@ -16,6 +18,7 @@ beforeEach(() => {
   mockSolve.mockReset();
   mockFetchReference.mockReset();
   mockNarrow.mockReset();
+  mockPreflopRanges.mockReset();
 });
 
 // Three grids are on the page by default (CardPicker, then OOP's and IP's
@@ -730,5 +733,81 @@ describe("SolvePage -- narrowing ranges by earlier action", () => {
 
     await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/doesn't support narrowing yet/i);
+  });
+});
+
+describe("SolvePage -- ranges from the preflop action", () => {
+  const sizeInput = () => screen.getByLabelText(/^to \(bb\)$/i);
+  const loadButton = () =>
+    screen.queryByRole("button", { name: /load both ranges from the preflop action/i });
+
+  /** BTN opens to 3, BB 3-bets to 9, BTN calls; flop picked. */
+  async function reachThreeBetPot(user: ReturnType<typeof userEvent.setup>) {
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "3");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BTN opens to 3
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "9");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BB 3-bets to 9
+    await user.click(screen.getByRole("button", { name: /^call/i })); // BTN calls
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+  }
+
+  it("isn't offered when preflop had no raise (a limped pot)", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await closePreflopByChecking(user);
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    expect(loadButton()).not.toBeInTheDocument();
+  });
+
+  it("sends the preflop line and fills both ranges for a 3-bet pot", async () => {
+    mockPreflopRanges.mockResolvedValue({
+      kind: "ok",
+      data: {
+        source: "reference_chart",
+        line: "three_bet",
+        description: "BTN opens, BB 3-bets, BTN calls",
+        chart_source: "approximate",
+        ranges: { BB: { AA: 1, KK: 1 }, BTN: { QQ: 1 } },
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachThreeBetPot(user);
+
+    await user.click(loadButton() as HTMLElement);
+
+    expect(mockPreflopRanges).toHaveBeenCalledWith({
+      positions_in_hand: ["BB", "BTN"],
+      effective_stack_bb: 100,
+      current_street: "preflop",
+      actions: [
+        { position: "BTN", street: "preflop", action: "raise", size_bb: 3 },
+        { position: "BB", street: "preflop", action: "raise", size_bb: 9 },
+        { position: "BTN", street: "preflop", action: "call" },
+      ],
+    });
+    expect(await screen.findByText(/loaded for: BTN opens, BB 3-bets, BTN calls/i)).toBeInTheDocument();
+    // OOP (BB) is the first grid: the 3-bettor's range. IP (BTN): the opener's call.
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "AA" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "QQ" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "QQ" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the server's reason when the line isn't charted, and changes no range", async () => {
+    mockPreflopRanges.mockResolvedValue({
+      kind: "unsupported",
+      reason: "3-bet / 4-bet charts only cover about 100bb (80-120bb) so far.",
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachThreeBetPot(user);
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
+
+    await user.click(loadButton() as HTMLElement);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/only cover about 100bb/);
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toHaveAttribute("aria-pressed", "true");
   });
 });

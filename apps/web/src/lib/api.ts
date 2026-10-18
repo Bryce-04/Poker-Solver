@@ -333,3 +333,57 @@ export async function narrowRanges(spot: Spot): Promise<NarrowRangesResult> {
   const data = result.data as NarrowResponse;
   return { kind: "narrowed", data: { ...data, bucketed_actions: data.bucketed_actions ?? [] } };
 }
+
+// Shaped to match apps/api/app/preflop_ranges.py's ranges_for_preflop_line.
+export interface PreflopRangesResponse {
+  source: "reference_chart";
+  line: "single_raised" | "three_bet" | "four_bet";
+  // "BTN opens, BB 3-bets, BTN calls" -- the line the ranges are for.
+  description: string;
+  chart_source: string;
+  ranges: Record<string, HandRange>;
+}
+
+export type PreflopRangesResult =
+  | { kind: "ok"; data: PreflopRangesResponse }
+  // 404: a real line the charts don't cover (limped pot, 5-bet, a seat pair or
+  // stack with no chart) -- or an API older than this route. The reason is the
+  // server's own sentence where it sent one.
+  | { kind: "unsupported"; reason: string }
+  | { kind: "invalid"; reason: string }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * POSTs a preflop line (two seats + the preflop actions, as a Spot) to
+ * /spots/preflop-ranges and returns both players' ranges for the postflop
+ * spot it leads to: open + call, 3-bet, or 4-bet pot. Never throws.
+ */
+export async function fetchPreflopRanges(spot: Spot): Promise<PreflopRangesResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots/preflop-ranges`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: spot,
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "ok", data: asJson(res.data) as PreflopRangesResponse };
+  }
+  const detail = (asJson(res.data) as { detail?: unknown } | undefined)?.detail;
+  const reason = typeof detail === "string" ? detail : undefined;
+  if (res.status === 404) {
+    return {
+      kind: "unsupported",
+      reason: reason ?? "The server has no ranges for this preflop line.",
+    };
+  }
+  if (res.status === 422) {
+    return { kind: "invalid", reason: reason ?? "The server couldn't read that preflop line." };
+  }
+  return { kind: "error", status: res.status };
+}

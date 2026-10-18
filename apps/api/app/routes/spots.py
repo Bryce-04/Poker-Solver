@@ -16,6 +16,7 @@ from poker_solver_schema import Spot
 
 from ..auth import current_user_id
 from ..db import SpotRow, get_db
+from ..preflop_ranges import InvalidPreflopLine, UnsupportedPreflopLine, ranges_for_preflop_line
 from ..reference_charts import find_matching_chart
 from ..solve import InvalidSolveRequest, SolverBusy, narrow_ranges, solve_spot
 
@@ -41,6 +42,21 @@ def reference_strategy(spot: Spot) -> dict:
         "chart_source": chart.source,
         "ranges": chart.ranges,
     }
+
+
+@router.post("/preflop-ranges")
+def preflop_ranges(spot: Spot) -> dict:
+    """Both players' ranges for a postflop spot, from the preflop line that
+    led to it (open + call, 3-bet, or 4-bet pot) -- see ../preflop_ranges.py.
+    positions_in_hand is the two seats, actions the preflop betting. 404 when
+    the line is real but uncharted (limped pot, 5-bet, a seat pair or stack
+    with no chart), 422 when it doesn't make sense."""
+    try:
+        return ranges_for_preflop_line(spot)
+    except UnsupportedPreflopLine as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except InvalidPreflopLine as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.post("/solve")

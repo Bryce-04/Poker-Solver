@@ -8,6 +8,7 @@ import { parseHandHistoryToPostflopSetup } from "../lib/parseHandHistory";
 import { STREET_ORDER, preflopContext, summarizeHand, toBettingActions } from "../lib/handBuilder";
 import type { BuilderAction } from "../lib/handBuilder";
 import {
+  fetchPreflopRanges,
   fetchReferenceStrategy,
   narrowRanges,
   solveSpot,
@@ -44,6 +45,12 @@ type Outcome =
   | { kind: "busy" }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
+
+type PreflopLoadState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "loaded"; description: string }
+  | { kind: "unavailable"; reason: string };
 
 type NarrowState =
   | { kind: "idle" }
@@ -142,6 +149,8 @@ export function SolvePage() {
   // "Narrow ranges by earlier action": its own status, plus the ranges as they
   // were before the last narrowing so it can be undone.
   const [narrowState, setNarrowState] = useState<NarrowState>({ kind: "idle" });
+  // "Load ranges from the preflop action": which line it loaded, or why not.
+  const [preflopLoad, setPreflopLoad] = useState<PreflopLoadState>({ kind: "idle" });
   const [rangesBeforeNarrow, setRangesBeforeNarrow] = useState<Partial<
     Record<Position, HandRange>
   > | null>(null);
@@ -315,6 +324,51 @@ export function SolvePage() {
     });
   }
 
+  // Both ranges straight from the preflop line that was clicked through --
+  // open and call, 3-bet, or 4-bet pot -- instead of per-seat guesses. Offered
+  // once preflop has closed with at least one raise.
+  const preflopHasRaise = streets.preflop.some(
+    (a) => a.action === "raise" || a.action === "bet" || a.action === "all_in",
+  );
+  const canLoadPreflopRanges =
+    setupMode === "click" && handSummary.targetStreet !== "preflop" && preflopHasRaise;
+
+  async function loadRangesFromPreflopAction() {
+    setPreflopLoad({ kind: "loading" });
+    const result = await fetchPreflopRanges({
+      positions_in_hand: [oopPosition, ipPosition],
+      effective_stack_bb: startingStackBb,
+      current_street: "preflop",
+      actions: toBettingActions("preflop", streets.preflop),
+    });
+    switch (result.kind) {
+      case "ok":
+        setRanges((prev) => ({
+          ...prev,
+          [oopPosition]: result.data.ranges[oopPosition] ?? {},
+          [ipPosition]: result.data.ranges[ipPosition] ?? {},
+        }));
+        // Fresh starting ranges: an earlier narrowing no longer applies to them.
+        setRangesBeforeNarrow(null);
+        setNarrowState({ kind: "idle" });
+        setPreflopLoad({ kind: "loaded", description: result.data.description });
+        return;
+      case "unsupported":
+      case "invalid":
+        setPreflopLoad({ kind: "unavailable", reason: result.reason });
+        return;
+      case "network-error":
+        setPreflopLoad({ kind: "unavailable", reason: "Couldn't reach the API." });
+        return;
+      case "error":
+        setPreflopLoad({
+          kind: "unavailable",
+          reason: `Couldn't load ranges (the request returned HTTP ${result.status}).`,
+        });
+        return;
+    }
+  }
+
   // The earlier postflop streets whose action can narrow the ranges for the
   // street being solved -- only when the hand was clicked through (a pasted
   // history carries no earlier-street actions) and every earlier street closed.
@@ -399,6 +453,7 @@ export function SolvePage() {
     setOutcome({ kind: "idle" });
     setNarrowState({ kind: "idle" });
     setRangesBeforeNarrow(null);
+    setPreflopLoad({ kind: "idle" });
     setStartingStackBb(100);
     setStreets(EMPTY_STREETS);
     setRedoStack([]);
@@ -740,6 +795,38 @@ export function SolvePage() {
           title="The ranges"
           subtitle="The hands each player could realistically have. Tap or drag on the grid to add or remove hands."
         >
+          {canLoadPreflopRanges && (
+            <section className="spot-builder__section">
+              <h3 className="spot-builder__legend">From the preflop action</h3>
+              <p className="spot-builder__hint">
+                Fill in both players' ranges from how preflop went: an open and a call, a 3-bet pot
+                (the 3-bettor's 3-bet range, the opener's call) or a 4-bet pot. Approximate ranges
+                at about 100bb.
+              </p>
+              <div className="solve-page__chart-load">
+                <button
+                  type="button"
+                  className="spot-builder__reset"
+                  onClick={loadRangesFromPreflopAction}
+                  disabled={preflopLoad.kind === "loading"}
+                >
+                  {preflopLoad.kind === "loading"
+                    ? "Loading…"
+                    : "Load both ranges from the preflop action"}
+                </button>
+              </div>
+              {preflopLoad.kind === "loaded" && (
+                <p className="spot-builder__hint" role="status">
+                  Loaded for: {preflopLoad.description}.
+                </p>
+              )}
+              {preflopLoad.kind === "unavailable" && (
+                <p className="spot-builder__field-error" role="alert">
+                  {preflopLoad.reason}
+                </p>
+              )}
+            </section>
+          )}
           {narrowStreets.length > 0 && (
             <section className="spot-builder__section solve-page__narrow">
               <h3 className="spot-builder__legend">Narrow by earlier action</h3>
