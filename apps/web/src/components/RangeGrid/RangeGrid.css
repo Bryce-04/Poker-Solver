@@ -23,8 +23,10 @@
   color: var(--text);
 }
 
-.range-grid__brush:hover:not(:disabled) {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .range-grid__brush:hover:not(:disabled):not([data-active="true"]) {
+    background: var(--surface-2);
+  }
 }
 
 .range-grid__brush[data-active="true"] {
@@ -80,11 +82,12 @@
   font-weight: 550;
   line-height: 1;
   color: var(--text-strong);
-  background: color-mix(
+  --cell-bg: color-mix(
     in oklab,
     var(--range-in) calc(var(--w) * 100%),
     var(--range-empty)
   );
+  background: var(--cell-bg);
 }
 
 .range-grid__cell[data-tier="high"] {
@@ -99,8 +102,16 @@ button.range-grid__cell {
   cursor: pointer;
 }
 
-button.range-grid__cell:hover {
-  box-shadow: inset 0 0 0 2px var(--accent-border);
+/* Keep the cell's own shade on hover (the global button:hover would repaint
+   it purple), and only show the hover ring where hover exists. */
+button.range-grid__cell:hover:not(:disabled) {
+  background: var(--cell-bg);
+}
+
+@media (hover: hover) {
+  button.range-grid__cell:hover {
+    box-shadow: inset 0 0 0 2px var(--accent-border);
+  }
 }
 
 button.range-grid__cell:focus-visible {
@@ -123,8 +134,10 @@ button.range-grid__cell:focus-visible {
   box-shadow: 0 0 0 1px var(--surface);
 }
 
+/* The hand open in the suit editor: a heavy neutral ring, deliberately not
+   the accent colour, so it can't be mistaken for "in the range". */
 .range-grid__cell[data-picked] {
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: inset 0 0 0 2px var(--text-strong);
 }
 
 .range-grid__hint {

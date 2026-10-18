@@ -1,8 +1,7 @@
 import type { CSSProperties } from "react";
 import type { HandRange } from "@poker-solver/schema";
 import {
-  SUITS,
-  comboKey,
+  comboSlots,
   comboWeights,
   indexRange,
   setComboWeight,
@@ -39,8 +38,6 @@ function cardText(card: string): string {
  */
 export function ComboEditor({ hand, value, onChange, brush = 1, deadCards = [] }: ComboEditorProps) {
   const weights = comboWeights(indexRange(value), hand);
-  const isPair = hand.length === 2;
-  const suited = hand[2] === "s";
   const dead = new Set(deadCards.map((c) => c[0].toUpperCase() + c[1].toLowerCase()));
 
   const liveCombos = Object.keys(weights).filter((combo) => !dead.has(combo.slice(0, 2)) && !dead.has(combo.slice(2)));
@@ -69,37 +66,30 @@ export function ComboEditor({ hand, value, onChange, brush = 1, deadCards = [] }
       </div>
 
       <div className="combo-editor__grid">
-        {SUITS.map((rowSuit, r) =>
-          SUITS.map((colSuit, c) => {
-            const high = hand[0] + rowSuit;
-            const low = hand[1] + colSuit;
-            const applicable = isPair ? c > r : suited ? r === c : r !== c;
-            if (!applicable) return <span key={`${r}-${c}`} className="combo-editor__gap" aria-hidden="true" />;
-
-            const key = comboKey(high, low);
-            const weight = weights[key] ?? 0;
-            const blocked = dead.has(high) || dead.has(low);
-            const pct = Math.round(weight * 100);
-            return (
-              <button
-                key={key}
-                type="button"
-                className="combo-editor__combo"
-                data-selected={weight > 0}
-                data-blocked={blocked || undefined}
-                disabled={blocked}
-                aria-pressed={weight > 0}
-                aria-label={`${key}${blocked ? ", on the board" : weight > 0 && weight < 1 ? `, ${pct}%` : ""}`}
-                style={{ "--w": weight } as CSSProperties}
-                onClick={() => onChange(setComboWeight(value, hand, key, weight > 0 ? 0 : brush))}
-              >
-                <span data-suit={high[1]}>{cardText(high)}</span>
-                <span data-suit={low[1]}>{cardText(low)}</span>
-                {weight > 0 && weight < 1 && <span className="combo-editor__weight">{pct}</span>}
-              </button>
-            );
-          }),
-        )}
+        {comboSlots(hand).map(({ combo: key, high, low }, i) => {
+          if (key === null) return <span key={i} className="combo-editor__gap" aria-hidden="true" />;
+          const weight = weights[key] ?? 0;
+          const blocked = dead.has(high) || dead.has(low);
+          const pct = Math.round(weight * 100);
+          return (
+            <button
+              key={key}
+              type="button"
+              className="combo-editor__combo"
+              data-selected={weight > 0}
+              data-blocked={blocked || undefined}
+              disabled={blocked}
+              aria-pressed={weight > 0}
+              aria-label={`${key}${blocked ? ", on the board" : weight > 0 && weight < 1 ? `, ${pct}%` : ""}`}
+              style={{ "--w": weight } as CSSProperties}
+              onClick={() => onChange(setComboWeight(value, hand, key, weight > 0 ? 0 : brush))}
+            >
+              <span data-suit={high[1]}>{cardText(high)}</span>
+              <span data-suit={low[1]}>{cardText(low)}</span>
+              {weight > 0 && weight < 1 && <span className="combo-editor__weight">{pct}</span>}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

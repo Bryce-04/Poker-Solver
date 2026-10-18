@@ -102,10 +102,10 @@ CapacitorHttp timeouts again — see that decision entry.
 **Range chaining, backend only (2026-10-18)**: `RangeCfrTrainer.posterior_ranges`
 and `POST /spots/narrow` compute each player's range after a closed street's
 recorded actions (Bayesian update from the street's equilibrium strategy) so a
-later street can start from them; no UI yet. Ranges (`HandRange`) now accept
+later street can start from them (the Solve page's "Narrow ranges by the flop/turn action" button, `lib/chaining.ts`). Ranges (`HandRange`) now accept
 specific-combo keys (`AhKh`) alongside 169-type labels, and narrowed ranges
 come back combo-level where suits matter (flush draws, blockers), plus a
-`line_probability` per player to flag lines the equilibrium never plays. See
+`line_probability` per player to flag lines the equilibrium never plays; solve results carry `combo_strategy` (per-suit strategies where suits differ) shown in `StrategyGrid`'s suit view. See
 `docs/decisions.md`.
 
 The new solver is merged (PR #21) and deployed, hardened for Render's

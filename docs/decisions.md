@@ -66,7 +66,39 @@ greyed via `deadCards`, which `SolvePage` passes). It sits below the grid
 for now; moving it into a phone bottom sheet / desktop side panel is the
 next step. Not yet checked on a device.
 
-**Not done yet.** The UI step ("use narrowed range" feeding the next
+**Update, same day — suits in results, narrowing in the UI, tap-highlight fix.**
+Three things reported from the phone, fixed together:
+
+- *Suits weren't visible in a solve.* `RangeCfrTrainer.combo_strategies()` and
+  the `/spots/solve` response's `combo_strategy` now carry per-combo
+  strategies, but only for hand types whose suits differ by more than 0.01 in
+  some action (everything else is already in `strategy`; measured 48 rows /
+  8.7 KB on a wide two-heart flop, where A♥K♥ — the nut flush draw — bets 6%
+  and its sibling combos never, which the AKs average of 2% hid).
+  `StrategyGrid` shows the tapped hand's suits (`SuitStrategy`, same 4×4
+  layout as the editor via `lib/rangeCombos.ts`'s `comboSlots`), each colored
+  by its own mix, board-blocked combos greyed. `solveSpot` normalizes a
+  missing `combo_strategy` to `{}` for an older backend.
+- *No way to load narrowed ranges.* `SolvePage` step 3 has a "Narrow ranges by
+  the flop (and turn) action" button when the target street is the turn or
+  river, in click-through mode with every earlier street closed
+  (`lib/chaining.ts`). For each earlier postflop street in order it POSTs
+  `/spots/narrow` with that street's own board, pot, stack and recorded
+  actions and the current ranges, and carries the result into the next
+  street. It refuses to apply a line either player takes under 1% of the time
+  (the server's `line_probability`) and says why, leaves ranges untouched on
+  any failure, and has Undo. A 404 from an API older than the web build is
+  reported as "server doesn't support narrowing yet". Paste mode has no
+  earlier-street actions, so it never offers it.
+- *Everything looked purple after a tap.* `index.css` had `button:hover`
+  repainting every button with the accent color; on a touchscreen :hover sticks
+  to the last tapped element, so a tapped grid cell turned purple whatever its
+  state, and the just-tapped brush looked inactive. Hover is now gated on
+  `@media (hover: hover)`, grid and suit cells keep their own shade on hover
+  (`--cell-bg`), and the "hand open in the suit editor" ring is neutral
+  (`--text-strong`), not the accent.
+
+**Not done yet.** Previously: the UI step ("use narrowed range" feeding the next
 street), and running `pytest apps/api` against Postgres (none available this
 session; `narrow_ranges` was called directly).
 

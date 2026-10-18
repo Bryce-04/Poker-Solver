@@ -276,6 +276,10 @@ def solve_spot(
         "converged": exploitability_pct < target_exploitability_pct,
         "position": spot.positions_in_hand[deciding_player],
         "strategy": trainer.label_strategies(),
+        # Per-suit strategies for hand types whose combos play differently
+        # (flush draws, blockers); every other hand type is in "strategy"
+        # alone. Keyed by specific combo ('AhKh').
+        "combo_strategy": trainer.combo_strategies(),
         "bucketed_actions": bucket_notes,
     }
 

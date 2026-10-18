@@ -229,8 +229,13 @@ button {
   transition: background-color 0.12s ease;
 }
 
-button:hover:not(:disabled) {
-  background: var(--accent-hover);
+/* Hover only where a pointer can really hover. On a touchscreen :hover sticks
+   to whatever was tapped last, which turned tapped grid cells purple and hid
+   whether they were in or out of the range. */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
 }
 
 button:disabled {

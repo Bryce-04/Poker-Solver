@@ -54,7 +54,13 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-strong);
-  background: color-mix(in oklab, var(--range-in) calc(var(--w) * 100%), var(--range-empty));
+  --cell-bg: color-mix(in oklab, var(--range-in) calc(var(--w) * 100%), var(--range-empty));
+  background: var(--cell-bg);
+}
+
+/* The global button:hover would repaint it purple, hiding in/out. */
+button.combo-editor__combo:hover:not(:disabled) {
+  background: var(--cell-bg);
 }
 
 .combo-editor__combo[data-selected="true"] {

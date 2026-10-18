@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { HAND_GRID } from "../../lib/hands";
 import { ACTION_LABEL, ACTION_ORDER } from "../../lib/strategySummary";
+import { comboSlots } from "../../lib/rangeCombos";
 import "../RangeGrid/RangeGrid.css";
 import "./StrategyGrid.css";
 
@@ -42,9 +43,72 @@ export interface StrategyGridProps {
    * color -- the gap is real, not hidden. Read-only: this displays a
    * solve result, it doesn't edit a range. */
   strategy: Record<string, Record<string, number>>;
+  /** Specific combo ("AhKh") -> the same action mix, for hand types whose
+   * suits play differently (flush draws, blockers) -- LiveSolveResponse's
+   * combo_strategy. A combo missing here plays like its hand type. */
+  comboStrategy?: Record<string, Record<string, number>>;
+  /** Board cards, greyed out in the suit view (those combos can't exist). */
+  deadCards?: readonly string[];
 }
 
-export function StrategyGrid({ strategy }: StrategyGridProps) {
+const GLYPH: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
+
+function describe(mix: Record<string, number>): string {
+  return orderedEntries(mix)
+    .map(([a, p]) => `${ACTION_LABEL[a]} ${Math.round(p * 100)}%`)
+    .join(", ");
+}
+
+/** The selected hand's suit combos, each colored by its own action mix. */
+function SuitStrategy({
+  hand,
+  handMix,
+  comboStrategy,
+  deadCards,
+}: {
+  hand: string;
+  handMix: Record<string, number> | undefined;
+  comboStrategy: Record<string, Record<string, number>>;
+  deadCards: readonly string[];
+}) {
+  const dead = new Set(deadCards.map((c) => c[0].toUpperCase() + c[1].toLowerCase()));
+  const differs = comboSlots(hand).some(({ combo }) => combo !== null && combo in comboStrategy);
+  return (
+    <div className="suit-strategy" role="group" aria-label={`${hand} by suit`}>
+      <div className="suit-strategy__grid">
+        {comboSlots(hand).map(({ combo, high, low }, i) => {
+          if (combo === null) return <span key={i} className="suit-strategy__gap" aria-hidden="true" />;
+          const blocked = dead.has(high) || dead.has(low);
+          const mix = comboStrategy[combo] ?? handMix;
+          return (
+            <div
+              key={combo}
+              className="suit-strategy__combo"
+              data-blocked={blocked || undefined}
+              role="img"
+              aria-label={
+                blocked ? `${combo}, on the board` : mix ? `${combo}: ${describe(mix)}` : `${combo}: no data`
+              }
+              style={{ background: !blocked && mix ? gradientFor(mix) : "var(--range-empty)" }}
+            >
+              <span className="suit-strategy__cards">
+                <span data-suit={high[1]}>{high[0]}{GLYPH[high[1]]}</span>
+                <span data-suit={low[1]}>{low[0]}{GLYPH[low[1]]}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="strategy-grid__detail">
+        {differs
+          ? "These suits play differently, usually because of flush draws or blockers."
+          : "Every suit of this hand plays the same."}
+      </p>
+    </div>
+  );
+}
+
+export function StrategyGrid({ strategy, comboStrategy = {}, deadCards = [] }: StrategyGridProps) {
   const [selected, setSelected] = useState<string | null>(null);
 
   const actionsPresent = ACTION_ORDER.filter((a) =>
@@ -113,6 +177,15 @@ export function StrategyGrid({ strategy }: StrategyGridProps) {
             ? `${selected}: no data.`
             : "Tap a hand to see its exact breakdown."}
       </p>
+
+      {selected && (
+        <SuitStrategy
+          hand={selected}
+          handMix={selectedHand}
+          comboStrategy={comboStrategy}
+          deadCards={deadCards}
+        />
+      )}
     </div>
   );
 }

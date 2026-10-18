@@ -74,6 +74,31 @@ export function labelCombos(label: string): string[] {
   return out;
 }
 
+/** One square of the 4x4 suit layout shared by the range editor and the
+ * strategy view: rows are the higher card's suit, columns the lower card's.
+ * `combo` is null for squares that hand type can't occupy (a pair uses the
+ * upper triangle, suited hands the diagonal, offsuit everything off it). */
+export interface ComboSlot {
+  combo: string | null;
+  high: string;
+  low: string;
+}
+
+export function comboSlots(label: string): ComboSlot[] {
+  const isPair = label.length === 2;
+  const suited = label[2] === "s";
+  const slots: ComboSlot[] = [];
+  SUITS.forEach((rowSuit, r) =>
+    SUITS.forEach((colSuit, c) => {
+      const high = label[0] + rowSuit;
+      const low = label[1] + colSuit;
+      const applicable = isPair ? c > r : suited ? r === c : r !== c;
+      slots.push({ combo: applicable ? comboKey(high, low) : null, high, low });
+    }),
+  );
+  return slots;
+}
+
 /** A range split once into label weights and per-label combo overrides, so
  * the 169 grid cells don't each rescan every key. */
 export interface RangeIndex {

@@ -388,6 +388,34 @@ class RangeCfrTrainer:
             result.append(weights)
         return result[0], result[1]
 
+    def combo_strategies(
+        self, history: tuple[str, ...] | None = None, min_spread: float = 0.01
+    ) -> dict[str, dict[str, float]]:
+        """Per-combo average strategies ('AhKh' -> {action: probability}),
+        but only for hand types whose suit combos actually play differently
+        (some action's probability differs by more than `min_spread`
+        between two of its combos -- flush draws, blockers). Hand types
+        whose combos all play alike are left out: label_strategies already
+        says it all, and sending 1326 near-identical rows would just bloat
+        the response."""
+        if history is None:
+            history = self._root.history
+        node = self._nodes[history]
+        strategy = node.average_strategy()
+        by_label: dict[str, list[int]] = {}
+        for i, label in enumerate(self.labels[node.actor]):
+            by_label.setdefault(label, []).append(i)
+        out: dict[str, dict[str, float]] = {}
+        for rows in by_label.values():
+            block = strategy[rows]
+            if len(rows) < 2 or float((block.max(axis=0) - block.min(axis=0)).max()) <= min_spread:
+                continue
+            for i in rows:
+                out[combo_key(self.combos[node.actor][i])] = {
+                    a: float(p) for a, p in zip(node.actions, strategy[i])
+                }
+        return out
+
     # --- convergence measurement ---------------------------------------
 
     def _best_response(self, state: BettingRoundState, player: int, opp: _OpponentReach) -> np.ndarray:

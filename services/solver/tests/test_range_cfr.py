@@ -312,3 +312,33 @@ def test_line_probability_matches_closed_form_and_flags_unplayed_lines() -> None
     assert abs(ip - 0.6) < 0.01
     assert abs(oop - 0.8) < 0.01
     assert trainer.line_probability(()) == (1.0, 1.0)
+
+
+def test_combo_strategies_split_flush_draw_combos_from_the_rest() -> None:
+    # IP acts after a check on a two-heart flop. KhQh has a flush draw the
+    # other KQs combos lack, so they play differently and all four are
+    # reported; hand types whose combos play alike are left out entirely.
+    trainer = RangeCfrTrainer(
+        RangeSpotConfig(
+            board=_board("7h", "2h", "9c"),
+            pot_bb=10.0,
+            effective_stack_bb=40.0,
+            range0={"QQ": 1.0, "JTs": 1.0, "88": 1.0, "A5s": 1.0, "K3o": 1.0},
+            range1={"AKs": 1.0, "KQs": 1.0, "AA": 1.0, "77": 1.0, "JJ": 1.0, "T9s": 1.0},
+            first_to_act=1,
+            prior_history=("check",),
+        )
+    )
+    trainer.train(150)
+    combos = trainer.combo_strategies()
+    assert {"KhQh", "KsQs", "KdQd", "KcQc"} <= set(combos)
+    assert all(abs(sum(p.values()) - 1) < 1e-6 for p in combos.values())
+    assert combos["KhQh"] != combos["KsQs"]
+    # A reported hand type is reported whole, never one combo of it.
+    from poker_solver.combos import combo_label, key_to_combos
+
+    by_label: dict[str, int] = {}
+    for key in combos:
+        label = combo_label(key_to_combos(key)[0])
+        by_label[label] = by_label.get(label, 0) + 1
+    assert by_label["KQs"] == 4

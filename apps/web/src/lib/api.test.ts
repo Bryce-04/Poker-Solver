@@ -1,6 +1,6 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { fetchReferenceStrategy, listSpots, saveSpot, solveSpot } from './api'
+import { fetchReferenceStrategy, listSpots, narrowRanges, saveSpot, solveSpot } from './api'
 import { getAccessToken } from './auth'
 
 // authHeaders() (api.ts) calls this directly -- mock it rather than the
@@ -225,7 +225,7 @@ describe('solveSpot', () => {
     mockResponse(200, solveBody)
     await expect(solveSpot(spot)).resolves.toEqual({
       kind: 'solved',
-      data: { ...solveBody, bucketed_actions: [] },
+      data: { ...solveBody, bucketed_actions: [], combo_strategy: {} },
     })
   })
 
@@ -280,5 +280,49 @@ describe('solveSpot', () => {
   it('classifies a request rejection as { kind: "network-error" } and never throws', async () => {
     requestMock.mockRejectedValue(new Error('network unreachable'))
     await expect(solveSpot(spot)).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('narrowRanges', () => {
+  const narrowBody = {
+    ranges: { BB: { KJo: 0.8 }, BTN: { AA: 1, '33': 0.2, KhQh: 0.5 } },
+    line_probability: { BB: 0.8, BTN: 0.6 },
+    exploitability_pct: 0.3,
+    converged: true,
+  }
+
+  it('POSTs the spot to /spots/narrow with the long solve timeout', async () => {
+    mockResponse(200, narrowBody)
+    await narrowRanges(spot)
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url).toMatch(/\/spots\/narrow$/)
+    expect(options.method).toBe('POST')
+    expect(options.data).toEqual(spot)
+    expect(options.readTimeout).toBe(150_000)
+  })
+
+  it('classifies a 2xx as narrowed, defaulting bucketed_actions', async () => {
+    mockResponse(200, narrowBody)
+    await expect(narrowRanges(spot)).resolves.toEqual({
+      kind: 'narrowed',
+      data: { ...narrowBody, bucketed_actions: [] },
+    })
+  })
+
+  it('treats a 404 as unsupported -- a deployed API older than the web build', async () => {
+    mockResponse(404, { detail: 'Not Found' })
+    await expect(narrowRanges(spot)).resolves.toEqual({ kind: 'unsupported' })
+  })
+
+  it('classifies 422, 503 and network failures like a solve does', async () => {
+    mockResponse(422, { detail: 'that action sequence already ends the hand' })
+    await expect(narrowRanges(spot)).resolves.toEqual({
+      kind: 'rejected',
+      reason: 'that action sequence already ends the hand',
+    })
+    mockResponse(503, { detail: 'busy' })
+    await expect(narrowRanges(spot)).resolves.toEqual({ kind: 'busy' })
+    requestMock.mockRejectedValue(new Error('network unreachable'))
+    await expect(narrowRanges(spot)).resolves.toEqual({ kind: 'network-error' })
   })
 })

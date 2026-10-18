@@ -1,18 +1,21 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
-import { fetchReferenceStrategy, solveSpot } from "../lib/api";
+import { fetchReferenceStrategy, narrowRanges, solveSpot } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   solveSpot: vi.fn(),
   fetchReferenceStrategy: vi.fn(),
+  narrowRanges: vi.fn(),
 }));
+const mockNarrow = vi.mocked(narrowRanges);
 const mockSolve = vi.mocked(solveSpot);
 const mockFetchReference = vi.mocked(fetchReferenceStrategy);
 
 beforeEach(() => {
   mockSolve.mockReset();
   mockFetchReference.mockReset();
+  mockNarrow.mockReset();
 });
 
 // Three grids are on the page by default (CardPicker, then OOP's and IP's
@@ -638,5 +641,89 @@ Hero: checks
         actions: [{ position: "BB", street: "flop", action: "check" }],
       }),
     );
+  });
+});
+
+
+describe("SolvePage -- narrowing ranges by earlier action", () => {
+  /** A hand clicked through to the turn: flop checked through, turn card down. */
+  async function reachTurn(user: ReturnType<typeof userEvent.setup>) {
+    await closePreflopByChecking(user);
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // OOP checks the flop
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // IP checks back
+    await user.click(screen.getByRole("gridcell", { name: /4 of clubs/i })); // turn card
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
+    await user.click(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }));
+  }
+
+  const narrowButton = () => screen.queryByRole("button", { name: /narrow ranges by/i });
+
+  it("is only offered once there is an earlier postflop street to narrow by", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user); // a flop decision: nothing earlier to narrow by
+    expect(narrowButton()).not.toBeInTheDocument();
+  });
+
+  it("narrows both ranges by the flop's action and can undo it", async () => {
+    mockNarrow.mockResolvedValue({
+      kind: "narrowed",
+      data: {
+        ranges: { BB: { KJo: 0.5 }, BTN: { AA: 0.5 } },
+        line_probability: { BB: 0.9, BTN: 0.4 },
+        bucketed_actions: [],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
+
+    // The request is the FLOP street: its own 3-card board, its own check-check line.
+    expect(mockNarrow).toHaveBeenCalledTimes(1);
+    expect(mockNarrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        current_street: "flop",
+        board: ["Ks", "Qh", "9d"],
+        positions_in_hand: ["BB", "BTN"],
+        ranges: { BB: { KJo: 1 }, BTN: { AA: 1 } },
+      }),
+    );
+    expect(await screen.findByText(/narrowed by the flop/i)).toBeInTheDocument();
+    expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA, 50%" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^undo$/i }));
+    expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" })).toBeInTheDocument();
+  });
+
+  it("refuses to build on a line the equilibrium never plays, and leaves the ranges alone", async () => {
+    mockNarrow.mockResolvedValue({
+      kind: "narrowed",
+      data: {
+        ranges: { BB: { KJo: 0.0002 }, BTN: { AA: 0.5 } },
+        line_probability: { BB: 0.0002, BTN: 0.5 },
+        bucketed_actions: [],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/BB \(0\.0%\) almost never/);
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toBeInTheDocument();
+  });
+
+  it("explains when the deployed server doesn't support narrowing yet", async () => {
+    mockNarrow.mockResolvedValue({ kind: "unsupported" });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/doesn't support narrowing yet/i);
   });
 });

@@ -1,5 +1,5 @@
 import { CapacitorHttp } from "@capacitor/core";
-import type { Position, Spot } from "@poker-solver/schema";
+import type { HandRange, Position, Spot } from "@poker-solver/schema";
 import { getAccessToken } from "./auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -191,6 +191,11 @@ export interface LiveSolveResponse {
   converged?: boolean;
   position: Position;
   strategy: Record<string, Record<string, number>>;
+  // Per-suit strategies for hand types whose suits play differently (flush
+  // draws, blockers), keyed by specific combo ("AhKh"). Hand types whose
+  // suits all play alike are in `strategy` alone. Normalized to {} for an
+  // older backend -- see solveSpot.
+  combo_strategy?: Record<string, Record<string, number>>;
   // Human-readable notes on any bet/raise in the submitted actions that
   // got lossily bucketed onto the engine's fixed bet-size menu (e.g. "BTN's
   // 47% pot bet -> bucketed to 75% pot (bet_medium)") -- see
@@ -218,16 +223,22 @@ export type SolveSpotResult =
   | { kind: "network-error" }
   | { kind: "error"; status: number };
 
+type SolveFailure = Exclude<SolveSpotResult, { kind: "solved" }>;
+
 /**
- * POSTs a Spot to /spots/solve and classifies the response. Same
- * CapacitorHttp-based convention as the rest of this module -- never
+ * POSTs a Spot to one of the solver routes (/spots/solve, /spots/narrow --
+ * same request contract, same failure shapes) and classifies the response.
+ * Same CapacitorHttp-based convention as the rest of this module -- never
  * throws, transport failures come back as { kind: "network-error" }.
  */
-export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
+async function postSolverRoute(
+  path: string,
+  spot: Spot,
+): Promise<{ kind: "ok"; data: unknown } | SolveFailure | { kind: "not-found" }> {
   let res: { status: number; data: unknown };
   try {
     res = await CapacitorHttp.request({
-      url: `${API_BASE_URL}/spots/solve`,
+      url: `${API_BASE_URL}${path}`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
       data: spot,
@@ -244,14 +255,7 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
   }
 
   if (res.status >= 200 && res.status < 300) {
-    const data = asJson(res.data) as LiveSolveResponse;
-    // A deploy lag between frontend and backend is real (Render deploys
-    // separately from the web build) -- bucketed_actions is a newer field
-    // the live API may not send yet. Normalize here, once, rather than
-    // every consumer needing an optional check: an older backend's
-    // response is still a fully valid "solved" result, just with nothing
-    // to disclose.
-    return { kind: "solved", data: { ...data, bucketed_actions: data.bucketed_actions ?? [] } };
+    return { kind: "ok", data: asJson(res.data) };
   }
   if (res.status === 422) {
     const body = asJson(res.data);
@@ -264,5 +268,64 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
   if (res.status === 503) {
     return { kind: "busy" };
   }
+  if (res.status === 404 || res.status === 405) {
+    return { kind: "not-found" };
+  }
   return { kind: "error", status: res.status };
+}
+
+export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
+  const result = await postSolverRoute("/spots/solve", spot);
+  if (result.kind === "not-found") return { kind: "error", status: 404 };
+  if (result.kind !== "ok") return result;
+  const data = result.data as LiveSolveResponse;
+  // A deploy lag between frontend and backend is real (Render deploys
+  // separately from the web build) -- bucketed_actions and combo_strategy
+  // are newer fields the live API may not send yet. Normalize here, once,
+  // rather than every consumer needing an optional check: an older
+  // backend's response is still a fully valid "solved" result, just with
+  // nothing to disclose and no per-suit detail.
+  return {
+    kind: "solved",
+    data: {
+      ...data,
+      bucketed_actions: data.bucketed_actions ?? [],
+      combo_strategy: data.combo_strategy ?? {},
+    },
+  };
+}
+
+// Shaped to match apps/api/app/solve.py's narrow_ranges response.
+export interface NarrowResponse {
+  // Each player's range after the street's recorded line: 169-type labels
+  // ("AKs") where a hand's suits agree, specific combos ("AhKh") where they
+  // differ -- exactly HandRange's two key formats.
+  ranges: Record<string, HandRange>;
+  // How likely each player was to take their side of the line at all. Near
+  // 0 means the equilibrium (almost) never plays it, and the ranges above
+  // are numerical noise rather than something to build on.
+  line_probability: Record<string, number>;
+  converged?: boolean;
+  exploitability_pct?: number;
+  bucketed_actions: string[];
+}
+
+export type NarrowRangesResult =
+  | { kind: "narrowed"; data: NarrowResponse }
+  // The deployed API predates /spots/narrow (Render deploys separately from
+  // the web build) -- the UI says so rather than showing a generic error.
+  | { kind: "unsupported" }
+  | Exclude<SolveFailure, never>;
+
+/**
+ * POSTs a Spot to /spots/narrow: solves the spot's current street from its
+ * start and returns each player's range conditional on that street's
+ * recorded actions -- the next street's starting ranges.
+ */
+export async function narrowRanges(spot: Spot): Promise<NarrowRangesResult> {
+  const result = await postSolverRoute("/spots/narrow", spot);
+  if (result.kind === "not-found") return { kind: "unsupported" };
+  if (result.kind !== "ok") return result;
+  const data = result.data as NarrowResponse;
+  return { kind: "narrowed", data: { ...data, bucketed_actions: data.bucketed_actions ?? [] } };
 }
