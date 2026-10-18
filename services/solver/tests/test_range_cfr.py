@@ -218,3 +218,97 @@ def test_posterior_rejects_an_illegal_line() -> None:
     trainer.train(5)
     with pytest.raises(ValueError):
         trainer.posterior_ranges(("fold",))  # nothing to fold to after a check
+
+
+# --- combo-level ranges ----------------------------------------------------
+
+
+def test_combo_key_overrides_its_label_weight() -> None:
+    from poker_solver.combos import expand_range
+
+    # AKs minus the heart combo, plus a lone off-suit combo at half weight.
+    expanded = expand_range({"AKs": 1.0, "AhKh": 0.0, "AsKd": 0.5})
+    assert len(expanded) == 4  # 3 suited + the one off-suit combo
+    assert sorted(label for _, _, label in expanded) == ["AKo", "AKs", "AKs", "AKs"]
+    assert sorted(w for _, w, _ in expanded) == [0.5, 1.0, 1.0, 1.0]
+    # Order in the dict must not matter.
+    assert sorted(expand_range({"AhKh": 0.0, "AKs": 1.0})) == sorted(
+        expand_range({"AKs": 1.0, "AhKh": 0.0})
+    )
+
+
+def test_combo_key_rejects_garbage() -> None:
+    from poker_solver.combos import expand_range
+
+    for bad in ("AhAh", "AhKz", "AhKhX", "Ah"):
+        with pytest.raises(ValueError):
+            expand_range({bad: 1.0})
+
+
+def test_solver_accepts_a_specific_combo_range() -> None:
+    # Only the nut-flush-draw combo in villain's range: the strategy comes
+    # back labeled by its 169 type, with exactly one combo behind it.
+    trainer = RangeCfrTrainer(
+        RangeSpotConfig(
+            board=_board("7h", "2h", "9c"),
+            pot_bb=10.0,
+            effective_stack_bb=40.0,
+            range0={"AhKh": 1.0},
+            range1={"QQ": 1.0},
+        )
+    )
+    assert len(trainer.combos[0]) == 1
+    trainer.train(5)
+    assert set(trainer.label_strategies()) == {"AKs"}
+
+
+def test_posterior_keeps_combos_apart_when_blockers_make_them_differ() -> None:
+    # Flop with two hearts: Ah-Kh has the nut flush draw, the other AKs
+    # combos don't, so a solved strategy treats them differently and the
+    # posterior after a bet must not average them into one 'AKs' weight.
+    trainer = RangeCfrTrainer(
+        RangeSpotConfig(
+            board=_board("7h", "2h", "9c"),
+            pot_bb=10.0,
+            effective_stack_bb=40.0,
+            range0={"AKs": 1.0, "QQ": 1.0, "55": 1.0},
+            range1={"AA": 1.0, "KQs": 1.0, "JTs": 1.0},
+        )
+    )
+    trainer.train(60)
+    oop, _ = trainer.posterior_ranges(("bet_medium",))
+    assert "AKs" not in oop
+    assert {"AhKh", "AsKs"} <= set(oop)
+    assert abs(oop["AhKh"] - oop["AsKs"]) > 1e-3
+
+
+def test_posterior_does_not_resurrect_an_excluded_combo() -> None:
+    trainer = RangeCfrTrainer(
+        RangeSpotConfig(
+            board=RIVER,
+            pot_bb=100.0,
+            effective_stack_bb=25.0,
+            range0={"KJo": 1.0, "KJs": 1.0, "KhJh": 0.0},
+            range1={"AA": 1.0, "33": 1.0},
+            first_to_act=1,
+            prior_history=("check",),
+        )
+    )
+    trainer.train(5)
+    oop, _ = trainer.posterior_ranges(())
+    assert "KhJh" not in oop  # absent (excluded), not 0.0
+    # KJs lost KhJh (excluded) and KsJs (the board's Ks), so a label key
+    # would bring KhJh back -- the two live combos are listed instead.
+    assert "KJs" not in oop
+    assert sorted(k for k in oop if k[0] == "K" and k[2] == "J" and k[1] == k[3]) == ["KcJc", "KdJd"]
+
+
+def test_line_probability_matches_closed_form_and_flags_unplayed_lines() -> None:
+    trainer = _river_trainer()
+    trainer.train(300)
+    oop, ip = trainer.line_probability(("all_in", "call"))
+    # IP shoves AA always and 33 20% of the time -> (1 + 0.2) / 2 of its range;
+    # OOP's lone KJo calls 80%.
+    assert abs(ip - 0.6) < 0.01
+    assert abs(oop - 0.8) < 0.01
+    assert trainer.line_probability(()) == (1.0, 1.0)

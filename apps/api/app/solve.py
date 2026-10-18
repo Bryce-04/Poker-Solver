@@ -297,8 +297,10 @@ def narrow_ranges(
     3-5 card board, pot_bb); the difference is that the street's actions
     are the line to narrow on, not a prefix to start a solve from.
     Lossy the same way too: sizes are bucketed onto the menu and
-    disclosed in "bucketed_actions". The ranges are weights in [0, 1]
-    per 169-type label, labels the line ruled out (< 1e-4) dropped.
+    disclosed in "bucketed_actions". The ranges are weights in [0, 1],
+    keyed by 169-type label where a hand's suit combos agree and by
+    specific combo ('AhKh') where they differ (HandRange's key formats);
+    entries the line ruled out (< 1e-4) are dropped.
     Costs one full solve of the street."""
     config, _, bucket_notes = build_solve_config(spot, allow_terminal_actions=True)
     # Solve the whole street, then walk the recorded line through it:
@@ -317,6 +319,7 @@ def narrow_ranges(
             target_exploitability_pct, max_iterations, deadline=start + max_seconds
         )
         oop_range, ip_range = trainer.posterior_ranges(line)
+        oop_probability, ip_probability = trainer.line_probability(line)
     except ValueError as e:
         raise InvalidSolveRequest(str(e)) from e
     finally:
@@ -333,5 +336,9 @@ def narrow_ranges(
         "exploitability_pct": exploitability_pct,
         "converged": exploitability_pct < target_exploitability_pct,
         "ranges": {oop: kept(oop_range), ip: kept(ip_range)},
+        # How likely each player was to take their side of the line at all
+        # (posterior mass / prior mass). Near 0 = the equilibrium almost
+        # never plays it and the ranges above are numerical noise.
+        "line_probability": {oop: oop_probability, ip: ip_probability},
         "bucketed_actions": bucket_notes,
     }

@@ -35,13 +35,17 @@ from dataclasses import dataclass
 import numpy as np
 
 from .betting_round import BettingRoundState
-from .combos import Combo, label_to_combos
+from .combos import Combo, combo_key, expand_range, label_to_combos
 from .equity import compute_equity_matrix
 
 # Brown & Sandholm's recommended DCFR parameters.
 _DCFR_ALPHA = 1.5
 _DCFR_BETA = 0.0
 _DCFR_GAMMA = 2.0
+
+# posterior_ranges collapses a label's combos back into one label weight when
+# they all agree to within this much; a bigger spread keeps them separate.
+_COLLAPSE_TOLERANCE = 1e-3
 
 
 @dataclass
@@ -67,21 +71,12 @@ class RangeSpotConfig:
 
 def _expand(range_weights: dict[str, float], blocked: frozenset[int]) -> tuple[list[Combo], np.ndarray, list[str]]:
     """Like combos.expand_range_to_combos, but also keeps each combo's
-    169-type label so strategies can be rolled back up per label."""
-    combos: list[Combo] = []
-    weights: list[float] = []
-    labels: list[str] = []
-    for label, weight in range_weights.items():
-        if weight <= 0:
-            continue
-        for combo in label_to_combos(label):
-            if combo[0] in blocked or combo[1] in blocked:
-                continue
-            combos.append(combo)
-            weights.append(weight)
-            labels.append(label)
-    if not combos:
+    169-type label so strategies can be rolled back up per label. Handles
+    specific-combo keys ('AhKh') as well as labels (combos.expand_range)."""
+    expanded = expand_range(range_weights, blocked)
+    if not expanded:
         raise ValueError("range has no combos left after removing blocked cards")
+    combos, weights, labels = (list(column) for column in zip(*expanded))
     return combos, np.array(weights, dtype=np.float64), labels
 
 
@@ -315,6 +310,32 @@ class RangeCfrTrainer:
             for label in sums
         }
 
+    def _reach_along(self, line: tuple[str, ...]) -> list[np.ndarray]:
+        """Each player's per-combo weight after `line` has been played from
+        the root: prior weight times the average-strategy probability of
+        each of that player's actions along it."""
+        state = self._root
+        reach = [self.weights[0].copy(), self.weights[1].copy()]
+        for action in line:
+            if state.is_terminal():
+                raise ValueError(f"line continues past a terminal state at {state.history!r}")
+            if action not in state.legal_actions():
+                raise ValueError(f"{action!r} isn't legal after {state.history!r}")
+            node = self._nodes[state.history]
+            reach[node.actor] = reach[node.actor] * node.average_strategy()[:, node.actions.index(action)]
+            state = state.apply(action)
+
+        return reach
+
+    def line_probability(self, line: tuple[str, ...]) -> tuple[float, float]:
+        """How likely each player was to take their side of `line` at all:
+        posterior mass over prior mass, per player. Near 0 means the
+        equilibrium (almost) never plays that line, so the posterior
+        ranges are numerical noise -- worth warning about before chaining
+        them into another solve."""
+        reach = self._reach_along(line)
+        return tuple(float(r.sum() / w.sum()) for r, w in zip(reach, self.weights))  # type: ignore[return-value]
+
     def posterior_ranges(self, line: tuple[str, ...]) -> tuple[dict[str, float], dict[str, float]]:
         """Both players' ranges conditional on `line` -- action labels
         played from this trainer's root (i.e. after any prior_history,
@@ -329,34 +350,42 @@ class RangeCfrTrainer:
 
         Weights are NOT renormalized, so they stay in [0, 1] like a
         painted range and a combo that took the line with certainty
-        keeps its prior weight. Combos roll up to 169-type labels by
-        plain average over the label's unblocked combos, the same
-        convention as label_strategies. A label whose every combo is
-        blocked by this street's board is absent. Labels the line has
+        keeps its prior weight.
+
+        Keys are combo-aware: a 169-type label ('AKs') where every one of
+        its live combos ended up within _COLLAPSE_TOLERANCE of the same
+        weight, otherwise one specific-combo key ('AhKh') per combo --
+        because the suits are the point (the nut flush draw is the hand
+        that bluffed, its blocker-free sibling isn't), and averaging them
+        back into a label would throw that away. A label whose every
+        combo is blocked by this street's board is absent; combos the line
         ruled out (weight ~0) are kept as 0.0 -- callers drop them.
 
         Not exact joint-equilibrium reasoning: nothing here accounts for
         how this street's strategy sets up the next one (no backward
         induction), only for what actually got played."""
-        state = self._root
-        reach = [self.weights[0].copy(), self.weights[1].copy()]
-        for action in line:
-            if state.is_terminal():
-                raise ValueError(f"line continues past a terminal state at {state.history!r}")
-            if action not in state.legal_actions():
-                raise ValueError(f"{action!r} isn't legal after {state.history!r}")
-            node = self._nodes[state.history]
-            reach[node.actor] = reach[node.actor] * node.average_strategy()[:, node.actions.index(action)]
-            state = state.apply(action)
-
+        reach = self._reach_along(line)
+        board = frozenset(self._config.board)
         result: list[dict[str, float]] = []
         for player in (0, 1):
-            sums: dict[str, float] = {}
-            counts: dict[str, int] = {}
-            for label, weight in zip(self.labels[player], reach[player]):
-                sums[label] = sums.get(label, 0.0) + float(weight)
-                counts[label] = counts.get(label, 0) + 1
-            result.append({label: sums[label] / counts[label] for label in sums})
+            by_label: dict[str, list[tuple[Combo, float]]] = {}
+            for label, combo, weight in zip(self.labels[player], self.combos[player], reach[player]):
+                by_label.setdefault(label, []).append((combo, float(weight)))
+            weights: dict[str, float] = {}
+            for label, members in by_label.items():
+                values = [w for _, w in members]
+                # Only collapse when the label has every combo this board
+                # leaves: a prior that excluded one (AKs minus AhKh) must
+                # not get it back by a label key standing for all four.
+                whole_label = len(members) == sum(
+                    1 for c in label_to_combos(label) if c[0] not in board and c[1] not in board
+                )
+                if whole_label and max(values) - min(values) <= _COLLAPSE_TOLERANCE:
+                    weights[label] = sum(values) / len(values)
+                else:
+                    for combo, weight in members:
+                        weights[combo_key(combo)] = weight
+            result.append(weights)
         return result[0], result[1]
 
     # --- convergence measurement ---------------------------------------

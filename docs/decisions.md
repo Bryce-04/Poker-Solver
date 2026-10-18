@@ -35,6 +35,24 @@ calling `narrow_ranges` directly measured 0.75 and 0.23 against the exact
 0.8 and 0.2 at the 0.5%-of-pot stop; the solver-level test at 300
 iterations is within 1%. Costs one full solve of the street.
 
+**Update, same day — combo-level ranges.** A `HandRange` key can now also
+be a specific combo (`AhKh`), which overrides its label's weight for that
+combo only (`{"AKs": 1, "AhKh": 0}` = AKs minus the heart combo). No shape
+change to the schema (still `dict[str, float]`, so saved spots and the
+generated TS types are untouched apart from the doc comment), but the
+solver now reads them (`combos.expand_range`), and `posterior_ranges` emits
+combo keys wherever a label's combos differ by more than 1e-3 (blockers,
+flush draws) instead of averaging them back into the label — averaging
+would throw away exactly the information chaining exists to keep. A label is
+only collapsed when all its board-live combos are present, so a combo the
+prior excluded is never resurrected. `/spots/narrow` also returns
+`line_probability` per position (posterior mass / prior mass): measured on
+a 7h2h9c flop, BB's 75%-pot bet had probability ~0 because the equilibrium
+checks almost everything, and the "range" returned was numerical noise —
+the UI must warn on a low value before chaining it. Also tightened
+`label_to_combos`, which had accepted `Ah` as AA. Strategy *output* is
+still per label; per-combo strategies are the next piece.
+
 **Not done yet.** The UI step ("use narrowed range" feeding the next
 street), and running `pytest apps/api` against Postgres (none available this
 session; `narrow_ranges` was called directly).
