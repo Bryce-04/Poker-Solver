@@ -17,7 +17,7 @@ from poker_solver_schema import Spot
 from ..auth import current_user_id
 from ..db import SpotRow, get_db
 from ..reference_charts import find_matching_chart
-from ..solve import InvalidSolveRequest, SolverBusy, solve_spot
+from ..solve import InvalidSolveRequest, SolverBusy, narrow_ranges, solve_spot
 
 router = APIRouter(prefix="/spots", tags=["spots"])
 
@@ -50,6 +50,20 @@ def solve(spot: Spot) -> dict:
     board, any non-terminal action prefix already on this street)."""
     try:
         return solve_spot(spot)
+    except InvalidSolveRequest as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except SolverBusy as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@router.post("/narrow")
+def narrow(spot: Spot) -> dict:
+    """Range chaining: each player's range after the current street's
+    recorded actions, from an equilibrium solve of that street -- feed it
+    into the next street's /solve. Same request contract as /solve, but
+    the street's actions are the line to narrow on (see ../solve.py)."""
+    try:
+        return narrow_ranges(spot)
     except InvalidSolveRequest as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     except SolverBusy as e:

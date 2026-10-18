@@ -117,14 +117,21 @@ _MENU_PCT_BY_LABEL = {label: f"{int(frac * 100)}%" for frac, label in BET_SIZE_M
 
 
 def _replay_street_actions(
-    street_actions: list[BettingAction], oop: str, pot_bb: float, effective_stack_bb: float
+    street_actions: list[BettingAction],
+    oop: str,
+    pot_bb: float,
+    effective_stack_bb: float,
+    allow_terminal: bool = False,
 ) -> tuple[int, tuple[str, ...], list[str]]:
     """Replays a street's recorded actions through BettingRoundState in
     order, returning the resulting (first_to_act, prior_history) for the
     solve plus a list of human-readable notes on any size that got
     bucketed. Raises InvalidSolveRequest if an action is out of turn,
     illegal at that point, size-less, or if the sequence is already
-    terminal (nothing left to solve)."""
+    terminal (nothing left to solve) -- unless allow_terminal, which
+    range narrowing uses: a street that has closed (bet + call, check +
+    check) is exactly what it wants to narrow on. A fold still ends the
+    hand, so it's rejected either way."""
     state = BettingRoundState.initial(pot_bb, effective_stack_bb, first_to_act=0)
     notes: list[str] = []
     for action in street_actions:
@@ -159,14 +166,16 @@ def _replay_street_actions(
                 f"(bucketed to '{label}') isn't legal at that point."
             )
         state = state.apply(label)
-    if state.is_terminal():
+    if state.is_terminal() and not (allow_terminal and state.history[-1] != "fold"):
         raise InvalidSolveRequest(
             "that action sequence already ends the hand -- there's no decision left to solve."
         )
     return state.to_act, state.history, notes
 
 
-def build_solve_config(spot: Spot) -> tuple[RangeSpotConfig, int, list[str]]:
+def build_solve_config(
+    spot: Spot, allow_terminal_actions: bool = False
+) -> tuple[RangeSpotConfig, int, list[str]]:
     """Validates and maps a Spot into a RangeSpotConfig, returning it
     alongside the index (0 or 1) of whichever player actually has the
     decision once prior_history is accounted for, and any bucketing
@@ -199,7 +208,7 @@ def build_solve_config(spot: Spot) -> tuple[RangeSpotConfig, int, list[str]]:
 
     street_actions = [a for a in spot.actions if a.street == spot.current_street]
     first_to_act, prior_history, bucket_notes = _replay_street_actions(
-        street_actions, oop, spot.pot_bb, spot.effective_stack_bb
+        street_actions, oop, spot.pot_bb, spot.effective_stack_bb, allow_terminal_actions
     )
 
     config = RangeSpotConfig(
@@ -267,5 +276,62 @@ def solve_spot(
         "converged": exploitability_pct < target_exploitability_pct,
         "position": spot.positions_in_hand[deciding_player],
         "strategy": trainer.label_strategies(),
+        "bucketed_actions": bucket_notes,
+    }
+
+
+def narrow_ranges(
+    spot: Spot,
+    target_exploitability_pct: float = TARGET_EXPLOITABILITY_PCT,
+    max_iterations: int = MAX_ITERATIONS,
+    max_seconds: float = MAX_SOLVE_SECONDS,
+) -> dict:
+    """Range chaining: solves the current street from its START, then
+    returns each player's range conditional on the street's recorded
+    actions (Spot.actions on current_street, which should be a CLOSED
+    street -- e.g. bet + call, or check + check) having been played. The
+    caller feeds those ranges into the next street's solve instead of
+    asking the user to guess them -- see docs/plan.md.
+
+    Same request contract as solve_spot (two positions, both ranges, a
+    3-5 card board, pot_bb); the difference is that the street's actions
+    are the line to narrow on, not a prefix to start a solve from.
+    Lossy the same way too: sizes are bucketed onto the menu and
+    disclosed in "bucketed_actions". The ranges are weights in [0, 1]
+    per 169-type label, labels the line ruled out (< 1e-4) dropped.
+    Costs one full solve of the street."""
+    config, _, bucket_notes = build_solve_config(spot, allow_terminal_actions=True)
+    # Solve the whole street, then walk the recorded line through it:
+    # build_solve_config seeded the line as prior_history, which a
+    # trainer never learns a strategy for, so undo that.
+    line = config.prior_history
+    config.prior_history = ()
+    config.first_to_act = 0
+
+    if not _solve_lock.acquire(blocking=False):
+        raise SolverBusy("Another solve is already running -- try again in a minute.")
+    try:
+        start = time.perf_counter()
+        trainer = RangeCfrTrainer(config)
+        exploitability_pct = trainer.train_until(
+            target_exploitability_pct, max_iterations, deadline=start + max_seconds
+        )
+        oop_range, ip_range = trainer.posterior_ranges(line)
+    except ValueError as e:
+        raise InvalidSolveRequest(str(e)) from e
+    finally:
+        _solve_lock.release()
+
+    oop, ip = spot.positions_in_hand
+
+    def kept(weights: dict[str, float]) -> dict[str, float]:
+        return {label: w for label, w in weights.items() if w >= 1e-4}
+
+    return {
+        "source": "live_solve",
+        "iterations": trainer.iterations,
+        "exploitability_pct": exploitability_pct,
+        "converged": exploitability_pct < target_exploitability_pct,
+        "ranges": {oop: kept(oop_range), ip: kept(ip_range)},
         "bucketed_actions": bucket_notes,
     }

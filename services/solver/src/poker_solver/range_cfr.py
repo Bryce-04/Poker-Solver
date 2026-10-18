@@ -315,6 +315,50 @@ class RangeCfrTrainer:
             for label in sums
         }
 
+    def posterior_ranges(self, line: tuple[str, ...]) -> tuple[dict[str, float], dict[str, float]]:
+        """Both players' ranges conditional on `line` -- action labels
+        played from this trainer's root (i.e. after any prior_history,
+        which is seeded, never trained, so it contributes no update; to
+        narrow on a whole street's play, solve it with no prior_history)
+        -- having happened: a Bayesian update of each
+        combo's prior weight by the average-strategy probability of
+        every action that player took along it. This is what makes a
+        later street's range a consequence of this street's equilibrium
+        instead of something the user has to guess (docs/plan.md,
+        "where does a later street's range come from?").
+
+        Weights are NOT renormalized, so they stay in [0, 1] like a
+        painted range and a combo that took the line with certainty
+        keeps its prior weight. Combos roll up to 169-type labels by
+        plain average over the label's unblocked combos, the same
+        convention as label_strategies. A label whose every combo is
+        blocked by this street's board is absent. Labels the line has
+        ruled out (weight ~0) are kept as 0.0 -- callers drop them.
+
+        Not exact joint-equilibrium reasoning: nothing here accounts for
+        how this street's strategy sets up the next one (no backward
+        induction), only for what actually got played."""
+        state = self._root
+        reach = [self.weights[0].copy(), self.weights[1].copy()]
+        for action in line:
+            if state.is_terminal():
+                raise ValueError(f"line continues past a terminal state at {state.history!r}")
+            if action not in state.legal_actions():
+                raise ValueError(f"{action!r} isn't legal after {state.history!r}")
+            node = self._nodes[state.history]
+            reach[node.actor] = reach[node.actor] * node.average_strategy()[:, node.actions.index(action)]
+            state = state.apply(action)
+
+        result: list[dict[str, float]] = []
+        for player in (0, 1):
+            sums: dict[str, float] = {}
+            counts: dict[str, int] = {}
+            for label, weight in zip(self.labels[player], reach[player]):
+                sums[label] = sums.get(label, 0.0) + float(weight)
+                counts[label] = counts.get(label, 0) + 1
+            result.append({label: sums[label] / counts[label] for label in sums})
+        return result[0], result[1]
+
     # --- convergence measurement ---------------------------------------
 
     def _best_response(self, state: BettingRoundState, player: int, opp: _OpponentReach) -> np.ndarray:

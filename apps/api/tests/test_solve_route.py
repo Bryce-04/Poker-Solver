@@ -162,3 +162,42 @@ def test_solve_reports_unconverged_when_cut_off_by_the_time_budget():
     body = solve_spot(Spot(**RIVER_SPOT), target_exploitability_pct=0.0, max_seconds=0.0)
     assert body["converged"] is False
     assert body["iterations"] == 1
+
+
+def test_narrow_returns_ranges_conditional_on_a_closed_street():
+    # Same closed-form spot, but the street's recorded line is a full one:
+    # BB checks, BTN shoves, BB calls. Narrowing solves the street from its
+    # start, so BTN's range after that line is AA at ~1 and the 33 bluff at
+    # its ~20% shove frequency; BB's KJo is at its ~80% call frequency.
+    spot = {
+        **RIVER_SPOT,
+        "effective_stack_bb": 25,
+        "actions": [
+            {"position": "BB", "street": "river", "action": "check"},
+            {"position": "BTN", "street": "river", "action": "all_in"},
+            {"position": "BB", "street": "river", "action": "call"},
+        ],
+    }
+    res = client.post("/spots/narrow", json=spot)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["converged"]
+    assert abs(body["ranges"]["BTN"]["AA"] - 1.0) < 0.05
+    # Looser than the solver's own tests: the route stops at the 0.5%-of-pot
+    # precision target (~25 iterations here), not at a fixed 300 -- measured
+    # 0.23 and 0.75 against the exact 0.2 and 0.8.
+    assert abs(body["ranges"]["BTN"]["33"] - 0.2) < 0.08
+    assert abs(body["ranges"]["BB"]["KJo"] - 0.8) < 0.08
+
+
+def test_narrow_rejects_a_street_that_ended_in_a_fold():
+    spot = {
+        **RIVER_SPOT,
+        "actions": [
+            {"position": "BB", "street": "river", "action": "check"},
+            {"position": "BTN", "street": "river", "action": "all_in"},
+            {"position": "BB", "street": "river", "action": "fold"},
+        ],
+    }
+    res = client.post("/spots/narrow", json=spot)
+    assert res.status_code == 422

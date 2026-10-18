@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from poker_solver.cards import parse_card
 from poker_solver.range_cfr import RangeCfrTrainer, RangeSpotConfig
@@ -187,3 +188,33 @@ def test_train_until_stops_at_a_deadline_and_reports_honestly() -> None:
     )
     assert trainer.iterations == 1  # one iteration, then the (already past) deadline
     assert reached > 0  # a real, un-converged number -- not a pretend success
+
+
+# --- posterior ranges (chaining a street's result into the next) -----------
+
+
+def test_posterior_ranges_match_closed_form_after_shove_and_call() -> None:
+    # Same spot as the closed-form test (the seeded check is the root, so
+    # the line starts at villain's decision): AA always shoves, 33 shoves
+    # 20%, KJo calls 80%. After all_in -> call, IP's range is AA at full
+    # weight and 33 at ~0.2, and OOP's KJo at its call frequency.
+    trainer = _river_trainer()
+    trainer.train(300)
+    oop, ip = trainer.posterior_ranges(("all_in", "call"))
+    assert abs(ip["AA"] - 1.0) < 0.01
+    assert abs(ip["33"] - 0.2) < 0.01
+    assert abs(oop["KJo"] - 0.8) < 0.01
+
+
+def test_posterior_of_an_empty_line_is_the_prior() -> None:
+    trainer = _river_trainer()
+    trainer.train(50)
+    oop, ip = trainer.posterior_ranges(())
+    assert oop == {"KJo": 1.0} and ip == {"AA": 1.0, "33": 1.0}
+
+
+def test_posterior_rejects_an_illegal_line() -> None:
+    trainer = _river_trainer()
+    trainer.train(5)
+    with pytest.raises(ValueError):
+        trainer.posterior_ranges(("fold",))  # nothing to fold to after a check

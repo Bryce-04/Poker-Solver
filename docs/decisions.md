@@ -6,6 +6,41 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-18 — Range chaining, step 1: `posterior_ranges` + `POST /spots/narrow`
+
+**Status:** proposed (backend only; no UI yet).
+
+**Context.** The open question in `docs/plan.md`: a later street's range
+was whatever the user painted or loaded (often a full preflop range on the
+river), not a consequence of what each player did earlier.
+
+**Decision.** Chain single-street solves with a Bayesian update, not a joint
+solve. `RangeCfrTrainer.posterior_ranges(line)` multiplies each combo's
+prior weight by its average-strategy probability for every action that
+player took along `line`, then rolls combos up to 169-type labels (plain
+average, same as `label_strategies`). Weights are not renormalized, so they
+stay in [0, 1] like a painted range. `POST /spots/narrow` (`app/solve.py`'s
+`narrow_ranges`) takes the `/solve` contract, but the current street's
+actions are the *line to narrow on* (a closed street: bet + call, check +
+check; a fold is rejected as the hand is over). It solves that street from
+its start, because seeded `prior_history` actions are never trained and so
+would contribute no update. It returns `ranges` per position (labels under
+1e-4 dropped), plus the solve's `exploitability_pct`/`converged`.
+
+**Honest limits.** No backward induction: a street's strategy doesn't
+account for what it sets up on the next one, so this is not equal to a full
+multi-street solve. Action sizes are bucketed onto the menu (disclosed in
+`bucketed_actions`). The posterior is only as precise as the street's solve:
+calling `narrow_ranges` directly measured 0.75 and 0.23 against the exact
+0.8 and 0.2 at the 0.5%-of-pot stop; the solver-level test at 300
+iterations is within 1%. Costs one full solve of the street.
+
+**Not done yet.** The UI step ("use narrowed range" feeding the next
+street), and running `pytest apps/api` against Postgres (none available this
+session; `narrow_ranges` was called directly).
+
+---
+
 ## 2026-10-07 — Click-through builder: each seat posts its own blind (corrects "Decision 2" below)
 
 **Status:** accepted.

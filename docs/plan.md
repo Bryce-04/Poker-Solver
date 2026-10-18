@@ -203,3 +203,9 @@ improves realism versus a full joint solve, what the UI/API shape for
 chaining solves would look like, and whether the per-combo range math
 (`services/solver/src/poker_solver/combos.py`) already has what a
 posterior-range computation would need or if that's new work too.
+
+**Update 2026-10-18:** the backend half of this middle ground is built:
+`RangeCfrTrainer.posterior_ranges` and `POST /spots/narrow` (see
+`docs/decisions.md`). Still open: the UI step that feeds the narrowed
+ranges into the next street's solve, and measuring how much it improves
+realism versus a full joint solve.
