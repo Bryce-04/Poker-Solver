@@ -672,6 +672,10 @@ describe("SolvePage -- narrowing ranges by earlier action", () => {
       data: {
         ranges: { BB: { KJo: 0.5 }, BTN: { AA: 0.5 } },
         line_probability: { BB: 0.9, BTN: 0.4 },
+        trimmed: {
+          BB: { dropped_entries: 40, dropped_weight_pct: 0.3 },
+          BTN: { dropped_entries: 12, dropped_weight_pct: 0.1 },
+        },
         bucketed_actions: [],
       },
     });
@@ -692,6 +696,7 @@ describe("SolvePage -- narrowing ranges by earlier action", () => {
       }),
     );
     expect(await screen.findByText(/narrowed by the flop/i)).toBeInTheDocument();
+    expect(screen.getByText(/52 in all/)).toBeInTheDocument(); // the tail trim is disclosed
     expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA, 50%" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^undo$/i }));

@@ -45,7 +45,7 @@ type Outcome =
 type NarrowState =
   | { kind: "idle" }
   | { kind: "loading"; street: string }
-  | { kind: "done"; streets: string }
+  | { kind: "done"; streets: string; trimmedNote: string }
   | { kind: "failed"; reason: string };
 
 // Status for each position's "Load reference range" button -- separate
@@ -327,6 +327,7 @@ export function SolvePage() {
     const before = ranges;
     let oop = oopRange;
     let ip = ipRange;
+    let droppedHands = 0;
     for (const street of narrowStreets) {
       setNarrowState({ kind: "loading", street });
       const spot = buildNarrowSpot({
@@ -349,6 +350,7 @@ export function SolvePage() {
         setNarrowState({ kind: "failed", reason: warning });
         return;
       }
+      for (const t of Object.values(result.data.trimmed ?? {})) droppedHands += t.dropped_entries;
       oop = result.data.ranges[oopPosition] ?? {};
       ip = result.data.ranges[ipPosition] ?? {};
       if (Object.keys(oop).length === 0 || Object.keys(ip).length === 0) {
@@ -361,7 +363,14 @@ export function SolvePage() {
     }
     setRangesBeforeNarrow(before);
     setRanges((prev) => ({ ...prev, [oopPosition]: oop, [ipPosition]: ip }));
-    setNarrowState({ kind: "done", streets: describeStreets(narrowStreets) });
+    setNarrowState({
+      kind: "done",
+      streets: describeStreets(narrowStreets),
+      trimmedNote:
+        droppedHands > 0
+          ? ` Hands the line almost never involved (under 2% of a range's top hand) were dropped: ${droppedHands} in all.`
+          : "",
+    });
   }
 
   function undoNarrowing() {
@@ -756,8 +765,8 @@ export function SolvePage() {
               </div>
               {narrowState.kind === "done" && (
                 <p className="spot-builder__hint" role="status">
-                  Narrowed by {narrowState.streets}. Hands with only some suits left show a dot
-                  in the grid &mdash; use Suits to see which.
+                  Narrowed by {narrowState.streets}.{narrowState.trimmedNote} Hands with only some
+                  suits left show a dot in the grid &mdash; use Suits to see which.
                 </p>
               )}
               {narrowState.kind === "failed" && (

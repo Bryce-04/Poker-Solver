@@ -307,6 +307,10 @@ export interface NarrowResponse {
   line_probability: Record<string, number>;
   converged?: boolean;
   exploitability_pct?: number;
+  // What the server's tail trim removed from each range (hands under 2% of
+  // the heaviest hand's weight): how many, and their share of the total
+  // weight. Optional -- an API from before the trim doesn't send it.
+  trimmed?: Record<string, { dropped_entries: number; dropped_weight_pct: number }>;
   bucketed_actions: string[];
 }
 

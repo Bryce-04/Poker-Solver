@@ -6,6 +6,7 @@ import {
   indexRange,
   isPartial,
   labelWeight,
+  liveComboCount,
   setLabelWeight,
   totalCombos,
 } from "../../lib/rangeCombos";
@@ -69,7 +70,12 @@ export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }:
 
   const summary = useMemo(() => {
     const combos = totalCombos(index);
+    const live = liveComboCount(index);
     return {
+      // Weighted combos add the weights up, so a narrowed range of many
+      // hands at small weights reads as a handful. `live` is how many
+      // combos actually carry any weight; shown only when they differ.
+      live: Math.abs(live - combos) >= 0.5 ? live : null,
       combos: Math.round(combos * 10) / 10,
       pct: Math.round((combos / TOTAL_COMBOS) * 1000) / 10,
     };
@@ -283,8 +289,9 @@ export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }:
       )}
 
       <p className="range-grid__summary">
-        {summary.combos} combos <span aria-hidden="true">·</span>{" "}
-        {summary.pct}% of hands
+        {summary.combos} combos
+        {summary.live !== null && <> (weighted, across {summary.live})</>}{" "}
+        <span aria-hidden="true">·</span> {summary.pct}% of hands
       </p>
     </div>
   );

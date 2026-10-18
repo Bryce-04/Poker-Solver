@@ -284,6 +284,43 @@ def solve_spot(
     }
 
 
+# A narrowed range has a long tail of hands the line almost never involved
+# (a combo at 0.3% of the heaviest one's weight). They barely move anyone's
+# strategy but make the range look far wider than it is, clutter the result
+# with hands that are effectively not there, and cost solve time -- the tail
+# multiplies when streets are chained. So a narrowed range drops every hand
+# under this share of its own heaviest hand's weight. Relative, not absolute:
+# narrowed weights aren't normalized (a rare line scales a whole range down).
+TRIM_BELOW_FRACTION_OF_MAX = 0.02
+
+
+def _combo_count(key: str) -> int:
+    """How many concrete combos a range key stands for (board blocking
+    ignored -- close enough for a share-of-weight report)."""
+    if len(key) == 4:
+        return 1
+    if len(key) == 2:
+        return 6
+    return 4 if key.endswith("s") else 12
+
+
+def _trim_tail(weights: dict[str, float]) -> tuple[dict[str, float], dict]:
+    """Drops entries under TRIM_BELOW_FRACTION_OF_MAX of the heaviest one.
+    Returns (kept, {"dropped_entries": n, "dropped_weight_pct": share of the
+    range's total combo-weighted mass removed})."""
+    if not weights:
+        return {}, {"dropped_entries": 0, "dropped_weight_pct": 0.0}
+    cutoff = TRIM_BELOW_FRACTION_OF_MAX * max(weights.values())
+    kept = {k: w for k, w in weights.items() if w >= max(cutoff, 1e-12)}
+    mass = lambda ws: sum(w * _combo_count(k) for k, w in ws.items())  # noqa: E731
+    total = mass(weights)
+    dropped = {k: w for k, w in weights.items() if k not in kept}
+    return kept, {
+        "dropped_entries": len(dropped),
+        "dropped_weight_pct": 100 * mass(dropped) / total if total > 0 else 0.0,
+    }
+
+
 def narrow_ranges(
     spot: Spot,
     target_exploitability_pct: float = TARGET_EXPLOITABILITY_PCT,
@@ -304,7 +341,8 @@ def narrow_ranges(
     disclosed in "bucketed_actions". The ranges are weights in [0, 1],
     keyed by 169-type label where a hand's suit combos agree and by
     specific combo ('AhKh') where they differ (HandRange's key formats);
-    entries the line ruled out (< 1e-4) are dropped.
+    the long tail under 2% of the heaviest hand is trimmed
+    (_trim_tail) and reported in "trimmed".
     Costs one full solve of the street."""
     config, _, bucket_notes = build_solve_config(spot, allow_terminal_actions=True)
     # Solve the whole street, then walk the recorded line through it:
@@ -331,15 +369,18 @@ def narrow_ranges(
 
     oop, ip = spot.positions_in_hand
 
-    def kept(weights: dict[str, float]) -> dict[str, float]:
-        return {label: w for label, w in weights.items() if w >= 1e-4}
+    oop_kept, oop_trim = _trim_tail(oop_range)
+    ip_kept, ip_trim = _trim_tail(ip_range)
 
     return {
         "source": "live_solve",
         "iterations": trainer.iterations,
         "exploitability_pct": exploitability_pct,
         "converged": exploitability_pct < target_exploitability_pct,
-        "ranges": {oop: kept(oop_range), ip: kept(ip_range)},
+        "ranges": {oop: oop_kept, ip: ip_kept},
+        # What the tail trim removed (see _trim_tail), so it's measured, not
+        # hidden: hands dropped and the share of the range's total weight.
+        "trimmed": {oop: oop_trim, ip: ip_trim},
         # How likely each player was to take their side of the line at all
         # (posterior mass / prior mass). Near 0 = the equilibrium almost
         # never plays it and the ranges above are numerical noise.

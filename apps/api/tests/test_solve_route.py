@@ -201,3 +201,17 @@ def test_narrow_rejects_a_street_that_ended_in_a_fold():
     }
     res = client.post("/spots/narrow", json=spot)
     assert res.status_code == 422
+
+
+def test_trim_tail_drops_hands_far_below_the_heaviest_and_reports_the_share():
+    from app.solve import _trim_tail
+
+    # AA is 1.0 (6 combos), KK 0.5 (6), QQ 0.01 (6): under 2% of the max, so
+    # only QQ goes -- 0.06 of 9.06 weighted combos is about 0.66%.
+    kept, report = _trim_tail({"AA": 1.0, "KK": 0.5, "QQ": 0.01})
+    assert kept == {"AA": 1.0, "KK": 0.5}
+    assert report["dropped_entries"] == 1
+    assert abs(report["dropped_weight_pct"] - 100 * 0.06 / 9.06) < 1e-9
+    assert _trim_tail({}) == ({}, {"dropped_entries": 0, "dropped_weight_pct": 0.0})
+    # A rare line scales a whole range down; the cutoff scales with it.
+    assert _trim_tail({"AA": 0.001, "KK": 0.0005})[0] == {"AA": 0.001, "KK": 0.0005}

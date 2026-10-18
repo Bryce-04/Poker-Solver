@@ -157,6 +157,17 @@ export function totalCombos(index: RangeIndex): number {
   return total;
 }
 
+/** How many concrete combos carry any weight at all -- as opposed to
+ * totalCombos, which adds the weights up (so 300 combos at 3% each is "9"). */
+export function liveComboCount(index: RangeIndex): number {
+  const labels = new Set([...Object.keys(index.labels), ...index.overrides.keys()]);
+  let count = 0;
+  for (const label of labels) {
+    for (const w of Object.values(comboWeights(index, label))) if (w > 0) count += 1;
+  }
+  return count;
+}
+
 function withoutLabel(range: HandRange, label: string): HandRange {
   const next: HandRange = {};
   for (const [key, weight] of Object.entries(range)) {

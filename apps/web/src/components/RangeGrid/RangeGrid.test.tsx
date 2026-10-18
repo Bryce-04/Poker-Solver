@@ -128,3 +128,17 @@ describe("RangeGrid with suit-level ranges", () => {
     expect(screen.getByRole("gridcell", { name: "AKs, some suits" })).toBeInTheDocument();
   });
 });
+
+describe("RangeGrid summary of a weighted range", () => {
+  it("says how many combos the weights are spread over, once they differ", () => {
+    // 12 combos at 10% each: 1.2 weighted combos, but 12 of them carry weight.
+    render(<Harness initial={{ AA: 0.1, KK: 0.1 }} />);
+    expect(screen.getByText(/^1\.2 combos \(weighted, across 12\)/)).toBeInTheDocument();
+  });
+
+  it("keeps the plain wording when every weight is a whole combo", () => {
+    render(<Harness initial={{ AA: 1 }} />);
+    expect(screen.getByText(/^6 combos/)).toBeInTheDocument();
+    expect(screen.queryByText(/weighted/)).not.toBeInTheDocument();
+  });
+});

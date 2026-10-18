@@ -98,6 +98,23 @@ Three things reported from the phone, fixed together:
   (`--cell-bg`), and the "hand open in the suit editor" ring is neutral
   (`--text-strong`), not the accent.
 
+**Update, same day — trimming the narrowed range's tail.** Reported from the
+phone: after narrowing, the grid said "8.7 combos" yet the solve showed far
+more hands. Both were true: the grid's count adds weights up (a narrowed range
+is hundreds of hands at small weights), while the solve charts every hand with
+any weight at all. Measured on wide ranges on a K♠7♥2♦ flop, "BB bets 75%, BTN
+calls" leaves BB with 416 entries, 110 of them under 1% weight. So
+`/spots/narrow` now drops every hand under 2% of the range's own heaviest
+hand (`solve.py`'s `_trim_tail`; relative, because narrowed weights aren't
+normalized — a rare line scales a whole range down) and reports what it
+removed in `trimmed` (measured: 124 of those 416 entries gone for 0.98% of
+BB's weight; 99 of BTN's for 0.25%). The page says how many hands were
+dropped. `RangeGrid`'s summary now reads "8.7 combos (weighted, across 312)"
+whenever weights are fractional, so the two numbers can't be confused. Chosen
+over leaving the tail in because a full multi-street solve will need pruning
+anyway (the tail compounds across chained streets); the threshold is a
+constant (`TRIM_BELOW_FRACTION_OF_MAX`) to tune against real solves.
+
 **Not done yet.** Previously: the UI step ("use narrowed range" feeding the next
 street), and running `pytest apps/api` against Postgres (none available this
 session; `narrow_ranges` was called directly).
