@@ -99,6 +99,21 @@ with no error boundary to catch it): `solveSpot` normalizes responses,
 `components/ErrorBoundary` wraps every route, and `solveSpot` has explicit
 CapacitorHttp timeouts again — see that decision entry.
 
+**Range chaining, backend only (2026-10-18)**: `RangeCfrTrainer.posterior_ranges`
+and `POST /spots/narrow` compute each player's range after a closed street's
+recorded actions (Bayesian update from the street's equilibrium strategy) so a
+later street can start from them (the Solve page's "Narrow ranges by the flop/turn action" button, `lib/chaining.ts`). Ranges (`HandRange`) now accept
+specific-combo keys (`AhKh`) alongside 169-type labels, and narrowed ranges
+come back combo-level where suits matter (flush draws, blockers), plus a
+`line_probability` per player to flag lines the equilibrium never plays; solve results carry `combo_strategy` (per-suit strategies where suits differ) shown in `StrategyGrid`'s suit view. See
+`docs/decisions.md`.
+
+**3-bet / 4-bet ranges (2026-10-18)**: `apps/api/app/preflop_ranges.py` +
+`POST /spots/preflop-ranges` give both players' ranges for a single-raised,
+3-bet or 4-bet pot at ~100bb (nine position pairs, approximate, constructed by
+principle); the Solve page's "Load both ranges from the preflop action"
+button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
+
 The new solver is merged (PR #21) and deployed, hardened for Render's
 free tier in PR #22 (single-threaded BLAS, one solve at a time with a 503
 "busy", a 100s server time budget returning `converged: false`). Measured

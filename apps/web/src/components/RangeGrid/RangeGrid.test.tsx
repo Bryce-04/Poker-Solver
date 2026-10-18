@@ -101,3 +101,44 @@ describe("RangeGrid", () => {
     });
   });
 });
+
+describe("RangeGrid with suit-level ranges", () => {
+  it("shows a combo-only hand as partially filled and counts its combos", () => {
+    render(<Harness initial={{ AhKh: 1 }} />);
+    expect(screen.getByRole("gridcell", { name: "AKs, some suits" })).toBeInTheDocument();
+    expect(screen.getByText(/^1 combos/)).toBeInTheDocument();
+  });
+
+  it("toggling a hand type wipes its per-suit edits", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={{ AsKs: 1, AdKd: 1 }} />);
+    await user.click(screen.getByRole("gridcell", { name: "AKs, some suits" }));
+    // Partially filled counts as in range, so a click erases it entirely.
+    expect(dump()).toEqual({});
+  });
+
+  it("Suits mode opens the suit editor instead of toggling", async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={{ AKs: 1 }} />);
+    await user.click(screen.getByRole("button", { name: "Suits" }));
+    await user.click(screen.getByRole("gridcell", { name: "AKs" }));
+    expect(dump()).toEqual({ AKs: 1 }); // untouched
+    await user.click(screen.getByRole("button", { name: "AhKh" }));
+    expect(dump()).toEqual({ AsKs: 1, AdKd: 1, AcKc: 1 });
+    expect(screen.getByRole("gridcell", { name: "AKs, some suits" })).toBeInTheDocument();
+  });
+});
+
+describe("RangeGrid summary of a weighted range", () => {
+  it("says how many combos the weights are spread over, once they differ", () => {
+    // 12 combos at 10% each: 1.2 weighted combos, but 12 of them carry weight.
+    render(<Harness initial={{ AA: 0.1, KK: 0.1 }} />);
+    expect(screen.getByText(/^1\.2 combos \(weighted, across 12\)/)).toBeInTheDocument();
+  });
+
+  it("keeps the plain wording when every weight is a whole combo", () => {
+    render(<Harness initial={{ AA: 1 }} />);
+    expect(screen.getByText(/^6 combos/)).toBeInTheDocument();
+    expect(screen.queryByText(/weighted/)).not.toBeInTheDocument();
+  });
+});

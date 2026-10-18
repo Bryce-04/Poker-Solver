@@ -46,3 +46,56 @@
   color: var(--text-muted);
   min-height: 1.2em;
 }
+
+/* --- Suit breakdown of the selected hand --- */
+
+.suit-strategy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.suit-strategy__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.suit-strategy__gap,
+.suit-strategy__combo {
+  min-height: 2.75rem;
+}
+
+.suit-strategy__combo {
+  display: grid;
+  place-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.suit-strategy__combo[data-blocked] {
+  opacity: 0.35;
+}
+
+/* Same translucent chip as the hand labels, so the cards stay legible over
+   any action colour. */
+.suit-strategy__cards {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--surface) 75%, transparent);
+  color: var(--text-strong);
+}
+
+.suit-strategy__cards [data-suit="h"],
+.suit-strategy__cards [data-suit="d"] {
+  color: var(--danger);
+}
+
+.suit-strategy__combo[data-out] {
+  opacity: 0.45;
+  border-style: dashed;
+}

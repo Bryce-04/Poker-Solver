@@ -6,6 +6,194 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-18 — 3-bet / 4-bet ranges and loading ranges from the preflop line
+
+**Status:** proposed.
+
+**Context.** Postflop solves started from per-seat guesses: "load BB's typical
+range" is a single-raised-pot range whatever actually happened preflop, so a
+3-bet pot was solved with the wrong ranges for both players. The existing
+defend charts are one combined continue range (call + 3-bet) with no split.
+
+**Decision.** `preflop_ranges.py` adds, for each of the nine pairs the defend
+charts cover (100bb only), the defender's 3-bet range, the opener's call and
+4-bet ranges against it, and the defender's call range against a 4-bet; the
+defender's flat range is *derived* (defend chart minus 3-bet) so the existing
+charts stay the single source of truth. `POST /spots/preflop-ranges` reads a
+preflop line and returns both players' ranges by role (open+call, 3-bet pot,
+4-bet pot); the Solve page's button calls it with the clicked-through preflop
+action. Constructed by principle, as the existing charts are (the user chose
+this over importing a source or solving preflop), and labeled approximate.
+
+**Why a line-reading route instead of more `reference-strategy` charts.**
+`reference-strategy` answers "what range for ONE seat in this exact Spot";
+a postflop solve needs the pair of ranges that are consistent with each
+other, and which seat gets which range depends on the whole line. The
+invariants (3-bet within defend, calls and 4-bets within the open range,
+disjoint) are tested so a hand-edited range can't give a player hands they
+couldn't have reached that node with.
+
+**Limits.** 100bb only; no limped or 5-bet pots; one weight per hand (no
+mixed frequencies, so a hand is either always 3-bet or never); not solver
+output. Frequencies were sanity-checked (3-bets 3-12%, 4-bets 2-3%, openers
+continue 42-62% of their range vs a 3-bet), not validated against a solve.
+
+**Testing note.** `pytest apps/api` normally needs Postgres, but tests that
+don't touch the database run fine without it:
+`DATABASE_URL=postgresql+psycopg://x:x@localhost:5432/x pytest --noconftest
+tests/test_preflop_ranges.py tests/test_solve_route.py ...` (the engine is
+lazy; `--noconftest` skips the session fixture that runs Alembic).
+
+---
+
+## 2026-10-18 — Range chaining, step 1: `posterior_ranges` + `POST /spots/narrow`
+
+**Status:** proposed (backend only; no UI yet).
+
+**Context.** The open question in `docs/plan.md`: a later street's range
+was whatever the user painted or loaded (often a full preflop range on the
+river), not a consequence of what each player did earlier.
+
+**Decision.** Chain single-street solves with a Bayesian update, not a joint
+solve. `RangeCfrTrainer.posterior_ranges(line)` multiplies each combo's
+prior weight by its average-strategy probability for every action that
+player took along `line`, then rolls combos up to 169-type labels (plain
+average, same as `label_strategies`). Weights are not renormalized, so they
+stay in [0, 1] like a painted range. `POST /spots/narrow` (`app/solve.py`'s
+`narrow_ranges`) takes the `/solve` contract, but the current street's
+actions are the *line to narrow on* (a closed street: bet + call, check +
+check; a fold is rejected as the hand is over). It solves that street from
+its start, because seeded `prior_history` actions are never trained and so
+would contribute no update. It returns `ranges` per position (labels under
+1e-4 dropped), plus the solve's `exploitability_pct`/`converged`.
+
+**Honest limits.** No backward induction: a street's strategy doesn't
+account for what it sets up on the next one, so this is not equal to a full
+multi-street solve. Action sizes are bucketed onto the menu (disclosed in
+`bucketed_actions`). The posterior is only as precise as the street's solve:
+calling `narrow_ranges` directly measured 0.75 and 0.23 against the exact
+0.8 and 0.2 at the 0.5%-of-pot stop; the solver-level test at 300
+iterations is within 1%. Costs one full solve of the street.
+
+**Update, same day — combo-level ranges.** A `HandRange` key can now also
+be a specific combo (`AhKh`), which overrides its label's weight for that
+combo only (`{"AKs": 1, "AhKh": 0}` = AKs minus the heart combo). No shape
+change to the schema (still `dict[str, float]`, so saved spots and the
+generated TS types are untouched apart from the doc comment), but the
+solver now reads them (`combos.expand_range`), and `posterior_ranges` emits
+combo keys wherever a label's combos differ by more than 1e-3 (blockers,
+flush draws) instead of averaging them back into the label — averaging
+would throw away exactly the information chaining exists to keep. A label is
+only collapsed when all its board-live combos are present, so a combo the
+prior excluded is never resurrected. `/spots/narrow` also returns
+`line_probability` per position (posterior mass / prior mass): measured on
+a 7h2h9c flop, BB's 75%-pot bet had probability ~0 because the equilibrium
+checks almost everything, and the "range" returned was numerical noise —
+the UI must warn on a low value before chaining it. Also tightened
+`label_to_combos`, which had accepted `Ah` as AA. Strategy *output* is
+still per label; per-combo strategies are the next piece.
+
+**Update, same day — suit editor in the grid.** `lib/rangeCombos.ts` mirrors
+the solver's key rule on the frontend (label weight first, combo keys
+override; `setComboWeight` re-encodes compactly — back to one label key when
+all combos agree, otherwise one key per live combo and no label key).
+`RangeGrid` reads everything through it: cells shade by mean combo weight,
+a corner dot marks a partly-filled hand type, the combo count is exact, and
+a whole-hand toggle/paint wipes that hand's per-suit edits (it previously
+would have ignored them). A "Suits" toggle puts the grid in select mode: a
+tap opens `components/ComboEditor` (4×4 suit grid; board-blocked combos
+greyed via `deadCards`, which `SolvePage` passes). It sits below the grid
+for now; moving it into a phone bottom sheet / desktop side panel is the
+next step. Not yet checked on a device.
+
+**Update, same day — suits in results, narrowing in the UI, tap-highlight fix.**
+Three things reported from the phone, fixed together:
+
+- *Suits weren't visible in a solve.* `RangeCfrTrainer.combo_strategies()` and
+  the `/spots/solve` response's `combo_strategy` now carry per-combo
+  strategies, but only for hand types whose suits differ by more than 0.01 in
+  some action (everything else is already in `strategy`; measured 48 rows /
+  8.7 KB on a wide two-heart flop, where A♥K♥ — the nut flush draw — bets 6%
+  and its sibling combos never, which the AKs average of 2% hid).
+  `StrategyGrid` shows the tapped hand's suits (`SuitStrategy`, same 4×4
+  layout as the editor via `lib/rangeCombos.ts`'s `comboSlots`), each colored
+  by its own mix, board-blocked combos greyed. `solveSpot` normalizes a
+  missing `combo_strategy` to `{}` for an older backend.
+- *No way to load narrowed ranges.* `SolvePage` step 3 has a "Narrow ranges by
+  the flop (and turn) action" button when the target street is the turn or
+  river, in click-through mode with every earlier street closed
+  (`lib/chaining.ts`). For each earlier postflop street in order it POSTs
+  `/spots/narrow` with that street's own board, pot, stack and recorded
+  actions and the current ranges, and carries the result into the next
+  street. It refuses to apply a line either player takes under 1% of the time
+  (the server's `line_probability`) and says why, leaves ranges untouched on
+  any failure, and has Undo. A 404 from an API older than the web build is
+  reported as "server doesn't support narrowing yet". Paste mode has no
+  earlier-street actions, so it never offers it.
+- *Everything looked purple after a tap.* `index.css` had `button:hover`
+  repainting every button with the accent color; on a touchscreen :hover sticks
+  to the last tapped element, so a tapped grid cell turned purple whatever its
+  state, and the just-tapped brush looked inactive. Hover is now gated on
+  `@media (hover: hover)`, grid and suit cells keep their own shade on hover
+  (`--cell-bg`), and the "hand open in the suit editor" ring is neutral
+  (`--text-strong`), not the accent.
+
+**Update, same day — trimming the narrowed range's tail.** Reported from the
+phone: after narrowing, the grid said "8.7 combos" yet the solve showed far
+more hands. Both were true: the grid's count adds weights up (a narrowed range
+is hundreds of hands at small weights), while the solve charts every hand with
+any weight at all. Measured on wide ranges on a K♠7♥2♦ flop, "BB bets 75%, BTN
+calls" leaves BB with 416 entries, 110 of them under 1% weight. So
+`/spots/narrow` now drops every hand under 2% of the range's own heaviest
+hand (`solve.py`'s `_trim_tail`; relative, because narrowed weights aren't
+normalized — a rare line scales a whole range down) and reports what it
+removed in `trimmed` (measured: 124 of those 416 entries gone for 0.98% of
+BB's weight; 99 of BTN's for 0.25%). The page says how many hands were
+dropped. `RangeGrid`'s summary now reads "8.7 combos (weighted, across 312)"
+whenever weights are fractional, so the two numbers can't be confused. Chosen
+over leaving the tail in because a full multi-street solve will need pruning
+anyway (the tail compounds across chained streets); the threshold is a
+constant (`TRIM_BELOW_FRACTION_OF_MAX`) to tune against real solves.
+
+**Update, same day — "the solve jams too many hands" (investigated, three fixes).**
+Reported on the phone: BTN facing a 2bb bet into 12.5bb on Q♠J♥7♥3♥ (flush
+just arrived), after narrowing both ranges by a flop of check / BTN bets 2bb /
+call, jammed a lot of hands (65s 95% all-in, K9o, Q9o...). Reproduced exactly
+from the reference charts (BTN `btn_open_100bb`, BB `bb_defend_vs_btn_open_100bb`;
+same 392/131 hand-type counts as the phone). Findings, measured:
+
+- The turn spot itself is fine: with the FULL ranges BTN folds 8%, calls 59%,
+  raises 12%+19%, and never jams (65s: raise medium 57% / large 40%, all-in 0%).
+  The jamming came from the narrowed range.
+- The narrowed range came from a line the equilibrium barely plays: on that
+  flop BTN's 2bb bet (bucketed to 25% pot) is taken by 3.4% of its range
+  (`line_probability`), and the hands that take it are mostly leftover mixing
+  (24 hand types sit at 0.5-5% bet_small, the noise floor of an average
+  strategy) rather than a coherent betting range. Our 1% guard let it through;
+  the guard is now 10% (`chaining.ts`'s `MIN_LINE_PROBABILITY`), with a message
+  that says why. The narrow step now refuses lines like this one.
+- The result chart overstated junk hands: 65s's "95% all-in" was one combo
+  (6♠5♠) at ~1% of the top hand's weight, drawn like a core hand, and the
+  headline averaged hand TYPES equally (37% all-in) where the range-weighted
+  share is 23%. `StrategyGrid` now takes the solved `range`: hands fade by
+  how much of the range they are and say so when tapped, and `overallMix` is
+  weighted by `handMass` (combos' worth in the range).
+- Bug in the suit view: it drew suits that aren't in the range as if they
+  played the hand's strategy (and said "every suit plays the same"). They are
+  now marked "not in the range".
+
+Still true and not fixed: a narrowed range is only as good as the street
+solve's rarely-reached nodes, and the average strategy there is noisy;
+chaining by a line the equilibrium plays often (BB's check-check here is
+~59%) is reliable, a rare line is not. A full multi-street solve would not
+have this problem, which is another reason it is the real fix.
+
+**Not done yet.** Previously: the UI step ("use narrowed range" feeding the next
+street), and running `pytest apps/api` against Postgres (none available this
+session; `narrow_ranges` was called directly).
+
+---
+
 ## 2026-10-07 — Click-through builder: each seat posts its own blind (corrects "Decision 2" below)
 
 **Status:** accepted.

@@ -8,7 +8,9 @@ import { parseHandHistoryToPostflopSetup } from "../lib/parseHandHistory";
 import { STREET_ORDER, preflopContext, summarizeHand, toBettingActions } from "../lib/handBuilder";
 import type { BuilderAction } from "../lib/handBuilder";
 import {
+  fetchPreflopRanges,
   fetchReferenceStrategy,
+  narrowRanges,
   solveSpot,
   type LiveSolveResponse,
   type SpotValidationIssue,
@@ -18,7 +20,14 @@ import { CardPicker } from "../components/CardPicker/CardPicker";
 import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
 import { StreetActions } from "../components/StreetActions/StreetActions";
 import { Step } from "../components/Step/Step";
+import {
+  buildNarrowSpot,
+  describeStreets,
+  streetsToNarrow,
+  unlikelyLineWarning,
+} from "../lib/chaining";
 import { formatMix, overallMix } from "../lib/strategySummary";
+import { handMass, indexRange } from "../lib/rangeCombos";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -28,12 +37,26 @@ type SetupMode = "click" | "paste";
 type Outcome =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "solved"; data: LiveSolveResponse }
+  // `range` is the deciding player's range as it was when solved, so the
+  // result can fade hands that are barely in it (later edits don't move it).
+  | { kind: "solved"; data: LiveSolveResponse; range: HandRange }
   | { kind: "invalid"; issues: SpotValidationIssue[] }
   | { kind: "rejected"; reason: string }
   | { kind: "busy" }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
+
+type PreflopLoadState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "loaded"; description: string }
+  | { kind: "unavailable"; reason: string };
+
+type NarrowState =
+  | { kind: "idle" }
+  | { kind: "loading"; street: string }
+  | { kind: "done"; streets: string; trimmedNote: string }
+  | { kind: "failed"; reason: string };
 
 // Status for each position's "Load reference range" button -- separate
 // from the solve Outcome above, since loading a starting range and
@@ -43,6 +66,26 @@ type ChartLoadState =
   | { kind: "loading" }
   | { kind: "loaded" }
   | { kind: "unavailable"; reason: string };
+
+function narrowFailureReason(
+  result: Exclude<Awaited<ReturnType<typeof narrowRanges>>, { kind: "narrowed" }>,
+  street: string,
+): string {
+  switch (result.kind) {
+    case "unsupported":
+      return "The server doesn't support narrowing yet (it needs the newest version) -- set the range by hand.";
+    case "rejected":
+      return `Couldn't narrow by the ${street}: ${result.reason}`;
+    case "invalid":
+      return `The server rejected the ${street} spot.`;
+    case "busy":
+      return "The solver is busy with another solve -- try again in a minute.";
+    case "network-error":
+      return "Couldn't reach the API. Check your connection and try again.";
+    case "error":
+      return `Narrowing failed: the request returned HTTP ${result.status}.`;
+  }
+}
 
 function streetForBoardLength(length: number): Street {
   if (length === 3) return "flop";
@@ -103,6 +146,14 @@ export function SolvePage() {
     setChartStates((prev) => ({ ...prev, [position]: state }));
   }
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
+  // "Narrow ranges by earlier action": its own status, plus the ranges as they
+  // were before the last narrowing so it can be undone.
+  const [narrowState, setNarrowState] = useState<NarrowState>({ kind: "idle" });
+  // "Load ranges from the preflop action": which line it loaded, or why not.
+  const [preflopLoad, setPreflopLoad] = useState<PreflopLoadState>({ kind: "idle" });
+  const [rangesBeforeNarrow, setRangesBeforeNarrow] = useState<Partial<
+    Record<Position, HandRange>
+  > | null>(null);
 
   // Click-through mode's own state: a true starting stack (before any
   // action) plus each street's real action log -- pot_bb/effective_stack_bb
@@ -189,7 +240,11 @@ export function SolvePage() {
     const result = await solveSpot(spot);
     switch (result.kind) {
       case "solved":
-        setOutcome({ kind: "solved", data: result.data });
+        setOutcome({
+          kind: "solved",
+          data: result.data,
+          range: result.data.position === oopPosition ? oopRange : ipRange,
+        });
         return;
       case "invalid":
         setOutcome({ kind: "invalid", issues: result.issues });
@@ -269,6 +324,122 @@ export function SolvePage() {
     });
   }
 
+  // Both ranges straight from the preflop line that was clicked through --
+  // open and call, 3-bet, or 4-bet pot -- instead of per-seat guesses. Offered
+  // once preflop has closed with at least one raise.
+  const preflopHasRaise = streets.preflop.some(
+    (a) => a.action === "raise" || a.action === "bet" || a.action === "all_in",
+  );
+  const canLoadPreflopRanges =
+    setupMode === "click" && handSummary.targetStreet !== "preflop" && preflopHasRaise;
+
+  async function loadRangesFromPreflopAction() {
+    setPreflopLoad({ kind: "loading" });
+    const result = await fetchPreflopRanges({
+      positions_in_hand: [oopPosition, ipPosition],
+      effective_stack_bb: startingStackBb,
+      current_street: "preflop",
+      actions: toBettingActions("preflop", streets.preflop),
+    });
+    switch (result.kind) {
+      case "ok":
+        setRanges((prev) => ({
+          ...prev,
+          [oopPosition]: result.data.ranges[oopPosition] ?? {},
+          [ipPosition]: result.data.ranges[ipPosition] ?? {},
+        }));
+        // Fresh starting ranges: an earlier narrowing no longer applies to them.
+        setRangesBeforeNarrow(null);
+        setNarrowState({ kind: "idle" });
+        setPreflopLoad({ kind: "loaded", description: result.data.description });
+        return;
+      case "unsupported":
+      case "invalid":
+        setPreflopLoad({ kind: "unavailable", reason: result.reason });
+        return;
+      case "network-error":
+        setPreflopLoad({ kind: "unavailable", reason: "Couldn't reach the API." });
+        return;
+      case "error":
+        setPreflopLoad({
+          kind: "unavailable",
+          reason: `Couldn't load ranges (the request returned HTTP ${result.status}).`,
+        });
+        return;
+    }
+  }
+
+  // The earlier postflop streets whose action can narrow the ranges for the
+  // street being solved -- only when the hand was clicked through (a pasted
+  // history carries no earlier-street actions) and every earlier street closed.
+  const narrowStreets =
+    setupMode === "click" && board.kind === "ok" && handSummary.blockedReason === null
+      ? streetsToNarrow(handSummary.targetStreet)
+      : [];
+
+  /**
+   * Range chaining: for each earlier postflop street in turn, asks the server
+   * to solve that street and narrow both ranges by the recorded action, then
+   * carries the result into the next one. Each step is a full street solve,
+   * so this can take as long as solves do.
+   */
+  async function narrowByEarlierStreets() {
+    if (board.kind !== "ok" || narrowStreets.length === 0) return;
+    const before = ranges;
+    let oop = oopRange;
+    let ip = ipRange;
+    let droppedHands = 0;
+    for (const street of narrowStreets) {
+      setNarrowState({ kind: "loading", street });
+      const spot = buildNarrowSpot({
+        oopPosition,
+        ipPosition,
+        startingStackBb,
+        streets,
+        board: board.cards,
+        street,
+        oopRange: oop,
+        ipRange: ip,
+      });
+      const result = await narrowRanges(spot);
+      if (result.kind !== "narrowed") {
+        setNarrowState({ kind: "failed", reason: narrowFailureReason(result, street) });
+        return;
+      }
+      const warning = unlikelyLineWarning(street, result.data.line_probability);
+      if (warning) {
+        setNarrowState({ kind: "failed", reason: warning });
+        return;
+      }
+      for (const t of Object.values(result.data.trimmed ?? {})) droppedHands += t.dropped_entries;
+      oop = result.data.ranges[oopPosition] ?? {};
+      ip = result.data.ranges[ipPosition] ?? {};
+      if (Object.keys(oop).length === 0 || Object.keys(ip).length === 0) {
+        setNarrowState({
+          kind: "failed",
+          reason: `Nothing is left of a range after the ${street} action, so the ranges were left as they were.`,
+        });
+        return;
+      }
+    }
+    setRangesBeforeNarrow(before);
+    setRanges((prev) => ({ ...prev, [oopPosition]: oop, [ipPosition]: ip }));
+    setNarrowState({
+      kind: "done",
+      streets: describeStreets(narrowStreets),
+      trimmedNote:
+        droppedHands > 0
+          ? ` Hands the line almost never involved (under 2% of a range's top hand) were dropped: ${droppedHands} in all.`
+          : "",
+    });
+  }
+
+  function undoNarrowing() {
+    if (rangesBeforeNarrow) setRanges(rangesBeforeNarrow);
+    setRangesBeforeNarrow(null);
+    setNarrowState({ kind: "idle" });
+  }
+
   /** Back to a blank page: every input, both ranges, and any result. */
   function resetAll() {
     setSetupMode("click");
@@ -280,6 +451,9 @@ export function SolvePage() {
     setRanges({});
     setChartStates({});
     setOutcome({ kind: "idle" });
+    setNarrowState({ kind: "idle" });
+    setRangesBeforeNarrow(null);
+    setPreflopLoad({ kind: "idle" });
     setStartingStackBb(100);
     setStreets(EMPTY_STREETS);
     setRedoStack([]);
@@ -621,6 +795,82 @@ export function SolvePage() {
           title="The ranges"
           subtitle="The hands each player could realistically have. Tap or drag on the grid to add or remove hands."
         >
+          {canLoadPreflopRanges && (
+            <section className="spot-builder__section">
+              <h3 className="spot-builder__legend">From the preflop action</h3>
+              <p className="spot-builder__hint">
+                Fill in both players' ranges from how preflop went: an open and a call, a 3-bet pot
+                (the 3-bettor's 3-bet range, the opener's call) or a 4-bet pot. Approximate ranges
+                at about 100bb.
+              </p>
+              <div className="solve-page__chart-load">
+                <button
+                  type="button"
+                  className="spot-builder__reset"
+                  onClick={loadRangesFromPreflopAction}
+                  disabled={preflopLoad.kind === "loading"}
+                >
+                  {preflopLoad.kind === "loading"
+                    ? "Loading…"
+                    : "Load both ranges from the preflop action"}
+                </button>
+              </div>
+              {preflopLoad.kind === "loaded" && (
+                <p className="spot-builder__hint" role="status">
+                  Loaded for: {preflopLoad.description}.
+                </p>
+              )}
+              {preflopLoad.kind === "unavailable" && (
+                <p className="spot-builder__field-error" role="alert">
+                  {preflopLoad.reason}
+                </p>
+              )}
+            </section>
+          )}
+          {narrowStreets.length > 0 && (
+            <section className="spot-builder__section solve-page__narrow">
+              <h3 className="spot-builder__legend">Narrow by earlier action</h3>
+              <p className="spot-builder__hint">
+                Right now these ranges are where each player starts. Narrow them by what each
+                player did on {describeStreets(narrowStreets)}: the solver works out which hands
+                would actually have played that way, and keeps only those. Needs both ranges
+                filled in, and takes about as long as a solve per street.
+              </p>
+              <div className="solve-page__chart-load">
+                <button
+                  type="button"
+                  className="spot-builder__reset"
+                  onClick={narrowByEarlierStreets}
+                  disabled={
+                    narrowState.kind === "loading" ||
+                    Object.keys(oopRange).length === 0 ||
+                    Object.keys(ipRange).length === 0
+                  }
+                >
+                  {narrowState.kind === "loading"
+                    ? `Narrowing by the ${narrowState.street}…`
+                    : `Narrow ranges by ${describeStreets(narrowStreets)} action`}
+                </button>
+                {rangesBeforeNarrow && narrowState.kind === "done" && (
+                  <button type="button" className="spot-builder__reset" onClick={undoNarrowing}>
+                    Undo
+                  </button>
+                )}
+              </div>
+              {narrowState.kind === "done" && (
+                <p className="spot-builder__hint" role="status">
+                  Narrowed by {narrowState.streets}.{narrowState.trimmedNote} Hands with only some
+                  suits left show a dot in the grid &mdash; use Suits to see which.
+                </p>
+              )}
+              {narrowState.kind === "failed" && (
+                <p className="spot-builder__field-error" role="alert">
+                  {narrowState.reason}
+                </p>
+              )}
+            </section>
+          )}
+
           <section className="spot-builder__section">
             <h3 className="spot-builder__legend">{oopPosition}&rsquo;s range</h3>
             <div className="solve-page__chart-load">
@@ -650,7 +900,11 @@ export function SolvePage() {
                 </span>
               )}
             </div>
-            <RangeGrid value={oopRange} onChange={(r) => setRangeFor(oopPosition, r)} />
+            <RangeGrid
+              value={oopRange}
+              onChange={(r) => setRangeFor(oopPosition, r)}
+              deadCards={board.kind === "ok" ? board.cards : []}
+            />
           </section>
 
           <section className="spot-builder__section">
@@ -682,7 +936,11 @@ export function SolvePage() {
                 </span>
               )}
             </div>
-            <RangeGrid value={ipRange} onChange={(r) => setRangeFor(ipPosition, r)} />
+            <RangeGrid
+              value={ipRange}
+              onChange={(r) => setRangeFor(ipPosition, r)}
+              deadCards={board.kind === "ok" ? board.cards : []}
+            />
           </section>
         </Step>
 
@@ -794,8 +1052,9 @@ export function SolvePage() {
           </p>
           {Object.keys(outcome.data.strategy).length > 0 && (
             <p className="solve-page__headline">
-              {outcome.data.position} to act. Averaged over the hands in this range:{" "}
-              {formatMix(overallMix(outcome.data.strategy))}.
+              {outcome.data.position} to act. Across the whole range, counting each hand
+              by how much of the range it is:{" "}
+              {formatMix(overallMix(outcome.data.strategy, handMass(indexRange(outcome.range))))}.
             </p>
           )}
           <p className="spot-builder__hint">
@@ -816,7 +1075,12 @@ export function SolvePage() {
               &mdash; try more iterations or a narrower board/range combination.
             </p>
           ) : (
-            <StrategyGrid strategy={outcome.data.strategy} />
+            <StrategyGrid
+              strategy={outcome.data.strategy}
+              comboStrategy={outcome.data.combo_strategy}
+              deadCards={board.kind === "ok" ? board.cards : []}
+              range={outcome.range}
+            />
           )}
           <details className="solve-page__details">
             <summary>Details</summary>

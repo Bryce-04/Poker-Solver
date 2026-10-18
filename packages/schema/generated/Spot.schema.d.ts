@@ -87,9 +87,13 @@ export interface Ranges {
   [k: string]: HandRange;
 }
 /**
- * Maps a hand combo notation (e.g. 'AKs', '72o', 'TT') to a weight in
- * [0, 1] — the fraction of the time that hand is played this way. A range
- * grid selection (Stage 2) serializes directly into this shape.
+ * Maps a hand to a weight in [0, 1] — the fraction of the time that
+ * hand is played this way. A key is either a 169-type label ('AKs', '72o',
+ * 'TT'), which sets every suit combo of that hand, or one specific combo
+ * ('AhKh', two cards, rank then suit each), which overrides its label's
+ * weight for just that combo — so 'AKs: 1, AhKh: 0' is AKs without the
+ * heart combo. Suits matter for flush draws and blockers. A range grid
+ * selection (Stage 2) serializes directly into this shape.
  *
  * This interface was referenced by `Spot`'s JSON-Schema
  * via the `definition` "HandRange".

@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import { HAND_GRID } from "../../lib/hands";
 import { ACTION_LABEL, ACTION_ORDER } from "../../lib/strategySummary";
+import type { HandRange } from "@poker-solver/schema";
+import { comboColumns, comboSlots, comboWeights, handMass, indexRange } from "../../lib/rangeCombos";
 import "../RangeGrid/RangeGrid.css";
 import "./StrategyGrid.css";
 
@@ -42,10 +44,116 @@ export interface StrategyGridProps {
    * color -- the gap is real, not hidden. Read-only: this displays a
    * solve result, it doesn't edit a range. */
   strategy: Record<string, Record<string, number>>;
+  /** Specific combo ("AhKh") -> the same action mix, for hand types whose
+   * suits play differently (flush draws, blockers) -- LiveSolveResponse's
+   * combo_strategy. A combo missing here plays like its hand type. */
+  comboStrategy?: Record<string, Record<string, number>>;
+  /** Board cards, greyed out in the suit view (those combos can't exist). */
+  deadCards?: readonly string[];
+  /** The range the strategy was solved for. With it, hands are faded by how
+   * much of the range they are (a hand at 1% of the top hand's weight looks
+   * nearly absent, not like a core hand) and suit combos that aren't in the
+   * range are shown as such rather than as if they were. */
+  range?: HandRange;
 }
 
-export function StrategyGrid({ strategy }: StrategyGridProps) {
+/** Combos a hand type has: 6 for a pair, 4 suited, 12 offsuit. */
+function comboCountOf(hand: string): number {
+  if (hand.length === 2) return 6;
+  return hand.endsWith("s") ? 4 : 12;
+}
+
+const GLYPH: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
+
+function describe(mix: Record<string, number>): string {
+  return orderedEntries(mix)
+    .map(([a, p]) => `${ACTION_LABEL[a]} ${Math.round(p * 100)}%`)
+    .join(", ");
+}
+
+/** The selected hand's suit combos, each colored by its own action mix. */
+function SuitStrategy({
+  hand,
+  handMix,
+  comboStrategy,
+  deadCards,
+  comboWeight,
+}: {
+  hand: string;
+  handMix: Record<string, number> | undefined;
+  comboStrategy: Record<string, Record<string, number>>;
+  deadCards: readonly string[];
+  /** Weight of each of this hand's combos in the range, when known. */
+  comboWeight?: Record<string, number>;
+}) {
+  const dead = new Set(deadCards.map((c) => c[0].toUpperCase() + c[1].toLowerCase()));
+  const differs = comboSlots(hand).some(({ combo }) => combo !== null && combo in comboStrategy);
+  return (
+    <div className="suit-strategy" role="group" aria-label={`${hand} by suit`}>
+      <div
+        className="suit-strategy__grid"
+        style={{ gridTemplateColumns: `repeat(${comboColumns(hand)}, 1fr)` }}
+      >
+        {comboSlots(hand).map(({ combo, high, low }, i) => {
+          if (combo === null) return <span key={i} className="suit-strategy__gap" aria-hidden="true" />;
+          const blocked = dead.has(high) || dead.has(low);
+          const outOfRange = !blocked && comboWeight !== undefined && (comboWeight[combo] ?? 0) <= 0;
+          const mix = comboStrategy[combo] ?? handMix;
+          return (
+            <div
+              key={combo}
+              className="suit-strategy__combo"
+              data-blocked={blocked || undefined}
+              data-out={outOfRange || undefined}
+              role="img"
+              aria-label={
+                blocked
+                  ? `${combo}, on the board`
+                  : outOfRange
+                    ? `${combo}, not in the range`
+                    : mix
+                      ? `${combo}: ${describe(mix)}`
+                      : `${combo}: no data`
+              }
+              style={{
+                background: !blocked && !outOfRange && mix ? gradientFor(mix) : "var(--range-empty)",
+              }}
+            >
+              <span className="suit-strategy__cards">
+                <span data-suit={high[1]}>{high[0]}{GLYPH[high[1]]}</span>
+                <span data-suit={low[1]}>{low[0]}{GLYPH[low[1]]}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="strategy-grid__detail">
+        {differs
+          ? "These suits play differently, usually because of flush draws or blockers."
+          : "Every suit of this hand plays the same."}
+      </p>
+    </div>
+  );
+}
+
+export function StrategyGrid({
+  strategy,
+  comboStrategy = {},
+  deadCards = [],
+  range,
+}: StrategyGridProps) {
   const [selected, setSelected] = useState<string | null>(null);
+
+  // How much of the range each hand type is, relative to the heaviest one.
+  const index = range ? indexRange(range) : null;
+  const mass = index ? handMass(index) : null;
+  const heaviest = mass
+    ? Math.max(0, ...Object.entries(mass).map(([hand, m]) => m / comboCountOf(hand)))
+    : 0;
+  const relativeWeight = (hand: string): number | null => {
+    if (!mass || heaviest <= 0) return null;
+    return (mass[hand] ?? 0) / comboCountOf(hand) / heaviest;
+  };
 
   const actionsPresent = ACTION_ORDER.filter((a) =>
     Object.values(strategy).some((hand) => a in hand),
@@ -75,8 +183,14 @@ export function StrategyGrid({ strategy }: StrategyGridProps) {
           <div className="range-grid__row" role="row" key={r}>
             {row.map((hand) => {
               const data = strategy[hand];
+              // A hand barely in the range is faded so it reads as barely
+              // there; the floor keeps it findable.
+              const rel = relativeWeight(hand);
               const style: CSSProperties = data
-                ? { background: gradientFor(data) }
+                ? {
+                    background: gradientFor(data),
+                    ...(rel !== null ? { opacity: 0.3 + 0.7 * Math.min(1, rel) } : {}),
+                  }
                 : { background: "var(--range-empty)" };
               return (
                 <button
@@ -108,11 +222,25 @@ export function StrategyGrid({ strategy }: StrategyGridProps) {
         {selected && selectedHand
           ? `${selected}: ${orderedEntries(selectedHand)
               .map(([a, p]) => `${ACTION_LABEL[a]} ${Math.round(p * 100)}%`)
-              .join(", ")}`
+              .join(", ")}${
+              relativeWeight(selected) !== null && (relativeWeight(selected) as number) < 0.995
+                ? ` (${Math.max(1, Math.round((relativeWeight(selected) as number) * 100))}% as much of the range as its heaviest hand)`
+                : ""
+            }`
           : selected
             ? `${selected}: no data.`
             : "Tap a hand to see its exact breakdown."}
       </p>
+
+      {selected && (
+        <SuitStrategy
+          hand={selected}
+          handMix={selectedHand}
+          comboStrategy={comboStrategy}
+          deadCards={deadCards}
+          comboWeight={index ? comboWeights(index, selected) : undefined}
+        />
+      )}
     </div>
   );
 }

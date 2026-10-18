@@ -1,18 +1,24 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
-import { fetchReferenceStrategy, solveSpot } from "../lib/api";
+import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, solveSpot } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   solveSpot: vi.fn(),
   fetchReferenceStrategy: vi.fn(),
+  narrowRanges: vi.fn(),
+  fetchPreflopRanges: vi.fn(),
 }));
+const mockPreflopRanges = vi.mocked(fetchPreflopRanges);
+const mockNarrow = vi.mocked(narrowRanges);
 const mockSolve = vi.mocked(solveSpot);
 const mockFetchReference = vi.mocked(fetchReferenceStrategy);
 
 beforeEach(() => {
   mockSolve.mockReset();
   mockFetchReference.mockReset();
+  mockNarrow.mockReset();
+  mockPreflopRanges.mockReset();
 });
 
 // Three grids are on the page by default (CardPicker, then OOP's and IP's
@@ -638,5 +644,170 @@ Hero: checks
         actions: [{ position: "BB", street: "flop", action: "check" }],
       }),
     );
+  });
+});
+
+
+describe("SolvePage -- narrowing ranges by earlier action", () => {
+  /** A hand clicked through to the turn: flop checked through, turn card down. */
+  async function reachTurn(user: ReturnType<typeof userEvent.setup>) {
+    await closePreflopByChecking(user);
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // OOP checks the flop
+    await user.click(screen.getByRole("button", { name: /^check$/i })); // IP checks back
+    await user.click(screen.getByRole("gridcell", { name: /4 of clubs/i })); // turn card
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
+    await user.click(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" }));
+  }
+
+  const narrowButton = () => screen.queryByRole("button", { name: /narrow ranges by/i });
+
+  it("is only offered once there is an earlier postflop street to narrow by", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await fillMinimalForm(user); // a flop decision: nothing earlier to narrow by
+    expect(narrowButton()).not.toBeInTheDocument();
+  });
+
+  it("narrows both ranges by the flop's action and can undo it", async () => {
+    mockNarrow.mockResolvedValue({
+      kind: "narrowed",
+      data: {
+        ranges: { BB: { KJo: 0.5 }, BTN: { AA: 0.5 } },
+        line_probability: { BB: 0.9, BTN: 0.4 },
+        trimmed: {
+          BB: { dropped_entries: 40, dropped_weight_pct: 0.3 },
+          BTN: { dropped_entries: 12, dropped_weight_pct: 0.1 },
+        },
+        bucketed_actions: [],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
+
+    // The request is the FLOP street: its own 3-card board, its own check-check line.
+    expect(mockNarrow).toHaveBeenCalledTimes(1);
+    expect(mockNarrow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        current_street: "flop",
+        board: ["Ks", "Qh", "9d"],
+        positions_in_hand: ["BB", "BTN"],
+        ranges: { BB: { KJo: 1 }, BTN: { AA: 1 } },
+      }),
+    );
+    expect(await screen.findByText(/narrowed by the flop/i)).toBeInTheDocument();
+    expect(screen.getByText(/52 in all/)).toBeInTheDocument(); // the tail trim is disclosed
+    expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA, 50%" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^undo$/i }));
+    expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "AA" })).toBeInTheDocument();
+  });
+
+  it("refuses to build on a line the equilibrium never plays, and leaves the ranges alone", async () => {
+    mockNarrow.mockResolvedValue({
+      kind: "narrowed",
+      data: {
+        ranges: { BB: { KJo: 0.0002 }, BTN: { AA: 0.5 } },
+        line_probability: { BB: 0.0002, BTN: 0.5 },
+        bucketed_actions: [],
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/BB \(0\.0%\) rarely takes/);
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toBeInTheDocument();
+  });
+
+  it("explains when the deployed server doesn't support narrowing yet", async () => {
+    mockNarrow.mockResolvedValue({ kind: "unsupported" });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachTurn(user);
+
+    await user.click(screen.getByRole("button", { name: /narrow ranges by the flop action/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/doesn't support narrowing yet/i);
+  });
+});
+
+describe("SolvePage -- ranges from the preflop action", () => {
+  const sizeInput = () => screen.getByLabelText(/^to \(bb\)$/i);
+  const loadButton = () =>
+    screen.queryByRole("button", { name: /load both ranges from the preflop action/i });
+
+  /** BTN opens to 3, BB 3-bets to 9, BTN calls; flop picked. */
+  async function reachThreeBetPot(user: ReturnType<typeof userEvent.setup>) {
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "3");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BTN opens to 3
+    await user.clear(sizeInput());
+    await user.type(sizeInput(), "9");
+    await user.click(screen.getByRole("button", { name: /^raise$/i })); // BB 3-bets to 9
+    await user.click(screen.getByRole("button", { name: /^call/i })); // BTN calls
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+  }
+
+  it("isn't offered when preflop had no raise (a limped pot)", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await closePreflopByChecking(user);
+    await pickBoard(user, [/king of spades/i, /queen of hearts/i, /9 of diamonds/i]);
+    expect(loadButton()).not.toBeInTheDocument();
+  });
+
+  it("sends the preflop line and fills both ranges for a 3-bet pot", async () => {
+    mockPreflopRanges.mockResolvedValue({
+      kind: "ok",
+      data: {
+        source: "reference_chart",
+        line: "three_bet",
+        description: "BTN opens, BB 3-bets, BTN calls",
+        chart_source: "approximate",
+        ranges: { BB: { AA: 1, KK: 1 }, BTN: { QQ: 1 } },
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachThreeBetPot(user);
+
+    await user.click(loadButton() as HTMLElement);
+
+    expect(mockPreflopRanges).toHaveBeenCalledWith({
+      positions_in_hand: ["BB", "BTN"],
+      effective_stack_bb: 100,
+      current_street: "preflop",
+      actions: [
+        { position: "BTN", street: "preflop", action: "raise", size_bb: 3 },
+        { position: "BB", street: "preflop", action: "raise", size_bb: 9 },
+        { position: "BTN", street: "preflop", action: "call" },
+      ],
+    });
+    expect(await screen.findByText(/loaded for: BTN opens, BB 3-bets, BTN calls/i)).toBeInTheDocument();
+    // OOP (BB) is the first grid: the 3-bettor's range. IP (BTN): the opener's call.
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "AA" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "QQ" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(rangeGrids()[1]).getByRole("gridcell", { name: "QQ" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows the server's reason when the line isn't charted, and changes no range", async () => {
+    mockPreflopRanges.mockResolvedValue({
+      kind: "unsupported",
+      reason: "3-bet / 4-bet charts only cover about 100bb (80-120bb) so far.",
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await reachThreeBetPot(user);
+    await user.click(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" }));
+
+    await user.click(loadButton() as HTMLElement);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/only cover about 100bb/);
+    expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toHaveAttribute("aria-pressed", "true");
   });
 });

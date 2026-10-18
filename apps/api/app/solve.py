@@ -117,14 +117,21 @@ _MENU_PCT_BY_LABEL = {label: f"{int(frac * 100)}%" for frac, label in BET_SIZE_M
 
 
 def _replay_street_actions(
-    street_actions: list[BettingAction], oop: str, pot_bb: float, effective_stack_bb: float
+    street_actions: list[BettingAction],
+    oop: str,
+    pot_bb: float,
+    effective_stack_bb: float,
+    allow_terminal: bool = False,
 ) -> tuple[int, tuple[str, ...], list[str]]:
     """Replays a street's recorded actions through BettingRoundState in
     order, returning the resulting (first_to_act, prior_history) for the
     solve plus a list of human-readable notes on any size that got
     bucketed. Raises InvalidSolveRequest if an action is out of turn,
     illegal at that point, size-less, or if the sequence is already
-    terminal (nothing left to solve)."""
+    terminal (nothing left to solve) -- unless allow_terminal, which
+    range narrowing uses: a street that has closed (bet + call, check +
+    check) is exactly what it wants to narrow on. A fold still ends the
+    hand, so it's rejected either way."""
     state = BettingRoundState.initial(pot_bb, effective_stack_bb, first_to_act=0)
     notes: list[str] = []
     for action in street_actions:
@@ -159,14 +166,16 @@ def _replay_street_actions(
                 f"(bucketed to '{label}') isn't legal at that point."
             )
         state = state.apply(label)
-    if state.is_terminal():
+    if state.is_terminal() and not (allow_terminal and state.history[-1] != "fold"):
         raise InvalidSolveRequest(
             "that action sequence already ends the hand -- there's no decision left to solve."
         )
     return state.to_act, state.history, notes
 
 
-def build_solve_config(spot: Spot) -> tuple[RangeSpotConfig, int, list[str]]:
+def build_solve_config(
+    spot: Spot, allow_terminal_actions: bool = False
+) -> tuple[RangeSpotConfig, int, list[str]]:
     """Validates and maps a Spot into a RangeSpotConfig, returning it
     alongside the index (0 or 1) of whichever player actually has the
     decision once prior_history is accounted for, and any bucketing
@@ -199,7 +208,7 @@ def build_solve_config(spot: Spot) -> tuple[RangeSpotConfig, int, list[str]]:
 
     street_actions = [a for a in spot.actions if a.street == spot.current_street]
     first_to_act, prior_history, bucket_notes = _replay_street_actions(
-        street_actions, oop, spot.pot_bb, spot.effective_stack_bb
+        street_actions, oop, spot.pot_bb, spot.effective_stack_bb, allow_terminal_actions
     )
 
     config = RangeSpotConfig(
@@ -267,5 +276,114 @@ def solve_spot(
         "converged": exploitability_pct < target_exploitability_pct,
         "position": spot.positions_in_hand[deciding_player],
         "strategy": trainer.label_strategies(),
+        # Per-suit strategies for hand types whose combos play differently
+        # (flush draws, blockers); every other hand type is in "strategy"
+        # alone. Keyed by specific combo ('AhKh').
+        "combo_strategy": trainer.combo_strategies(),
+        "bucketed_actions": bucket_notes,
+    }
+
+
+# A narrowed range has a long tail of hands the line almost never involved
+# (a combo at 0.3% of the heaviest one's weight). They barely move anyone's
+# strategy but make the range look far wider than it is, clutter the result
+# with hands that are effectively not there, and cost solve time -- the tail
+# multiplies when streets are chained. So a narrowed range drops every hand
+# under this share of its own heaviest hand's weight. Relative, not absolute:
+# narrowed weights aren't normalized (a rare line scales a whole range down).
+TRIM_BELOW_FRACTION_OF_MAX = 0.02
+
+
+def _combo_count(key: str) -> int:
+    """How many concrete combos a range key stands for (board blocking
+    ignored -- close enough for a share-of-weight report)."""
+    if len(key) == 4:
+        return 1
+    if len(key) == 2:
+        return 6
+    return 4 if key.endswith("s") else 12
+
+
+def _trim_tail(weights: dict[str, float]) -> tuple[dict[str, float], dict]:
+    """Drops entries under TRIM_BELOW_FRACTION_OF_MAX of the heaviest one.
+    Returns (kept, {"dropped_entries": n, "dropped_weight_pct": share of the
+    range's total combo-weighted mass removed})."""
+    if not weights:
+        return {}, {"dropped_entries": 0, "dropped_weight_pct": 0.0}
+    cutoff = TRIM_BELOW_FRACTION_OF_MAX * max(weights.values())
+    kept = {k: w for k, w in weights.items() if w >= max(cutoff, 1e-12)}
+    mass = lambda ws: sum(w * _combo_count(k) for k, w in ws.items())  # noqa: E731
+    total = mass(weights)
+    dropped = {k: w for k, w in weights.items() if k not in kept}
+    return kept, {
+        "dropped_entries": len(dropped),
+        "dropped_weight_pct": 100 * mass(dropped) / total if total > 0 else 0.0,
+    }
+
+
+def narrow_ranges(
+    spot: Spot,
+    target_exploitability_pct: float = TARGET_EXPLOITABILITY_PCT,
+    max_iterations: int = MAX_ITERATIONS,
+    max_seconds: float = MAX_SOLVE_SECONDS,
+) -> dict:
+    """Range chaining: solves the current street from its START, then
+    returns each player's range conditional on the street's recorded
+    actions (Spot.actions on current_street, which should be a CLOSED
+    street -- e.g. bet + call, or check + check) having been played. The
+    caller feeds those ranges into the next street's solve instead of
+    asking the user to guess them -- see docs/plan.md.
+
+    Same request contract as solve_spot (two positions, both ranges, a
+    3-5 card board, pot_bb); the difference is that the street's actions
+    are the line to narrow on, not a prefix to start a solve from.
+    Lossy the same way too: sizes are bucketed onto the menu and
+    disclosed in "bucketed_actions". The ranges are weights in [0, 1],
+    keyed by 169-type label where a hand's suit combos agree and by
+    specific combo ('AhKh') where they differ (HandRange's key formats);
+    the long tail under 2% of the heaviest hand is trimmed
+    (_trim_tail) and reported in "trimmed".
+    Costs one full solve of the street."""
+    config, _, bucket_notes = build_solve_config(spot, allow_terminal_actions=True)
+    # Solve the whole street, then walk the recorded line through it:
+    # build_solve_config seeded the line as prior_history, which a
+    # trainer never learns a strategy for, so undo that.
+    line = config.prior_history
+    config.prior_history = ()
+    config.first_to_act = 0
+
+    if not _solve_lock.acquire(blocking=False):
+        raise SolverBusy("Another solve is already running -- try again in a minute.")
+    try:
+        start = time.perf_counter()
+        trainer = RangeCfrTrainer(config)
+        exploitability_pct = trainer.train_until(
+            target_exploitability_pct, max_iterations, deadline=start + max_seconds
+        )
+        oop_range, ip_range = trainer.posterior_ranges(line)
+        oop_probability, ip_probability = trainer.line_probability(line)
+    except ValueError as e:
+        raise InvalidSolveRequest(str(e)) from e
+    finally:
+        _solve_lock.release()
+
+    oop, ip = spot.positions_in_hand
+
+    oop_kept, oop_trim = _trim_tail(oop_range)
+    ip_kept, ip_trim = _trim_tail(ip_range)
+
+    return {
+        "source": "live_solve",
+        "iterations": trainer.iterations,
+        "exploitability_pct": exploitability_pct,
+        "converged": exploitability_pct < target_exploitability_pct,
+        "ranges": {oop: oop_kept, ip: ip_kept},
+        # What the tail trim removed (see _trim_tail), so it's measured, not
+        # hidden: hands dropped and the share of the range's total weight.
+        "trimmed": {oop: oop_trim, ip: ip_trim},
+        # How likely each player was to take their side of the line at all
+        # (posterior mass / prior mass). Near 0 = the equilibrium almost
+        # never plays it and the ranges above are numerical noise.
+        "line_probability": {oop: oop_probability, ip: ip_probability},
         "bucketed_actions": bucket_notes,
     }

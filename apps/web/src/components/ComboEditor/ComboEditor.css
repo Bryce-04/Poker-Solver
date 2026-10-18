@@ -1,0 +1,97 @@
+.combo-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  max-width: 30rem;
+}
+
+.combo-editor__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.combo-editor__count {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.combo-editor__bulk {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.combo-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.combo-editor__gap {
+  min-height: 2.75rem; /* keeps the 4x4 shape so every combo has a fixed spot */
+}
+
+.combo-editor__combo {
+  --w: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 0.2rem;
+  align-items: center;
+  min-height: 2.75rem; /* a comfortable touch target */
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-strong);
+  --cell-bg: color-mix(in oklab, var(--range-in) calc(var(--w) * 100%), var(--range-empty));
+  background: var(--cell-bg);
+}
+
+/* The global button:hover would repaint it purple, hiding in/out. */
+button.combo-editor__combo:hover:not(:disabled) {
+  background: var(--cell-bg);
+}
+
+.combo-editor__combo[data-selected="true"] {
+  color: var(--range-in-contrast);
+}
+
+.combo-editor__combo:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.combo-editor__combo:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* Red suits stay readable on both the empty and the filled backgrounds. */
+.combo-editor__combo [data-suit="h"],
+.combo-editor__combo [data-suit="d"] {
+  color: var(--danger);
+}
+
+.combo-editor__combo[data-selected="true"] [data-suit="h"],
+.combo-editor__combo[data-selected="true"] [data-suit="d"] {
+  color: inherit;
+}
+
+.combo-editor__weight {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 0.55rem;
+  opacity: 0.85;
+}
