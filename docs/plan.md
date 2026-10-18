@@ -153,6 +153,44 @@ web (React/TS) -> api (FastAPI) -> solver (Python, MCCFR + equity)
                                  -> auth (Supabase, hosted by a teammate)
 ```
 
+## Next up: Swipe Drill (mobile-first, an early slice of Stage 7)
+
+Chosen 2026-10-18 as the phone-specific feature for the next demo: the
+practice mode Stage 7 calls for, built around how a phone is held.
+
+**The loop.** The app shows a spot — board, positions, pot, the action so
+far — and *your* hand. You swipe to act (e.g. left = fold/check, right =
+call, up = bet/raise; a size picker or a long-press for bet sizes), and
+the phone gives haptic feedback plus an immediate verdict scored against
+the solver's strategy for that exact hand. Then the next card. A session
+ends with a score and the spots you missed most.
+
+**What already exists to build on.** The solver returns a per-hand action
+mix (`LiveSolveResponse.strategy`), the Strategy chart already renders
+one, reference ranges give realistic hands to deal, and the click-through
+builder and hand-history parser describe spots in the same `Spot` shape.
+
+**Design points to settle before building:**
+- **Pre-solved spots, not live solves.** A drill needs an answer instantly;
+  a live solve takes seconds locally and up to ~90 s on Render. Solve a
+  deck of spots ahead of time (locally, where it's ~10x faster) and ship
+  the results as data, so a drill never waits on the API.
+- **Scoring a mixed strategy.** Equilibrium strategies often mix (e.g. a
+  hand checks 52% and bets 48%). Grade by the chosen action's solver
+  frequency — e.g. full credit at ≥ 50%, partial credit for a smaller but
+  real frequency, a miss below a few percent — rather than one "right"
+  answer. Show the full mix after each swipe so the player learns why.
+- **Mobile-only pieces.** Swipe gestures and `@capacitor/haptics` vibration
+  on Android/iOS; the desktop version can fall back to buttons and
+  arrow keys, or simply point people to the phone.
+- **What a "deck" is.** Probably themed decks (e.g. "BB vs BTN single-raised
+  pots, dry flops") built from the reference ranges, with hands dealt
+  weighted by how often they're actually in range.
+
+Open questions for the team: offline-first or tied to sign-in (save scores
+per user, which Stage 6 auth now supports)? And how many pre-solved spots
+make a deck feel fresh?
+
 ## Future direction: widening the solver
 
 Once Stage 5's narrow scope is validated and cached in production, in
