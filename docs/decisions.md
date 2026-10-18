@@ -53,6 +53,19 @@ the UI must warn on a low value before chaining it. Also tightened
 `label_to_combos`, which had accepted `Ah` as AA. Strategy *output* is
 still per label; per-combo strategies are the next piece.
 
+**Update, same day — suit editor in the grid.** `lib/rangeCombos.ts` mirrors
+the solver's key rule on the frontend (label weight first, combo keys
+override; `setComboWeight` re-encodes compactly — back to one label key when
+all combos agree, otherwise one key per live combo and no label key).
+`RangeGrid` reads everything through it: cells shade by mean combo weight,
+a corner dot marks a partly-filled hand type, the combo count is exact, and
+a whole-hand toggle/paint wipes that hand's per-suit edits (it previously
+would have ignored them). A "Suits" toggle puts the grid in select mode: a
+tap opens `components/ComboEditor` (4×4 suit grid; board-blocked combos
+greyed via `deadCards`, which `SolvePage` passes). It sits below the grid
+for now; moving it into a phone bottom sheet / desktop side panel is the
+next step. Not yet checked on a device.
+
 **Not done yet.** The UI step ("use narrowed range" feeding the next
 street), and running `pytest apps/api` against Postgres (none available this
 session; `narrow_ranges` was called directly).

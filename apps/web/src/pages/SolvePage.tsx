@@ -650,7 +650,11 @@ export function SolvePage() {
                 </span>
               )}
             </div>
-            <RangeGrid value={oopRange} onChange={(r) => setRangeFor(oopPosition, r)} />
+            <RangeGrid
+              value={oopRange}
+              onChange={(r) => setRangeFor(oopPosition, r)}
+              deadCards={board.kind === "ok" ? board.cards : []}
+            />
           </section>
 
           <section className="spot-builder__section">
@@ -682,7 +686,11 @@ export function SolvePage() {
                 </span>
               )}
             </div>
-            <RangeGrid value={ipRange} onChange={(r) => setRangeFor(ipPosition, r)} />
+            <RangeGrid
+              value={ipRange}
+              onChange={(r) => setRangeFor(ipPosition, r)}
+              deadCards={board.kind === "ok" ? board.cards : []}
+            />
           </section>
         </Step>
 

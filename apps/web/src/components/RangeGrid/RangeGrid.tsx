@@ -2,6 +2,14 @@ import { useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import type { HandRange } from "@poker-solver/schema";
 import { HAND_GRID } from "../../lib/hands";
+import {
+  indexRange,
+  isPartial,
+  labelWeight,
+  setLabelWeight,
+  totalCombos,
+} from "../../lib/rangeCombos";
+import { ComboEditor } from "../ComboEditor/ComboEditor";
 import "./RangeGrid.css";
 
 export interface RangeGridProps {
@@ -13,6 +21,9 @@ export interface RangeGridProps {
   /** Render read-only (Stage 2 reference-chart display) instead of an
    * editable selector. Defaults to editable. */
   readOnly?: boolean;
+  /** Board cards ("Ks", "7h"...) whose combos can't be held -- greyed out
+   * in the suit editor. */
+  deadCards?: readonly string[];
 }
 
 // Preset brush frequencies for weighted selection. Painting writes the
@@ -20,12 +31,6 @@ export interface RangeGridProps {
 const BRUSH_WEIGHTS = [1, 0.75, 0.5, 0.25] as const;
 
 const LAST = 12; // 13x13 grid, indices 0..12
-
-/** Combos per hand class: 6 for a pair, 4 suited, 12 offsuit. */
-function comboCount(hand: string): number {
-  if (hand.length === 2) return 6;
-  return hand.endsWith("s") ? 4 : 12;
-}
 
 const TOTAL_COMBOS = 1326;
 
@@ -45,35 +50,41 @@ const TOTAL_COMBOS = 1326;
  *
  * Read-only mode drops all of that and just renders the shaded grid.
  */
-export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps) {
+export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }: RangeGridProps) {
   const [brush, setBrush] = useState<number>(1);
   const [focus, setFocus] = useState<[number, number]>([0, 0]);
   // Active drag direction, or null when not painting. Ref, not state --
   // it's read/written inside pointer handlers and never needs a re-render.
   const paintRef = useRef<null | "fill" | "erase">(null);
   const cellRefs = useRef(new Map<string, HTMLButtonElement>());
+  // "Suits" mode: a tap selects a hand type for the suit editor below the
+  // grid instead of toggling it (no painting, so a drag can't edit by accident).
+  const [suitsMode, setSuitsMode] = useState(false);
+  const [selectedHand, setSelectedHand] = useState<string | null>(null);
 
-  const weightOf = (hand: string) => value[hand] ?? 0;
+  // Keys can be hand types ("AKs") or specific combos ("AhKh"); everything
+  // below reads the range through this one suit-aware view.
+  const index = useMemo(() => indexRange(value), [value]);
+  const weightOf = (hand: string) => labelWeight(index, hand);
 
   const summary = useMemo(() => {
-    let combos = 0;
-    for (const [hand, w] of Object.entries(value)) {
-      if (w > 0) combos += w * comboCount(hand);
-    }
+    const combos = totalCombos(index);
     return {
       combos: Math.round(combos * 10) / 10,
       pct: Math.round((combos / TOTAL_COMBOS) * 1000) / 10,
     };
-  }, [value]);
+  }, [index]);
 
   function writeHand(hand: string, weight: number): void {
-    const next = { ...value };
-    if (weight <= 0) delete next[hand];
-    else next[hand] = weight;
-    onChange(next);
+    // Whole-hand writes replace any per-suit edits that hand type had.
+    onChange(setLabelWeight(value, hand, weight));
   }
 
   function toggleHand(hand: string): void {
+    if (suitsMode) {
+      setSelectedHand(hand);
+      return;
+    }
     writeHand(hand, weightOf(hand) > 0 ? 0 : brush);
   }
 
@@ -87,6 +98,10 @@ export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps)
   function onCellPointerDown(e: PointerEvent<HTMLButtonElement>, hand: string): void {
     // Left button only; e.button can be 0 or undefined for the primary press.
     if (readOnly || (e.button && e.button !== 0)) return;
+    if (suitsMode) {
+      setSelectedHand(hand);
+      return;
+    }
     paintRef.current = weightOf(hand) > 0 ? "erase" : "fill";
     paint(hand);
   }
@@ -155,15 +170,18 @@ export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps)
       "data-selected": weight > 0,
       "data-tier": weight >= 0.5 ? "high" : "low",
       "data-diagonal": r === c || undefined,
-      "aria-label":
-        weight > 0 && weight < 1
+      "data-partial": isPartial(index, hand) || undefined,
+      "data-picked": hand === selectedHand || undefined,
+      "aria-label": isPartial(index, hand)
+        ? `${hand}, some suits`
+        : weight > 0 && weight < 1
           ? `${hand}, ${Math.round(weight * 100)}%`
           : hand,
       style: { "--w": weight } as CSSProperties,
       children: (
         <>
           <span className="range-grid__label">{hand}</span>
-          {weight > 0 && weight < 1 && (
+          {weight > 0 && weight < 1 && !isPartial(index, hand) && (
             <span className="range-grid__weight">
               {Math.round(weight * 100)}
             </span>
@@ -189,6 +207,18 @@ export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps)
               {Math.round(w * 100)}%
             </button>
           ))}
+          <button
+            type="button"
+            className="range-grid__brush range-grid__brush--suits"
+            data-active={suitsMode}
+            aria-pressed={suitsMode}
+            onClick={() => {
+              setSuitsMode(!suitsMode);
+              if (suitsMode) setSelectedHand(null);
+            }}
+          >
+            Suits
+          </button>
           <button
             type="button"
             className="range-grid__brush range-grid__brush--clear"
@@ -237,6 +267,20 @@ export function RangeGrid({ value, onChange, readOnly = false }: RangeGridProps)
           </div>
         ))}
       </div>
+
+      {!readOnly && suitsMode && (
+        selectedHand ? (
+          <ComboEditor
+            hand={selectedHand}
+            value={value}
+            onChange={onChange}
+            brush={brush}
+            deadCards={deadCards}
+          />
+        ) : (
+          <p className="range-grid__hint">Tap a hand to pick which suits are in the range.</p>
+        )
+      )}
 
       <p className="range-grid__summary">
         {summary.combos} combos <span aria-hidden="true">·</span>{" "}
