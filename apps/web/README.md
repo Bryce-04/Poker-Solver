@@ -58,6 +58,8 @@ src/
     TypeInPage.tsx              "/type-in" — Stage 3's plain-language entry
     ImportPage.tsx               "/import" — Stage 4's hand-history paste entry
     SolvePage.tsx                "/solve" — Stage 5's live MCCFR solve
+    DrillPage.tsx                "/drill" — the Swipe Drill; full screen, rendered
+                              outside the shell (see ## Swipe Drill)
     SavedSpotsPage.tsx          "/saved" — lists spots saved via apps/api
   components/
     SpotBuilder/              the spot builder form, reused by BuilderPage
@@ -66,6 +68,7 @@ src/
     StrategyGrid/             13×13 color-coded solve-result chart (SolvePage)
     StreetActions/            one street's action log + "add an action"
                               controls (SolvePage's click-through builder)
+    PlayingCard/              a face-up card ("Ah"); the drill forces white faces
     ErrorBoundary/            wraps every route (App.tsx): a render crash shows a
                               recoverable message, not a blank screen
   lib/
@@ -83,6 +86,9 @@ src/
                               instead of them being typed in
     cards.ts                   parseBoardText / boardFromCards — Stage 5's board
                               validation (SolvePage), typed or picked
+    drill.ts                   Swipe Drill logic, no React: deck types, gradeAction,
+                              swipe-direction -> action mapping, labels, shuffle
+    haptics.ts                 vibration on the drill's verdict (no-op on iOS Safari)
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions
@@ -316,6 +322,40 @@ blank screen a missing field once caused on a real phone.
 
 Reuses `SpotBuilder.css`'s `spot-builder__*` classes for every generic
 piece (fields, status blocks, buttons), same as `TypeInPage`/`ImportPage`.
+
+## Swipe Drill
+
+`pages/DrillPage.tsx` at `/drill`. A practice game, not a page of the app:
+`App.tsx` routes `/drill` to it directly, outside `Shell`, so there's no
+header or nav — just an X (top-left) back to `/`. It has three phases: a start
+screen (instructions, best score kept in `localStorage` under
+`drill.bestScore`), 15 cards, then a summary of the hands missed.
+
+**A card** is a purple felt table with a "You BB / Out of position vs BTN"
+seat badge above it, chips for what's owed ("BTN bets 1.4bb" in red, or "BB
+checked to you"), pot and depth, and the board and your hand on the felt.
+Left = fold/check, right = call, up = bet/raise (then a size picker); buttons
+at the bottom and the arrow keys do the same. Swipe zones brighten and the
+table tints as you drag; a finger swipe throws the card off-screen before it
+is graded. After each answer: a verdict (best / acceptable / miss), then the
+solver's full action mix for that hand, your pick bold and the solver's
+favorite starred.
+
+**Grading** (`lib/drill.ts`): an action is "best" if the solver plays it at
+least 40% of the time *or* it's the solver's top action (so a flat mix doesn't
+mark everything wrong), "acceptable" (half credit) at 10-40%, a miss below.
+
+**The deck is data, not live solves:** `src/data/drill-deck.json`, produced by
+`apps/api/scripts/make_drill_deck.py` (BB defend vs BTN open, single-raised
+pot, 100bb, 12 flops, 72 spots, each with the solver's mix for the dealt
+hand). It needs no API and works offline. Rerun the script after changing the
+solver, the ranges, or the bet-size menu — the deck does not update itself.
+
+**Theme:** its own purple palette, scoped under `.game` in `DrillPage.css`, the
+same in light and dark mode on purpose. **On a phone:** `index.html` plus
+`public/manifest.webmanifest` and the apple-touch icons let you Add to Home
+Screen (it opens on `/drill`); to try it on a LAN device, `pnpm exec vite
+--host`. Haptics need a native build — iOS Safari has no Vibration API.
 
 ## RangeGrid
 

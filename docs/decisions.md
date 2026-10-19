@@ -46,6 +46,12 @@ mix (bars use the Strategy chart's colors, your pick bold, the solver's top
 action starred). Bet sizes stay 25/75/125 (the solver's menu); 33/66/100 was
 considered and deferred pending the team.
 
+**Update, same day — the card is a felt table.** The white card read as a
+generic UI card rather than a poker scene, so the swipeable area is now a
+purple felt oval with a padded rail, and the board and hand sit directly on it
+(the playing cards keep white faces and a small shadow). Purely visual; the
+swipe, tint, and throw-off behavior is unchanged.
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;
