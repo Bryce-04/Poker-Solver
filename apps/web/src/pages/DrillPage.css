@@ -256,14 +256,22 @@
 }
 
 .card {
-  /* auto margins center the card in whatever height is left over. */
+  /* auto margins center the table in whatever height is left over. */
   margin: auto 0;
-  padding: 1rem 1.1rem 1.3rem;
-  border-radius: 20px;
-  background: var(--g-surface);
-  color: var(--g-ink);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
-  /* The card owns every touch on it, so a swipe doesn't scroll the page. */
+  padding: 1.6rem 1.2rem 1.7rem;
+  /* A poker table seen from above: purple felt, a darker padded rail, and a
+     thin light edge. The cards sit straight on the felt. */
+  border-radius: 7rem / 5.5rem;
+  background:
+    radial-gradient(90% 80% at 50% 38%, #7c4fe0 0%, #5b2fb8 55%, #46228f 100%);
+  border: 0.7rem solid #241048;
+  box-shadow:
+    0 0 0 2px #8b6bd9,
+    inset 0 0 0 2px rgba(255, 255, 255, 0.12),
+    inset 0 8px 30px rgba(0, 0, 0, 0.35),
+    0 16px 36px rgba(0, 0, 0, 0.5);
+  color: var(--g-text);
+  /* The table owns every touch on it, so a swipe doesn't scroll the page. */
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -272,14 +280,15 @@
   animation: card-in 0.28s ease-out;
   /* --tint (0..1) is set while dragging; a colored wash fades in with it. */
   position: relative;
+  text-align: center;
 }
 .card::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--g-accent-strong);
-  opacity: calc(var(--tint, 0) * 0.28);
+  background: #fff;
+  opacity: calc(var(--tint, 0) * 0.22);
   pointer-events: none;
 }
 .card.is-dragging {
@@ -290,17 +299,18 @@
   transition: transform 0.2s ease-in;
 }
 .card__label {
-  margin: 0.5rem 0 0.35rem;
+  margin: 0.6rem 0 0.4rem;
   font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--g-ink-muted);
+  color: rgba(255, 255, 255, 0.65);
 }
 .card__label:first-child {
   margin-top: 0;
 }
 .card__row {
   display: flex;
+  justify-content: center;
   gap: 0.4rem;
 }
 .card__row--hand {
@@ -574,6 +584,9 @@
 .game .playing-card[data-suit="h"],
 .game .playing-card[data-suit="d"] {
   color: #d32f2f;
+}
+.card .playing-card {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
 }
 .game .recap .playing-card,
 .game .missed .playing-card {
