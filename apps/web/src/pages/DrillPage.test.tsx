@@ -55,3 +55,38 @@ describe("DrillPage", () => {
     expect(localStorage.getItem("drill.bestScore")).not.toBeNull();
   });
 });
+
+describe("DrillPage table color", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("starts purple and switches the whole scene when a color is picked", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/drill"]}>
+        <DrillPage />
+      </MemoryRouter>,
+    );
+    const game = container.querySelector(".game")!;
+    expect(game.getAttribute("data-theme")).toBe("purple");
+    fireEvent.click(screen.getByRole("radio", { name: /ocean/i }));
+    expect(game.getAttribute("data-theme")).toBe("ocean");
+    expect(localStorage.getItem("drill.theme")).toBe("ocean");
+  });
+
+  it("remembers the pick next time, and ignores a bad stored value", () => {
+    localStorage.setItem("drill.theme", "midnight");
+    const { container, unmount } = render(
+      <MemoryRouter initialEntries={["/drill"]}>
+        <DrillPage />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector(".game")!.getAttribute("data-theme")).toBe("midnight");
+    unmount();
+    localStorage.setItem("drill.theme", "hotpink");
+    const again = render(
+      <MemoryRouter initialEntries={["/drill"]}>
+        <DrillPage />
+      </MemoryRouter>,
+    );
+    expect(again.container.querySelector(".game")!.getAttribute("data-theme")).toBe("purple");
+  });
+});

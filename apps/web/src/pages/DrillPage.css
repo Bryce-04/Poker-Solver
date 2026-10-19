@@ -14,6 +14,19 @@
   --g-panel: rgba(255, 255, 255, 0.09);
   --g-accent: #a78bfa;
   --g-accent-strong: #8b5cf6;
+  /* Fills that carry white text (badge, primary button): dark enough for it. */
+  --g-btn-1: #9468f7;
+  --g-btn-2: #7c3aed;
+  --g-glow: rgba(139, 92, 246, 0.45);
+  --g-bar-end: #e9d5ff;
+  --g-bet-bg: rgba(167, 139, 250, 0.25);
+  --g-bet-line: rgba(167, 139, 250, 0.7);
+  /* The table: felt (light centre to dark edge), padded rail, thin outer edge. */
+  --g-felt-1: #7c4fe0;
+  --g-felt-2: #5b2fb8;
+  --g-felt-3: #46228f;
+  --g-rail: #241048;
+  --g-rim: #8b6bd9;
   --g-good: #34d399;
   --g-ok: #fbbf24;
   --g-bad: #f87171;
@@ -29,6 +42,72 @@
   color: var(--g-text);
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* --- table colors ----------------------------------------------------------
+   The player's pick (data-theme on .game, see lib/drillTheme.ts). Purple is the
+   default above. Only the scene changes: the verdict colors (green / amber /
+   red), the solver-bar colors and the white playing-card faces never do, so
+   what a color *means* doesn't depend on the theme. */
+
+.game[data-theme="midnight"] {
+  --g-bg-top: #26262d;
+  --g-bg-bottom: #050507;
+  --g-text: #f5f5f7;
+  --g-text-muted: #b4b4c0;
+  --g-accent: #b8b8c6;
+  --g-accent-strong: #8e8e9c;
+  --g-btn-1: #6f6f7d;
+  --g-btn-2: #50505c;
+  --g-glow: rgba(180, 180, 200, 0.28);
+  --g-bar-end: #f1f1f5;
+  --g-bet-bg: rgba(184, 184, 198, 0.2);
+  --g-bet-line: rgba(184, 184, 198, 0.65);
+  --g-felt-1: #43434d;
+  --g-felt-2: #2c2c34;
+  --g-felt-3: #1d1d23;
+  --g-rail: #0a0a0d;
+  --g-rim: #7d7d8b;
+}
+
+.game[data-theme="ocean"] {
+  --g-bg-top: #14407f;
+  --g-bg-bottom: #071836;
+  --g-text: #eef5ff;
+  --g-text-muted: #b3c9ee;
+  --g-accent: #7db3f7;
+  --g-accent-strong: #3b82f6;
+  --g-btn-1: #3b82f6;
+  --g-btn-2: #1d56c9;
+  --g-glow: rgba(59, 130, 246, 0.45);
+  --g-bar-end: #dbeafe;
+  --g-bet-bg: rgba(125, 179, 247, 0.22);
+  --g-bet-line: rgba(125, 179, 247, 0.7);
+  --g-felt-1: #3f7fe0;
+  --g-felt-2: #2459b8;
+  --g-felt-3: #173f8a;
+  --g-rail: #0a1e4a;
+  --g-rim: #7fb0f5;
+}
+
+.game[data-theme="emerald"] {
+  --g-bg-top: #0f5238;
+  --g-bg-bottom: #04231a;
+  --g-text: #effcf5;
+  --g-text-muted: #b2dcc6;
+  --g-accent: #5ed3a1;
+  --g-accent-strong: #10b981;
+  --g-btn-1: #0f9d6e;
+  --g-btn-2: #087453;
+  --g-glow: rgba(16, 185, 129, 0.4);
+  --g-bar-end: #d1fae5;
+  --g-bet-bg: rgba(94, 211, 161, 0.2);
+  --g-bet-line: rgba(94, 211, 161, 0.65);
+  --g-felt-1: #2f9467;
+  --g-felt-2: #1d6f4b;
+  --g-felt-3: #145238;
+  --g-rail: #08261b;
+  --g-rim: #6fcfa3;
 }
 
 .game h1,
@@ -81,7 +160,7 @@
 .progress__bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--g-accent), #e9d5ff);
+  background: linear-gradient(90deg, var(--g-accent), var(--g-bar-end));
   transition: width 0.3s ease;
 }
 .progress__stats {
@@ -180,8 +259,8 @@
   min-width: 5.2rem;
   padding: 0.45rem 0.9rem 0.5rem;
   border-radius: 16px;
-  background: linear-gradient(160deg, var(--g-accent), var(--g-accent-strong));
-  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45);
+  background: linear-gradient(160deg, var(--g-btn-1), var(--g-btn-2));
+  box-shadow: 0 6px 18px var(--g-glow);
   color: #fff;
   line-height: 1;
 }
@@ -263,10 +342,10 @@
      thin light edge. The cards sit straight on the felt. */
   border-radius: 7rem / 5.5rem;
   background:
-    radial-gradient(90% 80% at 50% 38%, #7c4fe0 0%, #5b2fb8 55%, #46228f 100%);
-  border: 0.7rem solid #241048;
+    radial-gradient(90% 80% at 50% 38%, var(--g-felt-1) 0%, var(--g-felt-2) 55%, var(--g-felt-3) 100%);
+  border: 0.7rem solid var(--g-rail);
   box-shadow:
-    0 0 0 2px #8b6bd9,
+    0 0 0 2px var(--g-rim),
     inset 0 0 0 2px rgba(255, 255, 255, 0.12),
     inset 0 8px 30px rgba(0, 0, 0, 0.35),
     0 16px 36px rgba(0, 0, 0, 0.5);
@@ -372,8 +451,8 @@
   cursor: default;
 }
 .btn--bet {
-  background: rgba(167, 139, 250, 0.25);
-  border-color: rgba(167, 139, 250, 0.7);
+  background: var(--g-bet-bg);
+  border-color: var(--g-bet-line);
 }
 .btn--ghost {
   background: transparent;
@@ -384,7 +463,7 @@
   min-height: 3.4rem;
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(160deg, var(--g-accent), var(--g-accent-strong));
+  background: linear-gradient(160deg, var(--g-btn-1), var(--g-btn-2));
   color: #fff;
   font: inherit;
   font-size: 1.1rem;
@@ -591,4 +670,75 @@
 .game .recap .playing-card,
 .game .missed .playing-card {
   box-shadow: none;
+}
+
+/* --- table color picker (start screen) ------------------------------------ */
+
+.themes {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.themes legend {
+  padding: 0;
+  margin: 0 auto 0.5rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--g-text-muted);
+}
+.themes__row {
+  display: flex;
+  gap: 0.9rem;
+}
+.themes__option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--g-text-muted);
+  cursor: pointer;
+}
+/* The radio itself is visually hidden but stays focusable and keyboard-operable. */
+.themes__option input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.themes__swatch {
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 50%;
+  border: 0.28rem solid var(--swatch-rail);
+  background: radial-gradient(circle at 50% 35%, var(--swatch-felt), var(--swatch-edge));
+  box-shadow: 0 0 0 2px var(--swatch-rim);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.themes__option input:checked + .themes__swatch {
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px var(--g-text), 0 0 0 5px var(--swatch-rim);
+}
+.themes__option input:focus-visible + .themes__swatch {
+  outline: 3px solid var(--g-text);
+  outline-offset: 4px;
+}
+.themes__option:has(input:checked) {
+  color: var(--g-text);
+  font-weight: 700;
+}
+
+/* Keyboard focus follows the table color, not the app-wide violet. */
+.game :focus-visible {
+  outline: 3px solid var(--g-text);
+  outline-offset: 3px;
 }

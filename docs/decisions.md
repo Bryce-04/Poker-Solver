@@ -52,6 +52,17 @@ purple felt oval with a padded rail, and the board and hand sit directly on it
 (the playing cards keep white faces and a small shadow). Purely visual; the
 swipe, tint, and throw-off behavior is unchanged.
 
+**Update, same day — choosable table color (drill only).** A "Table color"
+picker on the start screen: Purple (default, the brand color), Midnight
+(near-black, silver accent), Ocean, Emerald. Four curated themes rather than a
+free color picker, because each is tuned for text contrast (fills that carry
+white text use separate `--g-btn-*` tokens) and a free picker invites
+unreadable combinations. Drill-only on purpose: the drill is a mode you enter
+with its own look; recoloring the whole app would fight the light/dark tokens
+and every other screen. Only the scene changes — verdict green/amber/red, the
+solver-bar colors and the white card faces are constant, so a color's meaning
+never depends on the theme. Remembered in localStorage (`drill.theme`).
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;

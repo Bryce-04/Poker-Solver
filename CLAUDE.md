@@ -135,6 +135,10 @@ phone home screen (`public/manifest.webmanifest`, apple-touch icons). The
 design plan lives on the `plan-swipe-drill` branch's `docs/plan.md`; the
 decision record is `docs/decisions.md`'s 2026-10-19 entry. Bet sizes are
 deliberately still 25/75/125 (33/66/100 was considered, deferred to the team).
+The start screen has a "Table color" picker (Purple / Midnight / Ocean /
+Emerald, `lib/drillTheme.ts`, remembered in localStorage): drill-only, themes
+only the scene via CSS variables under `.game[data-theme=...]`; verdict
+colors, solver-bar colors and the white card faces are fixed on purpose.
 
 The new solver is merged (PR #21) and deployed, hardened for Render's
 free tier in PR #22 (single-threaded BLAS, one solve at a time with a 503

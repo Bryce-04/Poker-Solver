@@ -16,6 +16,13 @@ import {
   type Grade,
   type SwipeDirection,
 } from "../lib/drill";
+import {
+  DRILL_THEMES,
+  readTheme,
+  themeById,
+  writeTheme,
+  type DrillThemeId,
+} from "../lib/drillTheme";
 import { haptic } from "../lib/haptics";
 import "./DrillPage.css";
 
@@ -104,10 +111,27 @@ function Chips({ spot }: { spot: DrillSpot }) {
 }
 
 export function DrillPage() {
+  const [theme, setTheme] = useState<DrillThemeId>(readTheme);
+
+  // Tint the browser / status bar to match the table while the drill is open.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const previous = meta?.content;
+    if (meta) meta.content = themeById(theme).chrome;
+    return () => {
+      if (meta && previous !== undefined) meta.content = previous;
+    };
+  }, [theme]);
+
+  function pickTheme(id: DrillThemeId) {
+    setTheme(id);
+    writeTheme(id);
+  }
+
   return (
-    <div className="game">
+    <div className="game" data-theme={theme}>
       <ErrorBoundary>
-        <Game />
+        <Game theme={theme} onTheme={pickTheme} />
       </ErrorBoundary>
     </div>
   );
@@ -115,7 +139,7 @@ export function DrillPage() {
 
 type Phase = "start" | "playing" | "done";
 
-function Game() {
+function Game({ theme, onTheme }: { theme: DrillThemeId; onTheme: (id: DrillThemeId) => void }) {
   const [phase, setPhase] = useState<Phase>("start");
   const [round, setRound] = useState(() => Date.now());
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -152,7 +176,7 @@ function Game() {
         )}
       </header>
 
-      {phase === "start" && <Start best={best} onPlay={play} />}
+      {phase === "start" && <Start best={best} onPlay={play} theme={theme} onTheme={onTheme} />}
       {phase === "playing" && (
         <Playing
           key={round}
@@ -199,7 +223,17 @@ function Progress({ answers, total }: { answers: Answer[]; total: number }) {
   );
 }
 
-function Start({ best, onPlay }: { best: number | null; onPlay: () => void }) {
+function Start({
+  best,
+  onPlay,
+  theme,
+  onTheme,
+}: {
+  best: number | null;
+  onPlay: () => void;
+  theme: DrillThemeId;
+  onTheme: (id: DrillThemeId) => void;
+}) {
   return (
     <main className="start">
       <h1 className="start__title">Swipe Drill</h1>
@@ -219,6 +253,32 @@ function Start({ best, onPlay }: { best: number | null; onPlay: () => void }) {
       <p className="start__note">
         {SESSION_LENGTH} hands. Scored against a solved strategy for your exact cards.
       </p>
+      <fieldset className="themes">
+        <legend>Table color</legend>
+        <div className="themes__row">
+          {DRILL_THEMES.map((t) => (
+            <label key={t.id} className="themes__option">
+              <input
+                type="radio"
+                name="drill-theme"
+                value={t.id}
+                checked={theme === t.id}
+                onChange={() => onTheme(t.id)}
+              />
+              <span
+                className="themes__swatch"
+                style={{
+                  ["--swatch-felt" as string]: t.felt,
+                  ["--swatch-edge" as string]: t.edge,
+                  ["--swatch-rail" as string]: t.rail,
+                  ["--swatch-rim" as string]: t.rim,
+                }}
+              />
+              {t.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       {best !== null && <p className="start__best">Best score: {best} / {SESSION_LENGTH}</p>}
       <button type="button" className="game__primary" onClick={onPlay} autoFocus>
         Play

@@ -88,6 +88,7 @@ src/
                               validation (SolvePage), typed or picked
     drill.ts                   Swipe Drill logic, no React: deck types, gradeAction,
                               swipe-direction -> action mapping, labels, shuffle
+    drillTheme.ts              the drill's table-color choices + remembered pick
     haptics.ts                 vibration on the drill's verdict (no-op on iOS Safari)
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
@@ -351,8 +352,15 @@ pot, 100bb, 12 flops, 72 spots, each with the solver's mix for the dealt
 hand). It needs no API and works offline. Rerun the script after changing the
 solver, the ranges, or the bet-size menu — the deck does not update itself.
 
-**Theme:** its own purple palette, scoped under `.game` in `DrillPage.css`, the
-same in light and dark mode on purpose. **On a phone:** `index.html` plus
+**Theme:** its own palette, scoped under `.game` in `DrillPage.css`, the same
+in light and dark mode on purpose. Purple is the default; the start screen's
+"Table color" picker offers Midnight, Ocean and Emerald too (`lib/drillTheme.ts`;
+remembered under `drill.theme`; also tints the browser/status bar). A theme is a
+set of `--g-*` variables under `.game[data-theme="..."]` and changes the scene
+only: the verdict colors (green/amber/red), the solver-bar colors and the white
+card faces never change, so what a color means doesn't depend on the theme. To
+add a theme, add a block there and an entry in `DRILL_THEMES` (the swatch
+colors are repeated in the TS entry). **On a phone:** `index.html` plus
 `public/manifest.webmanifest` and the apple-touch icons let you Add to Home
 Screen (it opens on `/drill`); to try it on a LAN device, `pnpm exec vite
 --host`. Haptics need a native build — iOS Safari has no Vibration API.
