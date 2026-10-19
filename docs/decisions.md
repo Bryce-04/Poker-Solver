@@ -31,6 +31,21 @@ of the time or it is the solver's top action for that hand (a flat 34/33/33
 mix shouldn't mark everything wrong), "good" (half credit) at 10-40%, a miss
 below. After every answer the full mix is shown.
 
+**Update, same day — game mode and a purple look.** `/drill` now renders
+outside the app shell (`App.tsx`: `/drill` is its own route, everything else is
+`Shell`): full screen, no header or nav, an X back to the app, a start screen
+with the best score (localStorage), and a summary. Own purple theme, identical
+in light and dark mode on purpose (a mode you enter, scoped under `.game`; the
+playing cards force white faces because the app-wide tokens flip in dark mode).
+Position is the headline: a large "You BB" badge with "Out of position" /
+"In position", plus chips for who owes what ("BTN bets 1.4bb", "BB checked to
+you"), pot and depth. Swipe zones brighten and the card tints as you drag, a
+finger swipe throws the card off-screen before grading, controls sit at the
+bottom for thumb reach, and feedback is a full-width verdict then the solver's
+mix (bars use the Strategy chart's colors, your pick bold, the solver's top
+action starred). Bet sizes stay 25/75/125 (the solver's menu); 33/66/100 was
+considered and deferred pending the team.
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;

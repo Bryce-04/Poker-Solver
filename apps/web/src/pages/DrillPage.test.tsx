@@ -1,30 +1,57 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it } from "vitest";
 import { DrillPage } from "./DrillPage";
 
+function open() {
+  render(
+    <MemoryRouter initialEntries={["/drill"]}>
+      <DrillPage />
+    </MemoryRouter>,
+  );
+}
+
+function play() {
+  fireEvent.click(screen.getByRole("button", { name: "Play" }));
+}
+
 describe("DrillPage", () => {
-  it("deals a card and shows the board and hand", () => {
-    render(<DrillPage />);
-    expect(screen.getByText(/Card 1 of 15/)).toBeTruthy();
+  beforeEach(() => localStorage.clear());
+
+  it("opens on a start screen with an exit button", () => {
+    open();
+    expect(screen.getByRole("heading", { name: "Swipe Drill" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /exit the drill/i }).getAttribute("href")).toBe("/");
+  });
+
+  it("deals a card that says who you are, with the board and hand", () => {
+    open();
+    play();
+    expect(screen.getByText("You")).toBeTruthy();
     expect(screen.getByText("Board")).toBeTruthy();
     expect(screen.getByText("Your hand")).toBeTruthy();
+    expect(screen.getByText(/1 \/ 15/)).toBeTruthy();
   });
 
   it("grades an answer, shows the solver's mix, and advances", () => {
-    render(<DrillPage />);
+    open();
+    play();
     // Left is always legal: check or fold.
     fireEvent.keyDown(window, { key: "ArrowLeft" });
-    expect(screen.getByRole("status").textContent).toMatch(/solver plays/);
-    fireEvent.click(screen.getByRole("button", { name: /next card/i }));
-    expect(screen.getByText(/Card 2 of 15/)).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toMatch(/best move|acceptable|miss/i);
+    expect(screen.getByText(/of the time with this hand/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /next hand/i }));
+    expect(screen.getByText(/2 \/ 15/)).toBeTruthy();
   });
 
-  it("finishes with a score summary", () => {
-    render(<DrillPage />);
+  it("finishes with a score summary and remembers the best score", () => {
+    open();
+    play();
     for (let i = 0; i < 15; i++) {
       fireEvent.keyDown(window, { key: "ArrowLeft" });
-      fireEvent.click(screen.getByRole("button", { name: /next card|see results/i }));
+      fireEvent.click(screen.getByRole("button", { name: /next hand|see results/i }));
     }
     expect(screen.getByRole("button", { name: /play again/i })).toBeTruthy();
+    expect(localStorage.getItem("drill.bestScore")).not.toBeNull();
   });
 });

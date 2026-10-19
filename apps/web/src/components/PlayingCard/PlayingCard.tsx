@@ -9,7 +9,7 @@ const SUIT_NAME: Record<string, string> = {
 };
 
 /** One face-up card from a "Ah"-style string. */
-export function PlayingCard({ card, size = "md" }: { card: string; size?: "md" | "lg" }) {
+export function PlayingCard({ card, size = "md" }: { card: string; size?: "md" | "lg" | "xl" }) {
   const rank = card[0] === "T" ? "10" : card[0];
   const suit = card[1].toLowerCase();
   return (

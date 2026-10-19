@@ -23,55 +23,65 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
  * (Stage 3), Import (Stage 4 hand-history paste), Solve (Stage 5's live
  * MCCFR solve). See docs/plan.md.
  */
+function Shell() {
+  return (
+    <div className="app">
+      <header className="app__header">
+        <div className="app__title">
+          <img className="app__logo" src="/favicon.svg" alt="" />
+          <h1>Poker Solver</h1>
+        </div>
+        <p className="app__tagline">
+          Manual hand builder, preflop reference charts, and a postflop
+          solver.
+        </p>
+        <nav className="app__nav">
+          <NavLink to="/" end className={navLinkClassName}>
+            Builder
+          </NavLink>
+          <NavLink to="/saved" className={navLinkClassName}>
+            Saved
+          </NavLink>
+          <NavLink to="/type-in" className={navLinkClassName}>
+            Type in
+          </NavLink>
+          <NavLink to="/import" className={navLinkClassName}>
+            Import
+          </NavLink>
+          <NavLink to="/solve" className={navLinkClassName}>
+            Solve
+          </NavLink>
+          <NavLink to="/drill" className={navLinkClassName}>
+            Drill
+          </NavLink>
+        </nav>
+        <AuthStatus />
+      </header>
+      <main>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<BuilderPage />} />
+            <Route path="/saved" element={<SavedSpotsPage />} />
+            <Route path="/type-in" element={<TypeInPage />} />
+            <Route path="/import" element={<ImportPage />} />
+            <Route path="/solve" element={<SolvePage />} />
+          </Routes>
+        </ErrorBoundary>
+      </main>
+    </div>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="app">
-          <header className="app__header">
-            <div className="app__title">
-              <img className="app__logo" src="/favicon.svg" alt="" />
-              <h1>Poker Solver</h1>
-            </div>
-            <p className="app__tagline">
-              Manual hand builder, preflop reference charts, and a postflop
-              solver.
-            </p>
-            <nav className="app__nav">
-              <NavLink to="/" end className={navLinkClassName}>
-                Builder
-              </NavLink>
-              <NavLink to="/saved" className={navLinkClassName}>
-                Saved
-              </NavLink>
-              <NavLink to="/type-in" className={navLinkClassName}>
-                Type in
-              </NavLink>
-              <NavLink to="/import" className={navLinkClassName}>
-                Import
-              </NavLink>
-              <NavLink to="/solve" className={navLinkClassName}>
-                Solve
-              </NavLink>
-              <NavLink to="/drill" className={navLinkClassName}>
-                Drill
-              </NavLink>
-            </nav>
-            <AuthStatus />
-          </header>
-          <main>
-            <ErrorBoundary>
-              <Routes>
-                <Route path="/" element={<BuilderPage />} />
-                <Route path="/saved" element={<SavedSpotsPage />} />
-                <Route path="/type-in" element={<TypeInPage />} />
-                <Route path="/import" element={<ImportPage />} />
-                <Route path="/solve" element={<SolvePage />} />
-                <Route path="/drill" element={<DrillPage />} />
-              </Routes>
-            </ErrorBoundary>
-          </main>
-        </div>
+        <Routes>
+          {/* The Swipe Drill is a full-screen "game": no header or nav
+              around it, and its own exit button back to the app. */}
+          <Route path="/drill" element={<DrillPage />} />
+          <Route path="*" element={<Shell />} />
+        </Routes>
       </BrowserRouter>
     </AuthProvider>
   );
