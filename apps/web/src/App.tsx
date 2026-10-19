@@ -7,6 +7,7 @@ import { SavedSpotsPage } from "./pages/SavedSpotsPage";
 import { TypeInPage } from "./pages/TypeInPage";
 import { ImportPage } from "./pages/ImportPage";
 import { SolvePage } from "./pages/SolvePage";
+import { DrillPage } from "./pages/DrillPage";
 import "./App.css";
 
 // react-router-dom v7's NavLink doesn't auto-apply an "active" class (that
@@ -52,6 +53,9 @@ function App() {
               <NavLink to="/solve" className={navLinkClassName}>
                 Solve
               </NavLink>
+              <NavLink to="/drill" className={navLinkClassName}>
+                Drill
+              </NavLink>
             </nav>
             <AuthStatus />
           </header>
@@ -63,6 +67,7 @@ function App() {
                 <Route path="/type-in" element={<TypeInPage />} />
                 <Route path="/import" element={<ImportPage />} />
                 <Route path="/solve" element={<SolvePage />} />
+                <Route path="/drill" element={<DrillPage />} />
               </Routes>
             </ErrorBoundary>
           </main>

@@ -6,6 +6,40 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-19 — Swipe Drill, first slice (`/drill`)
+
+**Status:** proposed (built on the `swipe-drill` branch, not yet tried on a device).
+
+**Context.** `docs/plan.md` (on `plan-swipe-drill`) picked a mobile-first
+practice mode: a card with a board and your hand, swipe to act, scored against
+the solver. Its first design point was pre-solved spots, since a live solve
+takes seconds to ~90 s.
+
+**Decision.** `apps/api/scripts/make_drill_deck.py` solves BB (defend range) vs
+BTN (open range) on 12 varied flops with `RangeCfrTrainer` (all under the
+0.5%-of-pot target) and writes `apps/web/src/data/drill-deck.json`. One solve
+gives every flop decision, so each board yields three card types: BB first to
+act, BTN facing a check, BTN facing a bet (size drawn by how often BB bets it).
+Per board and type, one hand is drawn by range weight and one is the most
+mixed of 12 drawn (so the deck isn't all obvious spots). 72 spots, shipped as
+app data: the drill needs no API and works offline. `DrillPage` deals 15 per
+session. Left = fold/check, right = call, up = bet/raise (then a size picker);
+buttons and arrow keys do the same on desktop.
+
+**Grading** (`lib/drill.ts`). A choice is "best" if the solver plays it >= 40%
+of the time or it is the solver's top action for that hand (a flat 34/33/33
+mix shouldn't mark everything wrong), "good" (half credit) at 10-40%, a miss
+below. After every answer the full mix is shown.
+
+**Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
+repo's approximate reference charts, so "correct" means correct against those
+ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;
+a native build would use `@capacitor/haptics`), saved scores, more decks,
+turn/river cards. The Add-to-Home-Screen manifest and icons were added so the
+web build installs as a home-screen app.
+
+---
+
 ## 2026-10-18 — 3-bet / 4-bet ranges and loading ranges from the preflop line
 
 **Status:** proposed.

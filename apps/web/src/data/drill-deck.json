@@ -1,0 +1,2316 @@
+{
+ "worstExploitabilityPct": 0.481,
+ "decks": [
+  {
+   "id": "bb-vs-btn-srp-flop",
+   "name": "BB vs BTN, single-raised pot",
+   "description": "BTN opened, BB called. Flop decisions for either seat, 100bb deep, scored against a solved strategy.",
+   "spots": [
+    {
+     "id": "AcKd9h-first_to_act-JcTs",
+     "board": [
+      "Ac",
+      "Kd",
+      "9h"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Jc",
+      "Ts"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.185,
+      "bet_small": 0.322,
+      "bet_medium": 0.427,
+      "bet_large": 0.066,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ks7h2d-facing_bet-5h4h",
+     "board": [
+      "Ks",
+      "7h",
+      "2d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "5h",
+      "4h"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.143,
+      "call": 0.756,
+      "bet_small": 0.002,
+      "bet_medium": 0.049,
+      "bet_large": 0.046,
+      "all_in": 0.005
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "9s8s6d-facing_check-AdTs",
+     "board": [
+      "9s",
+      "8s",
+      "6d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "Ts"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.53,
+      "bet_small": 0.0,
+      "bet_medium": 0.127,
+      "bet_large": 0.342,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "8h7d3c-facing_check-Qh9d",
+     "board": [
+      "8h",
+      "7d",
+      "3c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qh",
+      "9d"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.104,
+      "bet_small": 0.0,
+      "bet_medium": 0.359,
+      "bet_large": 0.537,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Th9h5s-facing_bet-AcKs",
+     "board": [
+      "Th",
+      "9h",
+      "5s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ac",
+      "Ks"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.557,
+      "call": 0.443,
+      "bet_small": 0.0,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     },
+     "facing": "bet_large"
+    },
+    {
+     "id": "Td5h5c-facing_check-Qc6c",
+     "board": [
+      "Td",
+      "5h",
+      "5c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qc",
+      "6c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.351,
+      "bet_small": 0.0,
+      "bet_medium": 0.403,
+      "bet_large": 0.245,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Th9h5s-first_to_act-AsQc",
+     "board": [
+      "Th",
+      "9h",
+      "5s"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "As",
+      "Qc"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.712,
+      "bet_small": 0.276,
+      "bet_medium": 0.006,
+      "bet_large": 0.006,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "7c6d2s-facing_bet-Jd9d",
+     "board": [
+      "7c",
+      "6d",
+      "2s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Jd",
+      "9d"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.415,
+      "call": 0.045,
+      "bet_small": 0.0,
+      "bet_medium": 0.351,
+      "bet_large": 0.189,
+      "all_in": 0.0
+     },
+     "facing": "bet_medium"
+    },
+    {
+     "id": "Ah8c3s-facing_bet-Qd9h",
+     "board": [
+      "Ah",
+      "8c",
+      "3s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qd",
+      "9h"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.695,
+      "call": 0.29,
+      "bet_small": 0.01,
+      "bet_medium": 0.003,
+      "bet_large": 0.002,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "9s8s6d-first_to_act-9c8c",
+     "board": [
+      "9s",
+      "8s",
+      "6d"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "9c",
+      "8c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.46,
+      "bet_small": 0.188,
+      "bet_medium": 0.3,
+      "bet_large": 0.053,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ah8c3s-facing_bet-As3h",
+     "board": [
+      "Ah",
+      "8c",
+      "3s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "As",
+      "3h"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.0,
+      "bet_small": 0.361,
+      "bet_medium": 0.571,
+      "bet_large": 0.066,
+      "all_in": 0.002
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "Ks7h2d-facing_check-8d8h",
+     "board": [
+      "Ks",
+      "7h",
+      "2d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "8d",
+      "8h"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.112,
+      "bet_small": 0.209,
+      "bet_medium": 0.669,
+      "bet_large": 0.01,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Th9h5s-facing_bet-AhKs",
+     "board": [
+      "Th",
+      "9h",
+      "5s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ah",
+      "Ks"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.008,
+      "call": 0.989,
+      "bet_small": 0.0,
+      "bet_medium": 0.001,
+      "bet_large": 0.002,
+      "all_in": 0.0
+     },
+     "facing": "bet_large"
+    },
+    {
+     "id": "Jc9d4d-facing_check-Ad8d",
+     "board": [
+      "Jc",
+      "9d",
+      "4d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "8d"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.001,
+      "bet_small": 0.39,
+      "bet_medium": 0.474,
+      "bet_large": 0.123,
+      "all_in": 0.012
+     }
+    },
+    {
+     "id": "7c6d2s-first_to_act-9c9h",
+     "board": [
+      "7c",
+      "6d",
+      "2s"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "9c",
+      "9h"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.256,
+      "bet_small": 0.298,
+      "bet_medium": 0.271,
+      "bet_large": 0.174,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "KhQh3h-first_to_act-Kd9h",
+     "board": [
+      "Kh",
+      "Qh",
+      "3h"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kd",
+      "9h"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.375,
+      "bet_small": 0.323,
+      "bet_medium": 0.291,
+      "bet_large": 0.011,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "9s8s6d-facing_check-QhTh",
+     "board": [
+      "9s",
+      "8s",
+      "6d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qh",
+      "Th"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.003,
+      "bet_small": 0.0,
+      "bet_medium": 0.39,
+      "bet_large": 0.607,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "9s8s6d-first_to_act-TcTd",
+     "board": [
+      "9s",
+      "8s",
+      "6d"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Tc",
+      "Td"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.253,
+      "bet_small": 0.109,
+      "bet_medium": 0.339,
+      "bet_large": 0.299,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "QdJh4c-facing_check-8c7c",
+     "board": [
+      "Qd",
+      "Jh",
+      "4c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "8c",
+      "7c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.199,
+      "bet_small": 0.001,
+      "bet_medium": 0.589,
+      "bet_large": 0.211,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ks7h2d-facing_bet-Kc3c",
+     "board": [
+      "Ks",
+      "7h",
+      "2d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kc",
+      "3c"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.092,
+      "bet_small": 0.383,
+      "bet_medium": 0.521,
+      "bet_large": 0.004,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "7c6d2s-facing_check-Kh8c",
+     "board": [
+      "7c",
+      "6d",
+      "2s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kh",
+      "8c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.982,
+      "bet_small": 0.0,
+      "bet_medium": 0.012,
+      "bet_large": 0.005,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Qs5c2c-facing_bet-KdTd",
+     "board": [
+      "Qs",
+      "5c",
+      "2c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kd",
+      "Td"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.001,
+      "call": 0.973,
+      "bet_small": 0.0,
+      "bet_medium": 0.021,
+      "bet_large": 0.005,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "Qs5c2c-first_to_act-Ac9c",
+     "board": [
+      "Qs",
+      "5c",
+      "2c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ac",
+      "9c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.418,
+      "bet_small": 0.315,
+      "bet_medium": 0.213,
+      "bet_large": 0.054,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "KhQh3h-first_to_act-KdQs",
+     "board": [
+      "Kh",
+      "Qh",
+      "3h"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kd",
+      "Qs"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.345,
+      "bet_small": 0.272,
+      "bet_medium": 0.255,
+      "bet_large": 0.128,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "QdJh4c-facing_bet-9h8h",
+     "board": [
+      "Qd",
+      "Jh",
+      "4c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "9h",
+      "8h"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.001,
+      "call": 0.997,
+      "bet_small": 0.0,
+      "bet_medium": 0.0,
+      "bet_large": 0.001,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "8h7d3c-facing_check-Ks8s",
+     "board": [
+      "8h",
+      "7d",
+      "3c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ks",
+      "8s"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.0,
+      "bet_small": 0.0,
+      "bet_medium": 0.052,
+      "bet_large": 0.947,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Th9h5s-facing_check-KhJc",
+     "board": [
+      "Th",
+      "9h",
+      "5s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kh",
+      "Jc"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.193,
+      "bet_small": 0.105,
+      "bet_medium": 0.288,
+      "bet_large": 0.414,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "AcKd9h-facing_bet-Jc8c",
+     "board": [
+      "Ac",
+      "Kd",
+      "9h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Jc",
+      "8c"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.963,
+      "call": 0.028,
+      "bet_small": 0.0,
+      "bet_medium": 0.005,
+      "bet_large": 0.004,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "7c6d2s-facing_bet-KcTh",
+     "board": [
+      "7c",
+      "6d",
+      "2s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kc",
+      "Th"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.571,
+      "call": 0.428,
+      "bet_small": 0.0,
+      "bet_medium": 0.001,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     },
+     "facing": "bet_medium"
+    },
+    {
+     "id": "Ks7h2d-first_to_act-Qc9c",
+     "board": [
+      "Ks",
+      "7h",
+      "2d"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qc",
+      "9c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.997,
+      "bet_small": 0.001,
+      "bet_medium": 0.002,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "8h7d3c-facing_bet-8c8s",
+     "board": [
+      "8h",
+      "7d",
+      "3c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "8c",
+      "8s"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.0,
+      "bet_small": 0.001,
+      "bet_medium": 0.635,
+      "bet_large": 0.172,
+      "all_in": 0.191
+     },
+     "facing": "bet_large"
+    },
+    {
+     "id": "Ks7h2d-first_to_act-Ad7c",
+     "board": [
+      "Ks",
+      "7h",
+      "2d"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "7c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.534,
+      "bet_small": 0.203,
+      "bet_medium": 0.262,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "9s8s6d-facing_bet-Ks6s",
+     "board": [
+      "9s",
+      "8s",
+      "6d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ks",
+      "6s"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.0,
+      "bet_small": 0.001,
+      "bet_medium": 0.479,
+      "bet_large": 0.238,
+      "all_in": 0.282
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "KhQh3h-facing_bet-QsJh",
+     "board": [
+      "Kh",
+      "Qh",
+      "3h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qs",
+      "Jh"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.261,
+      "bet_small": 0.122,
+      "bet_medium": 0.237,
+      "bet_large": 0.38,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "QdJh4c-facing_bet-Qc6c",
+     "board": [
+      "Qd",
+      "Jh",
+      "4c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qc",
+      "6c"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.2,
+      "bet_small": 0.305,
+      "bet_medium": 0.468,
+      "bet_large": 0.028,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "KhQh3h-facing_check-9c8c",
+     "board": [
+      "Kh",
+      "Qh",
+      "3h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "9c",
+      "8c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.37,
+      "bet_small": 0.097,
+      "bet_medium": 0.244,
+      "bet_large": 0.288,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "QdJh4c-first_to_act-3d3s",
+     "board": [
+      "Qd",
+      "Jh",
+      "4c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "3d",
+      "3s"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.515,
+      "bet_small": 0.485,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Td5h5c-facing_bet-KsJh",
+     "board": [
+      "Td",
+      "5h",
+      "5c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ks",
+      "Jh"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.242,
+      "bet_small": 0.0,
+      "bet_medium": 0.347,
+      "bet_large": 0.411,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "AcKd9h-facing_check-Ad8c",
+     "board": [
+      "Ac",
+      "Kd",
+      "9h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "8c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.004,
+      "bet_small": 0.011,
+      "bet_medium": 0.698,
+      "bet_large": 0.287,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "7c6d2s-first_to_act-QdTd",
+     "board": [
+      "7c",
+      "6d",
+      "2s"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qd",
+      "Td"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.962,
+      "bet_small": 0.001,
+      "bet_medium": 0.027,
+      "bet_large": 0.009,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Td5h5c-facing_bet-Ah4s",
+     "board": [
+      "Td",
+      "5h",
+      "5c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ah",
+      "4s"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 1.0,
+      "bet_small": 0.0,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "Th9h5s-first_to_act-KcTc",
+     "board": [
+      "Th",
+      "9h",
+      "5s"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kc",
+      "Tc"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.375,
+      "bet_small": 0.208,
+      "bet_medium": 0.215,
+      "bet_large": 0.201,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "KhQh3h-facing_bet-As4d",
+     "board": [
+      "Kh",
+      "Qh",
+      "3h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "As",
+      "4d"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.562,
+      "call": 0.383,
+      "bet_small": 0.0,
+      "bet_medium": 0.053,
+      "bet_large": 0.002,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "Td5h5c-facing_check-QdJh",
+     "board": [
+      "Td",
+      "5h",
+      "5c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qd",
+      "Jh"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.173,
+      "bet_small": 0.001,
+      "bet_medium": 0.351,
+      "bet_large": 0.474,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "QdJh4c-facing_check-AsKc",
+     "board": [
+      "Qd",
+      "Jh",
+      "4c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "As",
+      "Kc"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.143,
+      "bet_small": 0.043,
+      "bet_medium": 0.793,
+      "bet_large": 0.021,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ah8c3s-facing_check-7s5s",
+     "board": [
+      "Ah",
+      "8c",
+      "3s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "7s",
+      "5s"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.002,
+      "bet_small": 0.001,
+      "bet_medium": 0.912,
+      "bet_large": 0.085,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "AcKd9h-first_to_act-AdTh",
+     "board": [
+      "Ac",
+      "Kd",
+      "9h"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "Th"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.599,
+      "bet_small": 0.161,
+      "bet_medium": 0.119,
+      "bet_large": 0.122,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "AcKd9h-facing_bet-JdTc",
+     "board": [
+      "Ac",
+      "Kd",
+      "9h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Jd",
+      "Tc"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.008,
+      "call": 0.432,
+      "bet_small": 0.0,
+      "bet_medium": 0.221,
+      "bet_large": 0.335,
+      "all_in": 0.004
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "Td5h5c-first_to_act-AsKc",
+     "board": [
+      "Td",
+      "5h",
+      "5c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "As",
+      "Kc"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.352,
+      "bet_small": 0.248,
+      "bet_medium": 0.251,
+      "bet_large": 0.149,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Qs5c2c-facing_check-Kc8s",
+     "board": [
+      "Qs",
+      "5c",
+      "2c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Kc",
+      "8s"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.974,
+      "bet_small": 0.0,
+      "bet_medium": 0.005,
+      "bet_large": 0.021,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Jc9d4d-facing_bet-QdTs",
+     "board": [
+      "Jc",
+      "9d",
+      "4d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qd",
+      "Ts"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.945,
+      "bet_small": 0.0,
+      "bet_medium": 0.002,
+      "bet_large": 0.004,
+      "all_in": 0.049
+     },
+     "facing": "bet_medium"
+    },
+    {
+     "id": "KhQh3h-facing_check-Td7d",
+     "board": [
+      "Kh",
+      "Qh",
+      "3h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Td",
+      "7d"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.446,
+      "bet_small": 0.021,
+      "bet_medium": 0.253,
+      "bet_large": 0.279,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Th9h5s-facing_check-KsJs",
+     "board": [
+      "Th",
+      "9h",
+      "5s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ks",
+      "Js"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.501,
+      "bet_small": 0.058,
+      "bet_medium": 0.226,
+      "bet_large": 0.215,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Jc9d4d-facing_bet-Ad5s",
+     "board": [
+      "Jc",
+      "9d",
+      "4d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "5s"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.569,
+      "call": 0.409,
+      "bet_small": 0.0,
+      "bet_medium": 0.011,
+      "bet_large": 0.01,
+      "all_in": 0.0
+     },
+     "facing": "bet_medium"
+    },
+    {
+     "id": "8h7d3c-facing_bet-QdQs",
+     "board": [
+      "8h",
+      "7d",
+      "3c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qd",
+      "Qs"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 0.001,
+      "bet_small": 0.0,
+      "bet_medium": 0.84,
+      "bet_large": 0.103,
+      "all_in": 0.056
+     },
+     "facing": "bet_large"
+    },
+    {
+     "id": "Ah8c3s-facing_check-AcTd",
+     "board": [
+      "Ah",
+      "8c",
+      "3s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ac",
+      "Td"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.001,
+      "bet_small": 0.16,
+      "bet_medium": 0.505,
+      "bet_large": 0.334,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ks7h2d-facing_check-QhJd",
+     "board": [
+      "Ks",
+      "7h",
+      "2d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qh",
+      "Jd"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.973,
+      "bet_small": 0.024,
+      "bet_medium": 0.001,
+      "bet_large": 0.002,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Jc9d4d-first_to_act-Js9c",
+     "board": [
+      "Jc",
+      "9d",
+      "4d"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Js",
+      "9c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.275,
+      "bet_small": 0.267,
+      "bet_medium": 0.29,
+      "bet_large": 0.169,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Td5h5c-first_to_act-JsTs",
+     "board": [
+      "Td",
+      "5h",
+      "5c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Js",
+      "Ts"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.652,
+      "bet_small": 0.037,
+      "bet_medium": 0.295,
+      "bet_large": 0.016,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ah8c3s-first_to_act-KsQh",
+     "board": [
+      "Ah",
+      "8c",
+      "3s"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ks",
+      "Qh"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.032,
+      "bet_small": 0.968,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Qs5c2c-facing_bet-Td8d",
+     "board": [
+      "Qs",
+      "5c",
+      "2c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Td",
+      "8d"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.499,
+      "call": 0.497,
+      "bet_small": 0.0,
+      "bet_medium": 0.003,
+      "bet_large": 0.001,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "8h7d3c-first_to_act-5c5h",
+     "board": [
+      "8h",
+      "7d",
+      "3c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "5c",
+      "5h"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.25,
+      "bet_small": 0.165,
+      "bet_medium": 0.568,
+      "bet_large": 0.016,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "7c6d2s-facing_check-JhJs",
+     "board": [
+      "7c",
+      "6d",
+      "2s"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Jh",
+      "Js"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.0,
+      "bet_small": 0.001,
+      "bet_medium": 0.588,
+      "bet_large": 0.41,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Qs5c2c-facing_check-9h9s",
+     "board": [
+      "Qs",
+      "5c",
+      "2c"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "9h",
+      "9s"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.348,
+      "bet_small": 0.079,
+      "bet_medium": 0.451,
+      "bet_large": 0.122,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Jc9d4d-first_to_act-Th9c",
+     "board": [
+      "Jc",
+      "9d",
+      "4d"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Th",
+      "9c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.414,
+      "bet_small": 0.39,
+      "bet_medium": 0.193,
+      "bet_large": 0.003,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "QdJh4c-first_to_act-Qs5s",
+     "board": [
+      "Qd",
+      "Jh",
+      "4c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qs",
+      "5s"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.44,
+      "bet_small": 0.088,
+      "bet_medium": 0.385,
+      "bet_large": 0.087,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Qs5c2c-first_to_act-QcQd",
+     "board": [
+      "Qs",
+      "5c",
+      "2c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Qc",
+      "Qd"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.314,
+      "bet_small": 0.023,
+      "bet_medium": 0.335,
+      "bet_large": 0.327,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Ah8c3s-first_to_act-As9c",
+     "board": [
+      "Ah",
+      "8c",
+      "3s"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "As",
+      "9c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.464,
+      "bet_small": 0.308,
+      "bet_medium": 0.227,
+      "bet_large": 0.001,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "9s8s6d-facing_bet-AdQc",
+     "board": [
+      "9s",
+      "8s",
+      "6d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_bet",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ad",
+      "Qc"
+     ],
+     "actions": [
+      "fold",
+      "call",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "fold": 0.0,
+      "call": 1.0,
+      "bet_small": 0.0,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
+      "all_in": 0.0
+     },
+     "facing": "bet_small"
+    },
+    {
+     "id": "8h7d3c-first_to_act-Ah8c",
+     "board": [
+      "8h",
+      "7d",
+      "3c"
+     ],
+     "heroPosition": "BB",
+     "villainPosition": "BTN",
+     "situation": "first_to_act",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Ah",
+      "8c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.421,
+      "bet_small": 0.202,
+      "bet_medium": 0.048,
+      "bet_large": 0.329,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "AcKd9h-facing_check-Tc6c",
+     "board": [
+      "Ac",
+      "Kd",
+      "9h"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "Tc",
+      "6c"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.162,
+      "bet_small": 0.063,
+      "bet_medium": 0.465,
+      "bet_large": 0.31,
+      "all_in": 0.0
+     }
+    },
+    {
+     "id": "Jc9d4d-facing_check-7d6d",
+     "board": [
+      "Jc",
+      "9d",
+      "4d"
+     ],
+     "heroPosition": "BTN",
+     "villainPosition": "BB",
+     "situation": "facing_check",
+     "potBb": 5.5,
+     "stackBb": 97.5,
+     "hand": [
+      "7d",
+      "6d"
+     ],
+     "actions": [
+      "check",
+      "bet_small",
+      "bet_medium",
+      "bet_large",
+      "all_in"
+     ],
+     "mix": {
+      "check": 0.003,
+      "bet_small": 0.0,
+      "bet_medium": 0.007,
+      "bet_large": 0.99,
+      "all_in": 0.0
+     }
+    }
+   ]
+  }
+ ]
+}

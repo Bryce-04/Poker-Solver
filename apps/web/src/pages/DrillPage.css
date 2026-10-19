@@ -1,0 +1,206 @@
+.drill {
+  max-width: 26rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.drill__status {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.drill__card {
+  position: relative;
+  padding: 1rem 1.1rem 1.25rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  /* The card owns every touch on it, so a swipe doesn't scroll the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.drill__card.is-dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+.drill__card.is-best {
+  border-color: var(--success);
+}
+.drill__card.is-good {
+  border-color: var(--strategy-passive);
+}
+.drill__card.is-miss {
+  border-color: var(--danger);
+}
+
+.drill__positions {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.drill__situation {
+  margin: 0.15rem 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.drill__label {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.drill__cards {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.drill__hint {
+  position: absolute;
+  top: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.drill__hint--left {
+  right: 0.8rem;
+}
+.drill__hint--right {
+  left: 0.8rem;
+}
+.drill__hint--up {
+  right: 50%;
+  transform: translateX(50%);
+  top: auto;
+  bottom: 0.6rem;
+}
+
+.drill__prompt,
+.drill__muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+.drill__muted {
+  text-align: left;
+}
+
+.drill__buttons {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.drill__buttons button,
+.drill__next,
+.drill__cancel {
+  min-height: 2.75rem;
+  font-size: 0.95rem;
+}
+
+.drill__sizes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.drill__feedback {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.drill__feedback.is-best {
+  border-left-color: var(--success);
+}
+.drill__feedback.is-good {
+  border-left-color: var(--strategy-passive);
+}
+.drill__feedback.is-miss {
+  border-left-color: var(--danger);
+}
+
+.drill__verdict {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.drill__mix {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.drill__mix li {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr 2.6rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.drill__mix li.is-chosen .drill__mix-name {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.drill__mix-bar {
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--range-empty);
+  overflow: hidden;
+}
+.drill__mix-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.drill__mix-pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.drill__summary-title {
+  margin: 0;
+  font-size: 2.2rem;
+  color: var(--text-strong);
+}
+
+.drill__missed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  font-size: 0.9rem;
+}
+.drill__missed li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
