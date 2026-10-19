@@ -1,0 +1,594 @@
+/* The Swipe Drill is a full-screen "game" with its own purple look, the same
+   in light and dark mode on purpose: it is a mode you enter, not a page of
+   the app. Everything is scoped under .game; the tokens below are local. */
+
+.game {
+  --g-bg-top: #3b1a7a;
+  --g-bg-bottom: #1b0b3d;
+  --g-surface: #ffffff;
+  --g-ink: #1d1530;
+  --g-ink-muted: #6b6485;
+  --g-text: #f4efff;
+  --g-text-muted: #c7b8ee;
+  --g-line: rgba(255, 255, 255, 0.16);
+  --g-panel: rgba(255, 255, 255, 0.09);
+  --g-accent: #a78bfa;
+  --g-accent-strong: #8b5cf6;
+  --g-good: #34d399;
+  --g-ok: #fbbf24;
+  --g-bad: #f87171;
+
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: radial-gradient(120% 80% at 50% 0%, var(--g-bg-top), var(--g-bg-bottom));
+  color: var(--g-text);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game h1,
+.game h2 {
+  color: var(--g-text);
+}
+
+/* --- top bar ------------------------------------------------------------ */
+
+.game__top {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.7rem 1rem 0.4rem;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.game__exit {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--g-panel);
+  color: var(--g-text);
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+
+.game__title {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.progress__bar {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--g-panel);
+  overflow: hidden;
+}
+.progress__bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--g-accent), #e9d5ff);
+  transition: width 0.3s ease;
+}
+.progress__stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--g-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.progress__streak {
+  color: var(--g-ok);
+  font-weight: 700;
+}
+
+/* --- screens ------------------------------------------------------------ */
+
+.play,
+.start {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow-y: auto;
+}
+
+.start {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 0.6rem;
+}
+.start__title {
+  margin: 0;
+  font-size: 2.4rem;
+  letter-spacing: -0.02em;
+}
+.start__deck {
+  margin: 0;
+  font-weight: 700;
+  color: var(--g-accent);
+}
+.start__desc,
+.start__note {
+  margin: 0;
+  color: var(--g-text-muted);
+  font-size: 0.95rem;
+  max-width: 22rem;
+}
+.start__how {
+  list-style: none;
+  margin: 0.8rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+.start__how li {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 1.05rem;
+}
+.start__key {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 10px;
+  background: var(--g-panel);
+  border: 1px solid var(--g-line);
+  font-weight: 700;
+}
+.start__best {
+  margin: 0;
+  color: var(--g-ok);
+  font-weight: 700;
+}
+
+/* --- the seat badge: who you are ----------------------------------------- */
+
+.seat {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.seat__you {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 5.2rem;
+  padding: 0.45rem 0.9rem 0.5rem;
+  border-radius: 16px;
+  background: linear-gradient(160deg, var(--g-accent), var(--g-accent-strong));
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45);
+  color: #fff;
+  line-height: 1;
+}
+.seat__you-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.seat__name {
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.seat__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.seat__position {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.seat__vs {
+  font-size: 0.9rem;
+  color: var(--g-text-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.chip {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: var(--g-panel);
+  border: 1px solid var(--g-line);
+  font-size: 0.82rem;
+  color: var(--g-text-muted);
+}
+.chip--facing {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+  font-weight: 700;
+}
+.chip--free {
+  color: var(--g-text);
+  font-weight: 700;
+}
+
+/* --- swipe zones and the card ------------------------------------------- */
+
+.zones {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--g-accent);
+  margin-top: 0.2rem;
+}
+.zone--left {
+  text-align: left;
+}
+.zone--up {
+  text-align: center;
+}
+.zone--right {
+  text-align: right;
+}
+
+.card {
+  /* auto margins center the table in whatever height is left over. */
+  margin: auto 0;
+  padding: 1.6rem 1.2rem 1.7rem;
+  /* A poker table seen from above: purple felt, a darker padded rail, and a
+     thin light edge. The cards sit straight on the felt. */
+  border-radius: 7rem / 5.5rem;
+  background:
+    radial-gradient(90% 80% at 50% 38%, #7c4fe0 0%, #5b2fb8 55%, #46228f 100%);
+  border: 0.7rem solid #241048;
+  box-shadow:
+    0 0 0 2px #8b6bd9,
+    inset 0 0 0 2px rgba(255, 255, 255, 0.12),
+    inset 0 8px 30px rgba(0, 0, 0, 0.35),
+    0 16px 36px rgba(0, 0, 0, 0.5);
+  color: var(--g-text);
+  /* The table owns every touch on it, so a swipe doesn't scroll the page. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  transition: transform 0.2s ease;
+  animation: card-in 0.28s ease-out;
+  /* --tint (0..1) is set while dragging; a colored wash fades in with it. */
+  position: relative;
+  text-align: center;
+}
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #fff;
+  opacity: calc(var(--tint, 0) * 0.22);
+  pointer-events: none;
+}
+.card.is-dragging {
+  transition: none;
+  cursor: grabbing;
+}
+.card.is-thrown {
+  transition: transform 0.2s ease-in;
+}
+.card__label {
+  margin: 0.6rem 0 0.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+}
+.card__label:first-child {
+  margin-top: 0;
+}
+.card__row {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+}
+.card__row--hand {
+  /* the hand is the thing you act on: biggest, and in the same place every card */
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 0.3rem 0 0.2rem;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+
+/* --- controls (bottom, thumb reach) ------------------------------------- */
+
+.controls {
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.controls__row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+}
+.controls__prompt {
+  margin: 0;
+  text-align: center;
+  color: var(--g-text-muted);
+  font-size: 0.9rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.4rem;
+  padding: 0.5rem 0.4rem;
+  border: 1px solid var(--g-line);
+  border-radius: 14px;
+  background: var(--g-panel);
+  color: var(--g-text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.btn--bet {
+  background: rgba(167, 139, 250, 0.25);
+  border-color: rgba(167, 139, 250, 0.7);
+}
+.btn--ghost {
+  background: transparent;
+  min-height: 2.6rem;
+  font-weight: 500;
+}
+.game__primary {
+  min-height: 3.4rem;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(160deg, var(--g-accent), var(--g-accent-strong));
+  color: #fff;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0 2.5rem;
+}
+.start .game__primary {
+  margin-top: 0.6rem;
+}
+.game .btn:hover:not(:disabled),
+.game .game__primary:hover {
+  filter: brightness(1.1);
+}
+
+/* --- feedback ------------------------------------------------------------ */
+
+.verdict {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0.9rem 1.1rem;
+  border-radius: 16px;
+  color: #10231a;
+  animation: card-in 0.25s ease-out;
+}
+.verdict--best {
+  background: var(--g-good);
+}
+.verdict--good {
+  background: var(--g-ok);
+  color: #2b2008;
+}
+.verdict--miss {
+  background: var(--g-bad);
+  color: #310d0d;
+}
+.verdict__title {
+  font-size: 1.7rem;
+  font-weight: 800;
+}
+.verdict__points {
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.verdict__sub {
+  margin: 0;
+  color: var(--g-text-muted);
+  font-size: 0.95rem;
+}
+.verdict__sub strong {
+  color: var(--g-text);
+}
+
+.recap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 14px;
+  background: var(--g-panel);
+}
+
+.mix {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.mix__row {
+  display: grid;
+  grid-template-columns: 6.2rem 1fr 2.7rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--g-text-muted);
+}
+.mix__row.is-chosen .mix__name {
+  color: var(--g-text);
+  font-weight: 800;
+}
+.mix__row.is-top .mix__name::after {
+  content: " ★";
+  color: var(--g-ok);
+}
+.mix__bar {
+  height: 0.8rem;
+  border-radius: 999px;
+  background: var(--g-panel);
+  overflow: hidden;
+}
+.mix__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--strategy-bet-mid, #d94f3d);
+}
+.mix__bar span[data-kind="fold"] {
+  background: var(--strategy-fold, #6b7a99);
+}
+.mix__bar span[data-kind="check"],
+.mix__bar span[data-kind="call"] {
+  background: var(--strategy-passive, #d9a441);
+}
+.mix__bar span[data-kind="bet_small"] {
+  background: var(--strategy-bet-small, #e8776b);
+}
+.mix__bar span[data-kind="bet_large"] {
+  background: var(--strategy-bet-big, #b9342a);
+}
+.mix__bar span[data-kind="all_in"] {
+  background: #e5e1f0;
+}
+.mix__pct {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mix__legend {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--g-text-muted);
+}
+
+/* --- summary ------------------------------------------------------------- */
+
+.summary__score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  justify-content: center;
+  padding-top: 1rem;
+}
+.summary__big {
+  font-size: 4.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.summary__of {
+  font-size: 1.6rem;
+  color: var(--g-text-muted);
+}
+.summary__heading {
+  margin: 0.4rem 0 0;
+  font-size: 1.05rem;
+}
+.missed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.missed li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.6rem 0.7rem;
+  border-radius: 14px;
+  background: var(--g-panel);
+  font-size: 0.88rem;
+  color: var(--g-text-muted);
+}
+.missed li strong {
+  color: var(--g-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .verdict,
+  .progress__bar span {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* Short phones: tighten so the card and controls both fit. */
+@media (max-height: 700px) {
+  .seat__name {
+    font-size: 1.7rem;
+  }
+  .card {
+    padding: 0.7rem 0.9rem 0.9rem;
+  }
+}
+
+/* Playing cards are always white-faced here, whatever the phone's theme: the
+   app-wide tokens they normally use flip to dark in dark mode. */
+.game .playing-card {
+  background: #ffffff;
+  border-color: #d6d0e6;
+  color: #1d1530;
+}
+.game .playing-card[data-suit="h"],
+.game .playing-card[data-suit="d"] {
+  color: #d32f2f;
+}
+.card .playing-card {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+.game .recap .playing-card,
+.game .missed .playing-card {
+  box-shadow: none;
+}

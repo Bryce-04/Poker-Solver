@@ -30,7 +30,10 @@ see `docs/decisions.md`), and it's reachable now too: `apps/api`'s
 and the new **Solve** screen drives it end to end (two ranges, a board,
 a results table) — a visual board-card picker and modeling betting
 across *multiple* streets in one solve are still separate, bigger future
-directions. See `services/solver/README.md`.
+directions. See `services/solver/README.md`. A mobile-first **Swipe Drill**
+(`/drill`, full-screen, swipe to act and get scored against the solver's mixed
+strategy for your exact hand) is built on the `swipe-drill` branch, from a
+pre-solved flop deck, not live solves.
 
 ## Layout
 

@@ -114,6 +114,28 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Swipe Drill (2026-10-19, on the `swipe-drill` branch, not yet merged)**:
+`/drill` (`apps/web/src/pages/DrillPage.tsx`) is a mobile-first practice
+game, rendered full screen *outside* the app shell (`App.tsx`: `/drill` is its
+own route; every other path is `Shell`) with its own purple look, an X back to
+the app, a start screen, and a summary. A card is a felt-table scene — a big
+"You BB / out of position" seat badge, chips for what's owed, the board and
+your hand — and you swipe (left fold/check, right call, up bet/raise → size
+picker; buttons and arrow keys too). Each answer is graded against the
+solver's mixed strategy for that exact hand (`lib/drill.ts`: best at >= 40% or
+the solver's top action, acceptable at 10-40%, miss below) and the full mix is
+shown. The deck is **pre-solved app data, not live solves**:
+`apps/api/scripts/make_drill_deck.py` solves BB vs BTN single-raised-pot flops
+with `RangeCfrTrainer` and writes `apps/web/src/data/drill-deck.json` (72 spots;
+rerun the script after changing the solver, ranges, or bet menu — the deck does
+not update itself). It needs no API, so it works offline. Scope is flop only,
+one matchup, 100bb; haptics are a no-op on iOS Safari (`lib/haptics.ts`, a
+native build would use `@capacitor/haptics`). The web build is installable to a
+phone home screen (`public/manifest.webmanifest`, apple-touch icons). The
+design plan lives on the `plan-swipe-drill` branch's `docs/plan.md`; the
+decision record is `docs/decisions.md`'s 2026-10-19 entry. Bet sizes are
+deliberately still 25/75/125 (33/66/100 was considered, deferred to the team).
+
 The new solver is merged (PR #21) and deployed, hardened for Render's
 free tier in PR #22 (single-threaded BLAS, one solve at a time with a 503
 "busy", a 100s server time budget returning `converged: false`). Measured
@@ -158,6 +180,7 @@ pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 
 cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
+cd apps/api && python scripts/make_drill_deck.py             # regenerate the Swipe Drill deck (~1 min)
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 ```
