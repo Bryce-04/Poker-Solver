@@ -104,10 +104,18 @@ hand. Opening it scrolls the new text into view.
 
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
-ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;
-a native build would use `@capacitor/haptics`), saved scores, more decks,
+ranges. Not yet done: saved scores, more decks,
 turn/river cards. The Add-to-Home-Screen manifest and icons were added so the
 web build installs as a home-screen app.
+
+**Update (2026-10-20): iPhone build and haptics.** The drill runs natively on an
+iPhone via the Capacitor iOS project (`ios-app` merged in; free Apple ID signing,
+so the install expires after 7 days and needs a rebuild). Haptics are now an
+opt-in toggle in the drill's settings, off by default (`drill.haptics` in
+localStorage): `@capacitor/haptics` success/warning/error taps in the native apps,
+the Vibration API in a browser that has it. Turning it on plays a sample tap.
+Default-off is deliberate (it was always-on for Android web before). Local Xcode
+signing edits (team, bundle id) are not committed.
 
 ---
 

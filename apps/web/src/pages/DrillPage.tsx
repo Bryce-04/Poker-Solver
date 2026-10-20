@@ -26,7 +26,7 @@ import {
   writeTheme,
   type DrillThemeId,
 } from "../lib/drillTheme";
-import { readBetDisplay, writeBetDisplay } from "../lib/drillSettings";
+import { readBetDisplay, readHaptics, writeBetDisplay, writeHaptics } from "../lib/drillSettings";
 import { haptic } from "../lib/haptics";
 import "./DrillPage.css";
 
@@ -97,6 +97,7 @@ function SeatBadge({ spot }: { spot: DrillSpot }) {
 export function DrillPage() {
   const [theme, setTheme] = useState<DrillThemeId>(readTheme);
   const [betDisplay, setBetDisplay] = useState<BetDisplay>(readBetDisplay);
+  const [hapticsOn, setHapticsOn] = useState(readHaptics);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Tint the browser / status bar to match the table while the drill is open.
@@ -117,6 +118,7 @@ export function DrillPage() {
           <Settings
             theme={theme}
             betDisplay={betDisplay}
+            hapticsOn={hapticsOn}
             onTheme={(id) => {
               setTheme(id);
               writeTheme(id);
@@ -124,6 +126,12 @@ export function DrillPage() {
             onBetDisplay={(mode) => {
               setBetDisplay(mode);
               writeBetDisplay(mode);
+            }}
+            onHaptics={(on) => {
+              setHapticsOn(on);
+              writeHaptics(on);
+              // A sample tap, so turning it on shows what it feels like.
+              if (on) haptic("best");
             }}
             onClose={() => setSettingsOpen(false)}
           />
@@ -136,14 +144,18 @@ export function DrillPage() {
 function Settings({
   theme,
   betDisplay,
+  hapticsOn,
   onTheme,
   onBetDisplay,
+  onHaptics,
   onClose,
 }: {
   theme: DrillThemeId;
   betDisplay: BetDisplay;
+  hapticsOn: boolean;
   onTheme: (id: DrillThemeId) => void;
   onBetDisplay: (mode: BetDisplay) => void;
+  onHaptics: (on: boolean) => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -230,6 +242,20 @@ function Settings({
             </label>
           </div>
         </fieldset>
+
+        <label className="toggle">
+          <span className="toggle__text">
+            <strong>Haptics</strong>
+            <small>A tap on your phone for each verdict</small>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={hapticsOn}
+            onChange={(e) => onHaptics(e.target.checked)}
+          />
+          <span className="toggle__track" aria-hidden="true" />
+        </label>
       </div>
     </div>
   );

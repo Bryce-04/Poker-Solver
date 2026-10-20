@@ -139,6 +139,18 @@ describe("DrillPage settings", () => {
     expect(screen.getAllByRole("button").some((b) => /^\d+%/.test(b.textContent ?? ""))).toBe(true);
   });
 
+  it("keeps haptics off until switched on in settings, and remembers it", () => {
+    openPage();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const toggle = screen.getByRole("switch", { name: /haptics/i }) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    fireEvent.click(toggle);
+    expect(localStorage.getItem("drill.haptics")).toBe("on");
+    expect(toggle.checked).toBe(true);
+    fireEvent.click(toggle);
+    expect(localStorage.getItem("drill.haptics")).toBe("off");
+  });
+
   it("remembers the color next time, and ignores a bad stored value", () => {
     localStorage.setItem("drill.theme", "midnight");
     const first = openPage();

@@ -91,7 +91,7 @@ src/
                               solver's bet sizing), labels, shuffle
     drillSettings.ts           the drill's remembered bet-size display (bb or %)
     drillTheme.ts              the drill's table-color choices + remembered pick
-    haptics.ts                 vibration on the drill's verdict (no-op on iOS Safari)
+    haptics.ts                 opt-in haptics on the drill's verdict (native taps / Vibration API)
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions
@@ -176,6 +176,30 @@ them, don't hand-edit the generated `android/app/src/main/res/mipmap-*` /
 requests route through native networking on-device, sidestepping the
 WebView's CORS enforcement rather than needing `apps/api`'s CORS allowlist
 to cover the Capacitor origin.
+
+## iOS (Capacitor)
+
+`apps/web/ios/` is the committed Xcode project (`npx cap add ios`, Swift
+Package Manager — no CocoaPods). It can be generated and synced on any OS,
+but building and signing needs a Mac with Xcode. On the Mac, from the repo
+root:
+
+```
+pnpm install
+pnpm --filter web build                # production build -> talks to the deployed API
+cd apps/web && npx cap sync ios && npx cap open ios
+```
+
+In Xcode: select the **App** target → **Signing & Capabilities** → pick a
+Team (a free personal Apple ID works), plug in the iPhone, choose it as
+the run destination, and press Run. With a free Apple ID the install
+expires after 7 days (reinstall from Xcode), and the phone must allow it
+under Settings → General → VPN & Device Management, plus Developer Mode
+(Settings → Privacy & Security). If Xcode can't register the bundle id
+`com.pokersolver.app`, change it to something unique in Signing &
+Capabilities. TestFlight/App Store distribution needs the paid Apple
+Developer Program. Icons/splash come from `apps/web/assets/` via
+`npx capacitor-assets generate --ios`.
 
 ## SpotBuilder
 
@@ -384,7 +408,7 @@ depend on the theme. To add a theme, add a block there and an entry in
 `DRILL_THEMES` (the swatch colors are repeated in the TS entry). **On a phone:**
 `index.html` plus `public/manifest.webmanifest` and the apple-touch icons let you
 Add to Home Screen (it opens on `/drill`); to try it on a LAN device, `pnpm exec
-vite --host`. Haptics need a native build — iOS Safari has no Vibration API.
+vite --host`. Haptics are a settings toggle (off by default); on iPhone they only work in the native build (`@capacitor/haptics`), since iOS Safari has no Vibration API.
 
 ## RangeGrid
 

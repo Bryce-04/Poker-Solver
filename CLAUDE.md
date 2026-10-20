@@ -137,8 +137,9 @@ shown. The deck is **pre-solved app data, not live solves**:
 with `RangeCfrTrainer` and writes `apps/web/src/data/drill-deck.json` (72 spots;
 rerun the script after changing the solver, ranges, or bet menu — the deck does
 not update itself). It needs no API, so it works offline. Scope is flop only,
-one matchup, 100bb; haptics are a no-op on iOS Safari (`lib/haptics.ts`, a
-native build would use `@capacitor/haptics`). The web build is installable to a
+one matchup, 100bb; haptics are an opt-in setting (off by default): real
+taps via `@capacitor/haptics` in the native app, the Vibration API on Android
+web, nothing on iOS Safari (`lib/haptics.ts`). The web build is installable to a
 phone home screen (`public/manifest.webmanifest`, apple-touch icons). The
 design plan lives on the `plan-swipe-drill` branch's `docs/plan.md`; the
 decision record is `docs/decisions.md`'s 2026-10-19 entry. Bet sizes are

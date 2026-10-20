@@ -114,6 +114,12 @@ importers:
       '@capacitor/core':
         specifier: ^8.5.2
         version: 8.5.2
+      '@capacitor/haptics':
+        specifier: ^8.0.2
+        version: 8.0.2(@capacitor/core@8.5.2)
+      '@capacitor/ios':
+        specifier: ^8.5.2
+        version: 8.5.2(@capacitor/core@8.5.2)
       '@poker-solver/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -263,6 +269,16 @@ packages:
 
   '@capacitor/core@8.5.2':
     resolution: {integrity: sha512-agnQbGdhGw/KZFuLf7H9SY2o+oE7upkr/WPQsYaokXP6f9chaE8iVmbKkfN6SVl4w3pmz7oZ3Ur1hbkmy1hx+w==}
+
+  '@capacitor/haptics@8.0.2':
+    resolution: {integrity: sha512-c2hZzRR5Fk1tbTvhG1jhh2XBAf3EhnIerMIb2sl7Mt41Gxx1fhBJFDa0/BI1IbY4loVepyyuqNC9820/GZuoWQ==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/ios@8.5.2':
+    resolution: {integrity: sha512-eOT2S67AfTFG7KN0T3oxwAajrJz4rSye+ODfvChiwrk0F/+kWufFM1qU6cDjGJUOfwdAoeuEpZyWHSwZlu4GFg==}
+    peerDependencies:
+      '@capacitor/core': ^8.5.0
 
   '@csstools/color-helpers@6.1.1':
     resolution: {integrity: sha512-gLNsunvwf3mCi5u5o46/Z/JcJMnhbHSaZ69rkgPzNM3J4s8hWwpPUQB6/tt0EDFyCiWzxANlx+2LJwpYj4zS1w==}
@@ -2114,6 +2130,14 @@ snapshots:
   '@capacitor/core@8.5.2':
     dependencies:
       tslib: 2.8.1
+
+  '@capacitor/haptics@8.0.2(@capacitor/core@8.5.2)':
+    dependencies:
+      '@capacitor/core': 8.5.2
+
+  '@capacitor/ios@8.5.2(@capacitor/core@8.5.2)':
+    dependencies:
+      '@capacitor/core': 8.5.2
 
   '@csstools/color-helpers@6.1.1': {}
 
