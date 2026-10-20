@@ -114,7 +114,13 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
-**Poker Drill (2026-10-19; merged in PR #27 as the "Swipe Drill", swiping since removed — see `docs/decisions.md`)**:
+**Poker Drill (2026-10-19)** — branch status: `main` has only the first version
+(PR #27, the "Swipe Drill", with swiping). Everything below beyond that — tap-only
+actions, settings cog, table colors, the pot on the table, bb amounts, the "why"
+analysis and its tap-to-open row — is on an unmerged stack of branches, each
+built on the last: `drill-themes` → `drill-settings` → `drill-analysis` →
+`drill-why-dropdown` (one PR from the tip carries all of it). See
+`docs/decisions.md`:
 `/drill` (`apps/web/src/pages/DrillPage.tsx`) is a mobile-first practice
 game, rendered full screen *outside* the app shell (`App.tsx`: `/drill` is its
 own route; every other path is `Shell`) with its own purple look, an X back to
