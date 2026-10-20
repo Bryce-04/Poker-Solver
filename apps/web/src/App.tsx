@@ -1,11 +1,14 @@
-import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthStatus } from "./components/AuthStatus/AuthStatus";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
+import { PageHeader } from "./components/PageHeader/PageHeader";
+import { Sidebar } from "./components/Sidebar/Sidebar";
 import { AuthProvider } from "./lib/auth";
-import { BuilderPage } from "./pages/BuilderPage";
-import { SavedSpotsPage } from "./pages/SavedSpotsPage";
-import { TypeInPage } from "./pages/TypeInPage";
-import { ImportPage } from "./pages/ImportPage";
+import { NAV_ITEMS, PAGE_HEADERS } from "./lib/navigation";
+import { readSavedSpot, readSolvePrefill } from "./lib/solvePrefill";
+import { useIsDesktop } from "./lib/useIsDesktop";
+import { LibraryPage } from "./pages/LibraryPage";
+import { RangesPage } from "./pages/RangesPage";
 import { SolvePage } from "./pages/SolvePage";
 import { DrillPage } from "./pages/DrillPage";
 import "./App.css";
@@ -16,58 +19,85 @@ function navLinkClassName({ isActive }: { isActive: boolean }) {
   return isActive ? "active" : undefined;
 }
 
+/** Phones (< 1024px): the original top header, nav as one row of links. */
+function MobileHeader() {
+  return (
+    <header className="app__header">
+      <div className="app__title">
+        <img className="app__logo" src="/favicon.svg" alt="" />
+        <h1>Poker Solver</h1>
+      </div>
+      <p className="app__tagline">
+        Manual hand builder, preflop reference charts, and a postflop
+        solver.
+      </p>
+      <nav className="app__nav">
+        {NAV_ITEMS.map((item) => (
+          <NavLink key={item.id} to={item.to} className={navLinkClassName}>
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+      <AuthStatus />
+    </header>
+  );
+}
+
+/** Desktop: the bar at the top of the content area (docs/desktop-redesign.md
+ * §4), unless the page renders its own to hold page actions. */
+function ShellPageHeader() {
+  const header = PAGE_HEADERS[useLocation().pathname];
+  if (!header || header.ownHeader) return null;
+  return <PageHeader title={header.title} description={header.description} />;
+}
+
+/** /solve, optionally seeded from route state (lib/solvePrefill.ts): Ranges'
+ * "solve from here", or a spot opened from the Library. */
+function SolveRoute() {
+  const { state } = useLocation();
+  return <SolvePage prefill={readSolvePrefill(state)} savedSpot={readSavedSpot(state)} />;
+}
+
 /**
- * Stage 2 app shell -- now the router shell too. BrowserRouter lives here
- * (not in main.tsx) so App.test.tsx's `render(<App />)` keeps working with
- * no extra wrapper. Five screens: Builder (Stage 2), Saved, Type in
- * (Stage 3), Import (Stage 4 hand-history paste), Solve (Stage 5's live
- * MCCFR solve). See docs/plan.md.
+ * The router shell. BrowserRouter lives in App (not main.tsx) so
+ * App.test.tsx's `render(<App />)` keeps working with no extra wrapper.
+ *
+ * Four destinations (docs/desktop-redesign.md §3): Solve, Ranges (Builder,
+ * Type in and Import merged), Library (was Saved), Drill. The old routes
+ * redirect so links and bookmarks keep working.
+ *
+ * At >= 1024px the header becomes a left sidebar and pages get a header
+ * bar. The <main> stays at the same place in the tree in both layouts, so
+ * resizing across the breakpoint doesn't remount the page and lose a
+ * half-built spot.
  */
 function Shell() {
+  const isDesktop = useIsDesktop();
+  const workspace = PAGE_HEADERS[useLocation().pathname]?.workspace === true;
+  const mainClass = !isDesktop
+    ? undefined
+    : workspace
+      ? "app-shell__main app-shell__main--workspace"
+      : "app-shell__main app-shell__main--narrow";
   return (
-    <div className="app">
-      <header className="app__header">
-        <div className="app__title">
-          <img className="app__logo" src="/favicon.svg" alt="" />
-          <h1>Poker Solver</h1>
-        </div>
-        <p className="app__tagline">
-          Manual hand builder, preflop reference charts, and a postflop
-          solver.
-        </p>
-        <nav className="app__nav">
-          <NavLink to="/" end className={navLinkClassName}>
-            Builder
-          </NavLink>
-          <NavLink to="/saved" className={navLinkClassName}>
-            Saved
-          </NavLink>
-          <NavLink to="/type-in" className={navLinkClassName}>
-            Type in
-          </NavLink>
-          <NavLink to="/import" className={navLinkClassName}>
-            Import
-          </NavLink>
-          <NavLink to="/solve" className={navLinkClassName}>
-            Solve
-          </NavLink>
-          <NavLink to="/drill" className={navLinkClassName}>
-            Drill
-          </NavLink>
-        </nav>
-        <AuthStatus />
-      </header>
-      <main>
-        <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<BuilderPage />} />
-            <Route path="/saved" element={<SavedSpotsPage />} />
-            <Route path="/type-in" element={<TypeInPage />} />
-            <Route path="/import" element={<ImportPage />} />
-            <Route path="/solve" element={<SolvePage />} />
-          </Routes>
-        </ErrorBoundary>
-      </main>
+    <div className={isDesktop ? "app-shell" : "app"}>
+      {isDesktop ? <Sidebar /> : <MobileHeader />}
+      <div className={isDesktop ? "app-shell__content" : undefined}>
+        {isDesktop && <ShellPageHeader />}
+        <main className={mainClass}>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Navigate to="/solve" replace />} />
+              <Route path="/solve" element={<SolveRoute />} />
+              <Route path="/ranges" element={<RangesPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/saved" element={<Navigate to="/library" replace />} />
+              <Route path="/type-in" element={<Navigate to="/ranges?mode=type" replace />} />
+              <Route path="/import" element={<Navigate to="/ranges?mode=paste" replace />} />
+            </Routes>
+          </ErrorBoundary>
+        </main>
+      </div>
     </div>
   );
 }
@@ -77,8 +107,8 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* The Swipe Drill is a full-screen "game": no header or nav
-              around it, and its own exit button back to the app. */}
+          {/* The Drill is a full-screen "game": no header or nav around it,
+              and its own exit button back to the app. */}
           <Route path="/drill" element={<DrillPage />} />
           <Route path="*" element={<Shell />} />
         </Routes>

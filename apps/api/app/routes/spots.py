@@ -1,15 +1,17 @@
 """Stage 2 endpoint: match a submitted Spot against the reference-chart
 table (see ../reference_charts.py) and return it. Also POST/GET /spots for
-saving and listing spots -- both require a signed-in user (see ../auth.py)
-and only ever see that user's own spots. See docs/decisions.md for the
+saving, listing, renaming (PATCH) and deleting spots -- all require a
+signed-in user (see ../auth.py) and only ever see that user's own spots. See docs/decisions.md for the
 response-shape and Authorization-header contracts apps/web's api.ts was
 built against.
 """
 
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel, StringConstraints
 from sqlalchemy.orm import Session
 
 from poker_solver_schema import Spot
@@ -123,3 +125,43 @@ def list_spots(
         .all()
     )
     return [Spot.model_validate(row.data) for row in rows]
+
+
+class RenameSpot(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
+def _own_spot_row(db: Session, spot_id: UUID, user_id: UUID) -> SpotRow:
+    """The caller's own row, or 404 -- the same 404 whether the spot doesn't
+    exist, belongs to someone else, or predates auth (no owner), so a caller
+    can't probe for other users' spot ids."""
+    row = db.get(SpotRow, spot_id)
+    if row is None or row.created_by != user_id:
+        raise HTTPException(status_code=404, detail="No such spot.")
+    return row
+
+
+@router.patch("/{spot_id}")
+def rename_spot(
+    spot_id: UUID,
+    body: RenameSpot,
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(current_user_id),
+) -> Spot:
+    row = _own_spot_row(db, spot_id, user_id)
+    # A new dict, not an in-place edit: SQLAlchemy only sees a JSONB column
+    # change when the attribute is reassigned.
+    row.data = {**row.data, "name": body.name}
+    db.commit()
+    return Spot.model_validate(row.data)
+
+
+@router.delete("/{spot_id}", status_code=204)
+def delete_spot(
+    spot_id: UUID,
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(current_user_id),
+) -> Response:
+    db.delete(_own_spot_row(db, spot_id, user_id))
+    db.commit()
+    return Response(status_code=204)

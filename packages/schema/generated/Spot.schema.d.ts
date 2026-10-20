@@ -12,6 +12,10 @@ export type Id = string;
 export type CreatedBy = string | null;
 export type CreatedAt = string;
 /**
+ * The user's name for a saved spot. Null for spots saved before names existed.
+ */
+export type Name = string | null;
+/**
  * This interface was referenced by `Spot`'s JSON-Schema
  * via the `definition` "Position".
  */
@@ -59,6 +63,7 @@ export interface Spot {
   id?: Id;
   created_by?: CreatedBy;
   created_at?: CreatedAt;
+  name?: Name;
   positions_in_hand: PositionsInHand;
   effective_stack_bb: EffectiveStackBb;
   pot_bb?: PotBb;

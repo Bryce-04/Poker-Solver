@@ -145,6 +145,60 @@ export async function saveSpot(spot: Spot): Promise<SaveSpotResult> {
   return { kind: "error", status: res.status };
 }
 
+// Every reachable outcome of PATCH /spots/{id}. `not-found` covers a spot
+// that's gone or isn't the caller's -- apps/api answers both with a 404.
+export type RenameSpotResult =
+  | { kind: "renamed"; spot: Spot }
+  | { kind: "not-found" }
+  | { kind: "invalid"; issues: SpotValidationIssue[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Renames one of the signed-in user's saved spots. Never throws. */
+export async function renameSpot(id: string, name: string): Promise<RenameSpotResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots/${encodeURIComponent(id)}`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      data: { name },
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) return { kind: "renamed", spot: asJson(res.data) as Spot };
+  if (res.status === 404) return { kind: "not-found" };
+  if (res.status === 422) return { kind: "invalid", issues: parseValidationIssues(asJson(res.data)) };
+  return { kind: "error", status: res.status };
+}
+
+// Every reachable outcome of DELETE /spots/{id}.
+export type DeleteSpotResult =
+  | { kind: "deleted" }
+  | { kind: "not-found" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Deletes one of the signed-in user's saved spots. Never throws. */
+export async function deleteSpot(id: string): Promise<DeleteSpotResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/spots/${encodeURIComponent(id)}`,
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) return { kind: "deleted" };
+  if (res.status === 404) return { kind: "not-found" };
+  return { kind: "error", status: res.status };
+}
+
 // Every reachable outcome of GET /spots.
 export type ListSpotsResult =
   | { kind: "ok"; spots: Spot[] }
@@ -202,6 +256,11 @@ export interface LiveSolveResponse {
   // apps/api/app/solve.py's _replay_street_actions. Empty when nothing
   // needed bucketing (e.g. the seeded action was only a check).
   bucketed_actions: string[];
+  // Flop solves only (apps/api/app/hand_notes.py), else {}: each hand type's
+  // category ("Top pair, strong kicker") and the rule-of-thumb "why" bullets
+  // the Drill uses. Normalized to {} for an older backend -- see solveSpot.
+  hand_categories?: Record<string, string>;
+  hand_reasons?: Record<string, string[]>;
 }
 
 // /spots/solve's 422s aren't one shape: a schema-invalid Spot (missing
@@ -291,6 +350,8 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
       ...data,
       bucketed_actions: data.bucketed_actions ?? [],
       combo_strategy: data.combo_strategy ?? {},
+      hand_categories: data.hand_categories ?? {},
+      hand_reasons: data.hand_reasons ?? {},
     },
   };
 }

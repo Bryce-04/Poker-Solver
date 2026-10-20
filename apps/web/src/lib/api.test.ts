@@ -1,10 +1,12 @@
 import type { Spot } from '@poker-solver/schema'
 import { afterEach, beforeEach, vi } from 'vitest'
 import {
+  deleteSpot,
   fetchPreflopRanges,
   fetchReferenceStrategy,
   listSpots,
   narrowRanges,
+  renameSpot,
   saveSpot,
   solveSpot,
 } from './api'
@@ -232,8 +234,16 @@ describe('solveSpot', () => {
     mockResponse(200, solveBody)
     await expect(solveSpot(spot)).resolves.toEqual({
       kind: 'solved',
-      data: { ...solveBody, bucketed_actions: [], combo_strategy: {} },
+      data: { ...solveBody, bucketed_actions: [], combo_strategy: {}, hand_categories: {}, hand_reasons: {} },
     })
+  })
+
+  it('passes hand categories and reasons through, and defaults them to {} for an older backend', async () => {
+    const notes = { hand_categories: { AQo: 'Top pair, strong kicker' }, hand_reasons: { AQo: ['You have top pair.'] } }
+    mockResponse(200, { ...solveBody, ...notes })
+    const result = await solveSpot(spot)
+    expect(result.kind === 'solved' && result.data.hand_categories).toEqual(notes.hand_categories)
+    expect(result.kind === 'solved' && result.data.hand_reasons).toEqual(notes.hand_reasons)
   })
 
   it('normalizes a missing bucketed_actions to an empty array -- a deployed backend older than the web build is a real, recurring state (Render and the web app deploy separately), not a hypothetical', async () => {
@@ -370,5 +380,45 @@ describe('fetchPreflopRanges', () => {
     await expect(fetchPreflopRanges(spot)).resolves.toEqual({ kind: 'error', status: 500 })
     requestMock.mockRejectedValue(new Error('network unreachable'))
     await expect(fetchPreflopRanges(spot)).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('renameSpot', () => {
+  it('PATCHes /spots/{id} with the new name and the token', async () => {
+    mockGetAccessToken.mockResolvedValue('the-jwt')
+    mockResponse(200, { ...spot, name: 'Mine' })
+    await expect(renameSpot('abc', 'Mine')).resolves.toEqual({ kind: 'renamed', spot: { ...spot, name: 'Mine' } })
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url.endsWith("/spots/abc")).toBe(true)
+    expect(options.method).toBe('PATCH')
+    expect(options.data).toEqual({ name: 'Mine' })
+    expect(options.headers.Authorization).toBe('Bearer the-jwt')
+  })
+
+  it('classifies 404, 422 and transport failures without throwing', async () => {
+    mockResponse(404, { detail: 'No such spot.' })
+    await expect(renameSpot('abc', 'x')).resolves.toEqual({ kind: 'not-found' })
+    const detail = [{ loc: ['body', 'name'], msg: 'too short', type: 'string_too_short' }]
+    mockResponse(422, { detail })
+    await expect(renameSpot('abc', '')).resolves.toEqual({ kind: 'invalid', issues: detail })
+    requestMock.mockRejectedValue(new Error('offline'))
+    await expect(renameSpot('abc', 'x')).resolves.toEqual({ kind: 'network-error' })
+  })
+})
+
+describe('deleteSpot', () => {
+  it('DELETEs /spots/{id} and treats a 204 as deleted', async () => {
+    mockResponse(204, '')
+    await expect(deleteSpot('abc')).resolves.toEqual({ kind: 'deleted' })
+    const [options] = requestMock.mock.calls[0]
+    expect(options.url.endsWith("/spots/abc")).toBe(true)
+    expect(options.method).toBe('DELETE')
+  })
+
+  it('classifies a 404 as not-found and a rejection as a network error', async () => {
+    mockResponse(404, { detail: 'No such spot.' })
+    await expect(deleteSpot('abc')).resolves.toEqual({ kind: 'not-found' })
+    requestMock.mockRejectedValue(new Error('offline'))
+    await expect(deleteSpot('abc')).resolves.toEqual({ kind: 'network-error' })
   })
 })

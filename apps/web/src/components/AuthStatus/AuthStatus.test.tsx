@@ -41,6 +41,29 @@ describe("AuthStatus", () => {
     expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 
+  it("sidebar variant: initial avatar, full email on hover, and sign-out", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
+    mockSignOut.mockResolvedValue({ error: null } as never);
+    const user = userEvent.setup();
+    render(<AuthStatus variant="sidebar" />);
+
+    expect(screen.getByText("H")).toBeInTheDocument();
+    expect(screen.getByText("hero@example.com")).toHaveAttribute("title", "hero@example.com");
+    await user.click(screen.getByRole("button", { name: /sign out/i }));
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("sidebar variant, signed out: a Sign in button that opens the form", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    const user = userEvent.setup();
+    render(<AuthStatus variant="sidebar" />);
+
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^sign in$/i })).toHaveAttribute("type", "submit");
+  });
+
   it("submits sign-in with the entered credentials", async () => {
     mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
     mockSignIn.mockResolvedValue({ error: null } as never);

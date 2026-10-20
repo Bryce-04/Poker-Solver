@@ -158,3 +158,144 @@ button.range-grid__cell:focus-visible {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* --- Toolbar wrappers: they only shape the desktop toolbar below. --- */
+
+.range-grid__paint-label {
+  display: none;
+}
+
+.range-grid__weights,
+.range-grid__tools {
+  display: contents;
+}
+
+/* --- Desktop (docs/desktop-redesign.md §5; the mockup's grid) --- */
+
+@media (min-width: 1024px) {
+  .range-grid-wrap {
+    gap: 12px;
+    max-width: 680px;
+  }
+
+  .range-grid__brushes {
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .range-grid__paint-label {
+    display: inline;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* The four weights as one segmented pill, like components/SegmentedControl. */
+  .range-grid__weights {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    margin-inline-end: auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+  }
+
+  .range-grid__weights .range-grid__brush {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .range-grid__weights .range-grid__brush[data-active="true"] {
+    background: var(--surface-3);
+    color: var(--text-strong);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .range-grid__tools {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* Suits / Reset / Clear as ghost buttons. */
+  .range-grid__tools .range-grid__brush {
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .range-grid__brush--suits {
+    margin-inline-start: 0;
+  }
+
+  .range-grid__tools .range-grid__brush[data-active="true"] {
+    background: var(--accent-subtle);
+    border-color: transparent;
+    color: var(--text-strong);
+  }
+
+  .range-grid {
+    gap: 3px;
+    padding: 6px;
+    background: var(--surface);
+    border-color: var(--divider);
+    border-radius: 10px;
+  }
+
+  /* Weight drawn as a bottom-up fill rather than a blended shade: the filled
+     height is how often the hand is played. */
+  .range-grid__cell {
+    --cell-bg: linear-gradient(
+      to top,
+      var(--range-in) calc(var(--w) * 100%),
+      var(--range-empty) calc(var(--w) * 100%)
+    );
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--text);
+  }
+
+  .range-grid__cell[data-selected="true"] {
+    color: var(--text-strong);
+  }
+
+  .range-grid__cell[data-tier="high"] {
+    color: var(--text-strong);
+  }
+
+  .range-grid__cell[data-full] {
+    color: var(--range-in-contrast);
+  }
+
+  /* The mockup marks no diagonal; the pairs read from their labels. */
+  .range-grid__cell[data-diagonal] {
+    box-shadow: none;
+  }
+
+  .range-grid__summary {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .range-grid__weights .range-grid__brush:hover:not(:disabled):not([data-active="true"]) {
+    background: transparent;
+    color: var(--text-strong);
+  }
+
+  .range-grid__tools .range-grid__brush:hover:not(:disabled):not([data-active="true"]) {
+    background: var(--surface-hover);
+    color: var(--text-strong);
+  }
+}

@@ -1,21 +1,11 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { HAND_GRID } from "../../lib/hands";
-import { ACTION_LABEL, ACTION_ORDER } from "../../lib/strategySummary";
+import { ACTION_COLOR_VAR, ACTION_LABEL, ACTION_ORDER } from "../../lib/strategySummary";
 import type { HandRange } from "@poker-solver/schema";
 import { comboColumns, comboSlots, comboWeights, handMass, indexRange } from "../../lib/rangeCombos";
 import "../RangeGrid/RangeGrid.css";
 import "./StrategyGrid.css";
-
-const ACTION_COLOR_VAR: Record<string, string> = {
-  fold: "--strategy-fold",
-  check: "--strategy-passive",
-  call: "--strategy-passive",
-  bet_small: "--strategy-bet-small",
-  bet_medium: "--strategy-bet-mid",
-  bet_large: "--strategy-bet-big",
-  all_in: "--strategy-allin",
-};
 
 function orderedEntries(hand: Record<string, number>): [string, number][] {
   return ACTION_ORDER.filter((a) => a in hand).map((a) => [a, hand[a]]);
@@ -55,6 +45,15 @@ export interface StrategyGridProps {
    * nearly absent, not like a core hand) and suit combos that aren't in the
    * range are shown as such rather than as if they were. */
   range?: HandRange;
+  /** Controlled selection (desktop shows the selected hand in its own
+   * panel). Omitted, the grid tracks its own selection. */
+  selected?: string | null;
+  onSelect?: (hand: string) => void;
+  /** The one-line breakdown and suit view under the grid. Off when a page
+   * shows the selected hand elsewhere. */
+  showDetail?: boolean;
+  /** Hide the action legend above the grid (a page with its own legend). */
+  showLegend?: boolean;
 }
 
 /** Combos a hand type has: 6 for a pair, 4 suited, 12 offsuit. */
@@ -72,7 +71,7 @@ function describe(mix: Record<string, number>): string {
 }
 
 /** The selected hand's suit combos, each colored by its own action mix. */
-function SuitStrategy({
+export function SuitStrategy({
   hand,
   handMix,
   comboStrategy,
@@ -141,8 +140,14 @@ export function StrategyGrid({
   comboStrategy = {},
   deadCards = [],
   range,
+  selected: selectedProp,
+  onSelect,
+  showDetail = true,
+  showLegend = true,
 }: StrategyGridProps) {
-  const [selected, setSelected] = useState<string | null>(null);
+  const [ownSelected, setOwnSelected] = useState<string | null>(null);
+  const selected = selectedProp !== undefined ? selectedProp : ownSelected;
+  const setSelected = (hand: string) => (onSelect ? onSelect(hand) : setOwnSelected(hand));
 
   // How much of the range each hand type is, relative to the heaviest one.
   const index = range ? indexRange(range) : null;
@@ -163,7 +168,7 @@ export function StrategyGrid({
 
   return (
     <div className="strategy-grid">
-      {actionsPresent.length > 0 && (
+      {showLegend && actionsPresent.length > 0 && (
         <div className="strategy-grid__legend">
           {actionsPresent.map((action) => (
             <span className="strategy-grid__legend-item" key={action}>
@@ -218,21 +223,23 @@ export function StrategyGrid({
         ))}
       </div>
 
-      <p className="strategy-grid__detail">
-        {selected && selectedHand
-          ? `${selected}: ${orderedEntries(selectedHand)
-              .map(([a, p]) => `${ACTION_LABEL[a]} ${Math.round(p * 100)}%`)
-              .join(", ")}${
-              relativeWeight(selected) !== null && (relativeWeight(selected) as number) < 0.995
-                ? ` (${Math.max(1, Math.round((relativeWeight(selected) as number) * 100))}% as much of the range as its heaviest hand)`
-                : ""
-            }`
-          : selected
-            ? `${selected}: no data.`
-            : "Tap a hand to see its exact breakdown."}
-      </p>
+      {showDetail && (
+        <p className="strategy-grid__detail">
+          {selected && selectedHand
+            ? `${selected}: ${orderedEntries(selectedHand)
+                .map(([a, p]) => `${ACTION_LABEL[a]} ${Math.round(p * 100)}%`)
+                .join(", ")}${
+                relativeWeight(selected) !== null && (relativeWeight(selected) as number) < 0.995
+                  ? ` (${Math.max(1, Math.round((relativeWeight(selected) as number) * 100))}% as much of the range as its heaviest hand)`
+                  : ""
+              }`
+            : selected
+              ? `${selected}: no data.`
+              : "Tap a hand to see its exact breakdown."}
+        </p>
+      )}
 
-      {selected && (
+      {showDetail && selected && (
         <SuitStrategy
           hand={selected}
           handMix={selectedHand}

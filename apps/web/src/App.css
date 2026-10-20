@@ -58,3 +58,75 @@
   color: var(--text-h);
   border-bottom-color: var(--accent-border);
 }
+
+/* Desktop shell (>= 1024px; docs/desktop-redesign.md §4): sidebar on the
+   left, content filling the rest, no max-width on the shell itself. The
+   phone layout above (.app) isn't used at this width. */
+@media (min-width: 1024px) {
+  .app-shell {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 100svh;
+  }
+
+  .app-shell__content {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100svh;
+  }
+
+  .page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 32px;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .page-header__title {
+    margin: 0;
+    line-height: 1.5;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .page-header__description {
+    margin-top: 2px;
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  .app-shell__main {
+    padding: 24px 32px 4rem;
+  }
+
+  /* Pages not yet laid out for desktop keep their phone-width column. */
+  .app-shell__main--narrow > * {
+    max-width: 44rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Pages with their own desktop layout (rail + canvas) fill the content
+     area edge to edge and stretch to its full height. */
+  .app-shell__main--workspace {
+    flex: 1;
+    display: flex;
+    padding: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+}

@@ -342,3 +342,21 @@ def test_combo_strategies_split_flush_draw_combos_from_the_rest() -> None:
         label = combo_label(key_to_combos(key)[0])
         by_label[label] = by_label.get(label, 0) + 1
     assert by_label["KQs"] == 4
+
+
+def test_combo_equities_match_the_showdown_by_hand() -> None:
+    # On Ks Qh 9d 4c 2s, KJo (a pair of kings) beats 33 and loses to AA, and
+    # blocks neither, so against six AA and six 33 combos it wins exactly
+    # half; AA always wins, 33 never does.
+    trainer = _river_trainer()
+    kj, kj_overall = trainer.combo_equities(0)
+    assert np.allclose(kj, 0.5)
+    assert kj_overall == pytest.approx(0.5)
+
+    villain, villain_overall = trainer.combo_equities(1)
+    by_label = {label: [] for label in ("AA", "33")}
+    for label, equity in zip(trainer.labels[1], villain):
+        by_label[label].append(equity)
+    assert np.allclose(by_label["AA"], 1.0)
+    assert np.allclose(by_label["33"], 0.0)
+    assert villain_overall == pytest.approx(0.5)

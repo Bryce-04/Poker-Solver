@@ -215,3 +215,25 @@ def test_trim_tail_drops_hands_far_below_the_heaviest_and_reports_the_share():
     assert _trim_tail({}) == ({}, {"dropped_entries": 0, "dropped_weight_pct": 0.0})
     # A rare line scales a whole range down; the cutoff scales with it.
     assert _trim_tail({"AA": 0.001, "KK": 0.0005})[0] == {"AA": 0.001, "KK": 0.0005}
+
+
+def test_solve_adds_hand_categories_and_reasons_on_a_flop_only():
+    flop = {
+        **RIVER_SPOT,
+        "board": ["Qs", "5c", "2c"],
+        "current_street": "flop",
+        "actions": [],
+        "ranges": {"BB": {"AQo": 1.0, "55": 1.0}, "BTN": {"AA": 1.0, "KK": 1.0}},
+    }
+    body = client.post("/spots/solve", json=flop).json()
+    assert body["position"] == "BB"
+    assert body["hand_categories"] == {"AQo": "Top pair, strong kicker", "55": "Set"}
+    assert set(body["hand_reasons"]) == {"AQo", "55"}
+    # Seats read as "BTN", not the enum's "Position.BTN".
+    bullets = " ".join(b for bs in body["hand_reasons"].values() for b in bs)
+    assert "BTN's range" in bullets
+    assert "Position." not in bullets
+
+    river = client.post("/spots/solve", json=RIVER_SPOT).json()
+    assert river["hand_categories"] == {}
+    assert river["hand_reasons"] == {}

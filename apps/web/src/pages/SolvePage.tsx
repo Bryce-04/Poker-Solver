@@ -1,104 +1,20 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
-import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
-import { SIX_MAX_POSITIONS, assignPostflopSeats } from "../lib/positions";
-import { boardFromCards, parseBoardText } from "../lib/cards";
-import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
-import { parseHandHistoryToPostflopSetup } from "../lib/parseHandHistory";
-import { STREET_ORDER, preflopContext, summarizeHand, toBettingActions } from "../lib/handBuilder";
-import type { BuilderAction } from "../lib/handBuilder";
-import {
-  fetchPreflopRanges,
-  fetchReferenceStrategy,
-  narrowRanges,
-  solveSpot,
-  type LiveSolveResponse,
-  type SpotValidationIssue,
-} from "../lib/api";
+import type { Position, Spot } from "@poker-solver/schema";
+import { SIX_MAX_POSITIONS } from "../lib/positions";
+import { STREET_ORDER } from "../lib/handBuilder";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { CardPicker } from "../components/CardPicker/CardPicker";
 import { StrategyGrid } from "../components/StrategyGrid/StrategyGrid";
 import { StreetActions } from "../components/StreetActions/StreetActions";
 import { Step } from "../components/Step/Step";
-import {
-  buildNarrowSpot,
-  describeStreets,
-  streetsToNarrow,
-  unlikelyLineWarning,
-} from "../lib/chaining";
+import { describeStreets } from "../lib/chaining";
 import { formatMix, overallMix } from "../lib/strategySummary";
 import { handMass, indexRange } from "../lib/rangeCombos";
+import type { SolvePrefill } from "../lib/solvePrefill";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
-
-type BoardMode = "pick" | "text";
-type SetupMode = "click" | "paste";
-
-type Outcome =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  // `range` is the deciding player's range as it was when solved, so the
-  // result can fade hands that are barely in it (later edits don't move it).
-  | { kind: "solved"; data: LiveSolveResponse; range: HandRange }
-  | { kind: "invalid"; issues: SpotValidationIssue[] }
-  | { kind: "rejected"; reason: string }
-  | { kind: "busy" }
-  | { kind: "network-error" }
-  | { kind: "error"; status: number };
-
-type PreflopLoadState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "loaded"; description: string }
-  | { kind: "unavailable"; reason: string };
-
-type NarrowState =
-  | { kind: "idle" }
-  | { kind: "loading"; street: string }
-  | { kind: "done"; streets: string; trimmedNote: string }
-  | { kind: "failed"; reason: string };
-
-// Status for each position's "Load reference range" button -- separate
-// from the solve Outcome above, since loading a starting range and
-// submitting a solve are independent actions with independent feedback.
-type ChartLoadState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "loaded" }
-  | { kind: "unavailable"; reason: string };
-
-function narrowFailureReason(
-  result: Exclude<Awaited<ReturnType<typeof narrowRanges>>, { kind: "narrowed" }>,
-  street: string,
-): string {
-  switch (result.kind) {
-    case "unsupported":
-      return "The server doesn't support narrowing yet (it needs the newest version) -- set the range by hand.";
-    case "rejected":
-      return `Couldn't narrow by the ${street}: ${result.reason}`;
-    case "invalid":
-      return `The server rejected the ${street} spot.`;
-    case "busy":
-      return "The solver is busy with another solve -- try again in a minute.";
-    case "network-error":
-      return "Couldn't reach the API. Check your connection and try again.";
-    case "error":
-      return `Narrowing failed: the request returned HTTP ${result.status}.`;
-  }
-}
-
-function streetForBoardLength(length: number): Street {
-  if (length === 3) return "flop";
-  if (length === 4) return "turn";
-  return "river";
-}
-
-const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
-  preflop: [],
-  flop: [],
-  turn: [],
-  river: [],
-};
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { useSolveSetup, type SolveSetup } from "./solve/useSolveSetup";
+import { SolveWorkspace } from "./solve/SolveWorkspace";
 
 /**
  * Stage 5's live-solve screen: a real MCCFR solve (apps/api's
@@ -121,392 +37,78 @@ const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
  * entries, shared by both setup modes: 3/4/5 cards picked is what unlocks
  * the flop/turn/river action-builder sections in click mode.
  */
-export function SolvePage() {
-  const [setupMode, setSetupMode] = useState<SetupMode>("click");
-  // The two heads-up seats, in whichever order they were picked -- who is
-  // out of position / in position is derived from them, never chosen.
-  const [seatA, setSeatA] = useState<Position>("BB");
-  const [seatB, setSeatB] = useState<Position>("BTN");
-  const { oop: oopPosition, ip: ipPosition } = assignPostflopSeats(seatA, seatB);
-  const [boardMode, setBoardMode] = useState<BoardMode>("pick");
-  const [boardText, setBoardText] = useState("");
-  const [pickedCards, setPickedCards] = useState<string[]>([]);
-  // Ranges and "Load typical range" status are kept per SEAT, not per role,
-  // so changing the other player never leaves a range on the wrong player.
-  const [ranges, setRanges] = useState<Partial<Record<Position, HandRange>>>({});
-  const [chartStates, setChartStates] = useState<Partial<Record<Position, ChartLoadState>>>({});
-  const oopRange = ranges[oopPosition] ?? {};
-  const ipRange = ranges[ipPosition] ?? {};
-  const oopChartState = chartStates[oopPosition] ?? { kind: "idle" as const };
-  const ipChartState = chartStates[ipPosition] ?? { kind: "idle" as const };
-  function setRangeFor(position: Position, range: HandRange) {
-    setRanges((prev) => ({ ...prev, [position]: range }));
-  }
-  function setChartStateFor(position: Position, state: ChartLoadState) {
-    setChartStates((prev) => ({ ...prev, [position]: state }));
-  }
-  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
-  // "Narrow ranges by earlier action": its own status, plus the ranges as they
-  // were before the last narrowing so it can be undone.
-  const [narrowState, setNarrowState] = useState<NarrowState>({ kind: "idle" });
-  // "Load ranges from the preflop action": which line it loaded, or why not.
-  const [preflopLoad, setPreflopLoad] = useState<PreflopLoadState>({ kind: "idle" });
-  const [rangesBeforeNarrow, setRangesBeforeNarrow] = useState<Partial<
-    Record<Position, HandRange>
-  > | null>(null);
+export function SolvePage({ prefill, savedSpot }: { prefill?: SolvePrefill; savedSpot?: Spot } = {}) {
+  const setup = useSolveSetup(prefill, savedSpot);
+  const isDesktop = useIsDesktop();
+  return isDesktop ? <SolveWorkspace setup={setup} /> : <SolvePhone setup={setup} />;
+}
 
-  // Click-through mode's own state: a true starting stack (before any
-  // action) plus each street's real action log -- pot_bb/effective_stack_bb
-  // for whichever street the board's card count lands on are computed from
-  // these, never typed in directly (see docs/decisions.md's 2026-10-07
-  // entry on why the old flat pot_bb=100/effective_stack_bb=33 defaults
-  // didn't make sense).
-  const [startingStackBb, setStartingStackBb] = useState(100);
-  const [streets, setStreets] = useState<Record<Street, BuilderAction[]>>(EMPTY_STREETS);
-  // Actions stepped back over (via Back or a street's own Undo), newest
-  // last -- what "Forward" re-applies. Any fresh action clears it.
-  const [redoStack, setRedoStack] = useState<{ street: Street; action: BuilderAction }[]>([]);
-
-  // Paste mode's own state -- unchanged from before this street-by-street
-  // builder existed: a hand history directly tells you pot/stack/board at
-  // the point it stops, so there's nothing to click through.
-  const [handHistoryText, setHandHistoryText] = useState("");
-  const [handHistoryError, setHandHistoryError] = useState<string | null>(null);
-  const [pastedPotBb, setPastedPotBb] = useState(0);
-  const [pastedStackBb, setPastedStackBb] = useState(0);
-  const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
-  const [pasteLoaded, setPasteLoaded] = useState(false);
-
-  function loadFromHandHistory() {
-    const result = parseHandHistoryToPostflopSetup(handHistoryText);
-    if (result.kind === "unrecognized") {
-      setHandHistoryError(result.reason);
-      return;
-    }
-    setHandHistoryError(null);
-    const { setup } = result;
-    setSeatA(setup.oopPosition);
-    setSeatB(setup.ipPosition);
-    setPastedStackBb(setup.effectiveStackBb);
-    setPastedPotBb(setup.potBb);
-    setBoardMode("pick");
-    setPickedCards(setup.board);
-    setOopAlreadyChecked(setup.oopAlreadyChecked);
-    setPasteLoaded(true);
-  }
-
-  const board = boardMode === "pick" ? boardFromCards(pickedCards) : parseBoardText(boardText);
-  const boardLength =
-    board.kind === "ok" ? board.cards.length : boardMode === "pick" ? pickedCards.length : 0;
-  const positionsAreValid = oopPosition !== ipPosition;
-
-  const preflop = preflopContext(oopPosition, ipPosition, startingStackBb);
-  const handSummary = summarizeHand(oopPosition, ipPosition, startingStackBb, streets, boardLength);
-
-  const potBb = setupMode === "click" ? handSummary.potBb : pastedPotBb;
-  const effectiveStackBb = setupMode === "click" ? handSummary.effectiveStackBb : pastedStackBb;
-  const currentStreet = setupMode === "click" ? handSummary.targetStreet : streetForBoardLength(boardLength);
-  const currentStreetActions: BuilderAction[] =
-    setupMode === "click"
-      ? streets[handSummary.targetStreet]
-      : oopAlreadyChecked
-        ? [{ position: oopPosition, action: "check" }]
-        : [];
-
-  const setupIsReady =
-    setupMode === "click"
-      ? handSummary.blockedReason === null && boardLength >= 3
-      : pasteLoaded;
-
-  const rangesAreValid = Object.keys(oopRange).length > 0 && Object.keys(ipRange).length > 0;
-  const canSubmit =
-    positionsAreValid && setupIsReady && rangesAreValid && board.kind === "ok";
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!canSubmit || board.kind !== "ok") return;
-
-    const spot: Spot = {
-      positions_in_hand: [oopPosition, ipPosition],
-      effective_stack_bb: effectiveStackBb,
-      pot_bb: potBb,
-      board: board.cards,
-      current_street: currentStreet,
-      actions: toBettingActions(currentStreet, currentStreetActions),
-      ranges: { [oopPosition]: oopRange, [ipPosition]: ipRange },
-    };
-
-    setOutcome({ kind: "loading" });
-    const result = await solveSpot(spot);
-    switch (result.kind) {
-      case "solved":
-        setOutcome({
-          kind: "solved",
-          data: result.data,
-          range: result.data.position === oopPosition ? oopRange : ipRange,
-        });
-        return;
-      case "invalid":
-        setOutcome({ kind: "invalid", issues: result.issues });
-        return;
-      case "rejected":
-        setOutcome({ kind: "rejected", reason: result.reason });
-        return;
-      case "busy":
-        setOutcome({ kind: "busy" });
-        return;
-      case "network-error":
-        setOutcome({ kind: "network-error" });
-        return;
-      case "error":
-        setOutcome({ kind: "error", status: result.status });
-        return;
-    }
-  }
-
-  /**
-   * Seeds a position's range from reference-chart data (the same curated
-   * charts /spots/reference-strategy already serves for Stage 2) instead
-   * of leaving it empty -- an approximate real starting point to tweak,
-   * not an accurate postflop range (the reference chart has no idea
-   * what's happened since preflop).
-   *
-   * Tries the position's own opening chart first; BB has none (it can
-   * never be first to act in an unopened pot), so for BB -- and as a
-   * second attempt for anyone else's open miss -- this falls back to the
-   * defend-vs-raise chart, treating `otherPosition` as the preflop
-   * raiser. That's a real assumption, not just a lookup: it's only
-   * accurate if the in-position player was actually the preflop
-   * aggressor, which is the common case for a heads-up postflop pot but
-   * not the only one. Charts cover BB defending against every other
-   * 6-max seat, so this combination covers every position pair the
-   * pickers allow; a genuine coverage gap (an unusual stack depth) still
-   * falls through to the plain "no chart" message.
-   */
-  async function loadReferenceRange(
-    position: Position,
-    otherPosition: Position,
-    setRange: (range: HandRange) => void,
-    setStatus: (state: ChartLoadState) => void,
-  ) {
-    const stackForChart = setupMode === "click" ? startingStackBb : effectiveStackBb;
-    setStatus({ kind: "loading" });
-    const openResult = await fetchReferenceStrategy(buildOpenSpot(position, stackForChart));
-    if (openResult.kind === "match") {
-      setRange(openResult.data.ranges[position] ?? {});
-      setStatus({ kind: "loaded" });
-      return;
-    }
-    if (openResult.kind === "network-error") {
-      setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
-      return;
-    }
-    if (openResult.kind !== "no-match") {
-      setStatus({ kind: "unavailable", reason: "Couldn't load a reference range." });
-      return;
-    }
-
-    const defendResult = await fetchReferenceStrategy(
-      buildVsRaiseSpot(position, otherPosition, stackForChart),
-    );
-    if (defendResult.kind === "match") {
-      setRange(defendResult.data.ranges[position] ?? {});
-      setStatus({ kind: "loaded" });
-      return;
-    }
-    if (defendResult.kind === "network-error") {
-      setStatus({ kind: "unavailable", reason: "Couldn't reach the API." });
-      return;
-    }
-    setStatus({
-      kind: "unavailable",
-      reason: `No reference chart covers ${position} opening, or defending vs ${otherPosition}, at this stack -- build it manually.`,
-    });
-  }
-
-  // Both ranges straight from the preflop line that was clicked through --
-  // open and call, 3-bet, or 4-bet pot -- instead of per-seat guesses. Offered
-  // once preflop has closed with at least one raise.
-  const preflopHasRaise = streets.preflop.some(
-    (a) => a.action === "raise" || a.action === "bet" || a.action === "all_in",
-  );
-  const canLoadPreflopRanges =
-    setupMode === "click" && handSummary.targetStreet !== "preflop" && preflopHasRaise;
-
-  async function loadRangesFromPreflopAction() {
-    setPreflopLoad({ kind: "loading" });
-    const result = await fetchPreflopRanges({
-      positions_in_hand: [oopPosition, ipPosition],
-      effective_stack_bb: startingStackBb,
-      current_street: "preflop",
-      actions: toBettingActions("preflop", streets.preflop),
-    });
-    switch (result.kind) {
-      case "ok":
-        setRanges((prev) => ({
-          ...prev,
-          [oopPosition]: result.data.ranges[oopPosition] ?? {},
-          [ipPosition]: result.data.ranges[ipPosition] ?? {},
-        }));
-        // Fresh starting ranges: an earlier narrowing no longer applies to them.
-        setRangesBeforeNarrow(null);
-        setNarrowState({ kind: "idle" });
-        setPreflopLoad({ kind: "loaded", description: result.data.description });
-        return;
-      case "unsupported":
-      case "invalid":
-        setPreflopLoad({ kind: "unavailable", reason: result.reason });
-        return;
-      case "network-error":
-        setPreflopLoad({ kind: "unavailable", reason: "Couldn't reach the API." });
-        return;
-      case "error":
-        setPreflopLoad({
-          kind: "unavailable",
-          reason: `Couldn't load ranges (the request returned HTTP ${result.status}).`,
-        });
-        return;
-    }
-  }
-
-  // The earlier postflop streets whose action can narrow the ranges for the
-  // street being solved -- only when the hand was clicked through (a pasted
-  // history carries no earlier-street actions) and every earlier street closed.
-  const narrowStreets =
-    setupMode === "click" && board.kind === "ok" && handSummary.blockedReason === null
-      ? streetsToNarrow(handSummary.targetStreet)
-      : [];
-
-  /**
-   * Range chaining: for each earlier postflop street in turn, asks the server
-   * to solve that street and narrow both ranges by the recorded action, then
-   * carries the result into the next one. Each step is a full street solve,
-   * so this can take as long as solves do.
-   */
-  async function narrowByEarlierStreets() {
-    if (board.kind !== "ok" || narrowStreets.length === 0) return;
-    const before = ranges;
-    let oop = oopRange;
-    let ip = ipRange;
-    let droppedHands = 0;
-    for (const street of narrowStreets) {
-      setNarrowState({ kind: "loading", street });
-      const spot = buildNarrowSpot({
-        oopPosition,
-        ipPosition,
-        startingStackBb,
-        streets,
-        board: board.cards,
-        street,
-        oopRange: oop,
-        ipRange: ip,
-      });
-      const result = await narrowRanges(spot);
-      if (result.kind !== "narrowed") {
-        setNarrowState({ kind: "failed", reason: narrowFailureReason(result, street) });
-        return;
-      }
-      const warning = unlikelyLineWarning(street, result.data.line_probability);
-      if (warning) {
-        setNarrowState({ kind: "failed", reason: warning });
-        return;
-      }
-      for (const t of Object.values(result.data.trimmed ?? {})) droppedHands += t.dropped_entries;
-      oop = result.data.ranges[oopPosition] ?? {};
-      ip = result.data.ranges[ipPosition] ?? {};
-      if (Object.keys(oop).length === 0 || Object.keys(ip).length === 0) {
-        setNarrowState({
-          kind: "failed",
-          reason: `Nothing is left of a range after the ${street} action, so the ranges were left as they were.`,
-        });
-        return;
-      }
-    }
-    setRangesBeforeNarrow(before);
-    setRanges((prev) => ({ ...prev, [oopPosition]: oop, [ipPosition]: ip }));
-    setNarrowState({
-      kind: "done",
-      streets: describeStreets(narrowStreets),
-      trimmedNote:
-        droppedHands > 0
-          ? ` Hands the line almost never involved (under 2% of a range's top hand) were dropped: ${droppedHands} in all.`
-          : "",
-    });
-  }
-
-  function undoNarrowing() {
-    if (rangesBeforeNarrow) setRanges(rangesBeforeNarrow);
-    setRangesBeforeNarrow(null);
-    setNarrowState({ kind: "idle" });
-  }
-
-  /** Back to a blank page: every input, both ranges, and any result. */
-  function resetAll() {
-    setSetupMode("click");
-    setSeatA("BB");
-    setSeatB("BTN");
-    setBoardMode("pick");
-    setBoardText("");
-    setPickedCards([]);
-    setRanges({});
-    setChartStates({});
-    setOutcome({ kind: "idle" });
-    setNarrowState({ kind: "idle" });
-    setRangesBeforeNarrow(null);
-    setPreflopLoad({ kind: "idle" });
-    setStartingStackBb(100);
-    setStreets(EMPTY_STREETS);
-    setRedoStack([]);
-    setHandHistoryText("");
-    setHandHistoryError(null);
-    setPastedPotBb(0);
-    setPastedStackBb(0);
-    setOopAlreadyChecked(false);
-    setPasteLoaded(false);
-  }
-
-  function setStreetActions(street: Street, actions: BuilderAction[]) {
-    const before = streets[street];
-    if (actions.length > before.length) {
-      setRedoStack([]); // a new action forks the hand -- the old "future" is gone
-    } else if (actions.length < before.length) {
-      const removed = before.slice(actions.length).reverse();
-      setRedoStack((prev) => [...prev, ...removed.map((action) => ({ street, action }))]);
-    }
-    setStreets((prev) => ({ ...prev, [street]: actions }));
-  }
-
-  /** Steps the whole hand back one action, across street boundaries. */
-  function goBack() {
-    const street = [...STREET_ORDER].reverse().find((st) => streets[st].length > 0);
-    if (street) setStreetActions(street, streets[street].slice(0, -1));
-  }
-
-  function goForward() {
-    const next = redoStack[redoStack.length - 1];
-    if (!next) return;
-    setRedoStack((prev) => prev.slice(0, -1));
-    setStreets((prev) => ({ ...prev, [next.street]: [...prev[next.street], next.action] }));
-  }
-
-  const hasActions = STREET_ORDER.some((st) => streets[st].length > 0);
-
-  const missing: string[] = [];
-  if (!positionsAreValid) missing.push("Pick two different positions.");
-  if (setupMode === "paste" && !pasteLoaded) {
-    missing.push("Load a hand history in step 1.");
-  } else if (setupMode === "click" && handSummary.blockedReason !== null) {
-    missing.push("Finish the action on the earlier streets in step 1.");
-  }
-  if (boardLength < 3) missing.push("Pick at least 3 board cards (the flop) in step 2.");
-  else if (board.kind !== "ok") missing.push("Fix the board in step 2.");
-  if (Object.keys(oopRange).length === 0) missing.push(`Add hands to ${oopPosition}'s range in step 3.`);
-  if (Object.keys(ipRange).length === 0) missing.push(`Add hands to ${ipPosition}'s range in step 3.`);
-
-  const spotSummary =
-    board.kind === "ok"
-      ? `${oopPosition} vs ${ipPosition} · ${currentStreet} ${board.cards.join(" ")} · pot ${potBb.toLocaleString()}bb`
-      : `${oopPosition} vs ${ipPosition}`;
+/** The phone layout (< 1024px): the original four stacked steps. */
+function SolvePhone({ setup }: { setup: SolveSetup }) {
+  const {
+    setupMode,
+    setSetupMode,
+    seatA,
+    setSeatA,
+    seatB,
+    setSeatB,
+    oopPosition,
+    ipPosition,
+    boardMode,
+    setBoardMode,
+    boardText,
+    setBoardText,
+    pickedCards,
+    setPickedCards,
+    oopRange,
+    ipRange,
+    oopChartState,
+    ipChartState,
+    outcome,
+    narrowState,
+    preflopLoad,
+    rangesBeforeNarrow,
+    startingStackBb,
+    setStartingStackBb,
+    streets,
+    redoStack,
+    setRedoStack,
+    handHistoryText,
+    setHandHistoryText,
+    handHistoryError,
+    pastedPotBb,
+    setPastedPotBb,
+    pastedStackBb,
+    setPastedStackBb,
+    oopAlreadyChecked,
+    setOopAlreadyChecked,
+    board,
+    boardLength,
+    positionsAreValid,
+    preflop,
+    handSummary,
+    potBb,
+    effectiveStackBb,
+    currentStreet,
+    canSubmit,
+    canLoadPreflopRanges,
+    narrowStreets,
+    hasActions,
+    missing,
+    spotSummary,
+    setRangeFor,
+    setChartStateFor,
+    loadFromHandHistory,
+    handleSubmit,
+    loadReferenceRange,
+    loadRangesFromPreflopAction,
+    narrowByEarlierStreets,
+    undoNarrowing,
+    resetAll,
+    setStreetActions,
+    goBack,
+    goForward,
+  } = setup;
 
   return (
     <div className="spot-builder">
@@ -549,7 +151,7 @@ export function SolvePage() {
                   placeholder="Paste up through the point just before the decision you want to look at"
                 />
               </label>
-              <button type="button" className="spot-builder__reset" onClick={loadFromHandHistory}>
+              <button type="button" className="spot-builder__reset btn-secondary" onClick={loadFromHandHistory}>
                 Load from hand history
               </button>
               {handHistoryError && <p className="spot-builder__field-error">{handHistoryError}</p>}
@@ -641,7 +243,7 @@ export function SolvePage() {
             <div className="solve-page__history">
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={goBack}
                 disabled={!hasActions}
                 aria-label="Back one action"
@@ -650,7 +252,7 @@ export function SolvePage() {
               </button>
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={goForward}
                 disabled={redoStack.length === 0}
                 aria-label="Forward one action"
@@ -806,7 +408,7 @@ export function SolvePage() {
               <div className="solve-page__chart-load">
                 <button
                   type="button"
-                  className="spot-builder__reset"
+                  className="spot-builder__reset btn-secondary"
                   onClick={loadRangesFromPreflopAction}
                   disabled={preflopLoad.kind === "loading"}
                 >
@@ -839,7 +441,7 @@ export function SolvePage() {
               <div className="solve-page__chart-load">
                 <button
                   type="button"
-                  className="spot-builder__reset"
+                  className="spot-builder__reset btn-secondary"
                   onClick={narrowByEarlierStreets}
                   disabled={
                     narrowState.kind === "loading" ||
@@ -852,7 +454,7 @@ export function SolvePage() {
                     : `Narrow ranges by ${describeStreets(narrowStreets)} action`}
                 </button>
                 {rangesBeforeNarrow && narrowState.kind === "done" && (
-                  <button type="button" className="spot-builder__reset" onClick={undoNarrowing}>
+                  <button type="button" className="spot-builder__reset btn-secondary" onClick={undoNarrowing}>
                     Undo
                   </button>
                 )}
@@ -876,7 +478,7 @@ export function SolvePage() {
             <div className="solve-page__chart-load">
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={() =>
                   loadReferenceRange(
                     oopPosition,
@@ -912,7 +514,7 @@ export function SolvePage() {
             <div className="solve-page__chart-load">
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={() =>
                   loadReferenceRange(
                     ipPosition,
@@ -958,10 +560,10 @@ export function SolvePage() {
             </ul>
           )}
           <div className="solve-page__actions">
-            <button type="submit" disabled={!canSubmit || outcome.kind === "loading"}>
+            <button type="submit" className="btn-primary" disabled={!canSubmit || outcome.kind === "loading"}>
               Solve
             </button>
-            <button type="button" className="spot-builder__reset" onClick={resetAll}>
+            <button type="button" className="spot-builder__reset btn-ghost" onClick={resetAll}>
               Reset
             </button>
           </div>

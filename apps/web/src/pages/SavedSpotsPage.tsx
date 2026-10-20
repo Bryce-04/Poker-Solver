@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Spot } from "@poker-solver/schema";
 import { listSpots } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { summarize } from "../lib/spotText";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
@@ -12,15 +13,6 @@ type ListState =
   | { kind: "ok"; spots: Spot[] }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
-
-function summarize(spot: Spot): string {
-  const positions = spot.positions_in_hand.join("/");
-  const raise = (spot.actions ?? []).find((a) => a.action === "raise");
-  const situation = raise
-    ? `facing a raise from ${raise.position}`
-    : "unopened pot";
-  return `${positions} — ${spot.effective_stack_bb}bb, ${situation}`;
-}
 
 function formatSavedAt(spot: Spot): string | null {
   if (!spot.created_at) return null;
@@ -96,9 +88,15 @@ function SavedSpotsList({ state }: { state: ListState }) {
       <div className="spot-builder__status-block spot-builder__status-block--error">
         <p className="spot-builder__status-title">Couldn&rsquo;t reach the API.</p>
         <p>
-          Is <code>apps/api</code> running? Start it with{" "}
-          <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+          Check your connection and try again. The server may also be
+          waking up &mdash; give it a minute.
         </p>
+        {import.meta.env.DEV && (
+          <p>
+            Dev: is <code>apps/api</code> running? Start it with{" "}
+            <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+          </p>
+        )}
       </div>
     );
   }

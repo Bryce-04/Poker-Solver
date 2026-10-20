@@ -142,3 +142,25 @@ describe("RangeGrid summary of a weighted range", () => {
     expect(screen.queryByText(/weighted/)).not.toBeInTheDocument();
   });
 });
+
+describe("RangeGrid -- optional toolbar reset and summary", () => {
+  it("adds a reset button only when asked, and can hide the summary line", async () => {
+    const user = userEvent.setup();
+    const onReset = vi.fn();
+    const { rerender } = render(<RangeGrid value={{ AA: 1 }} onChange={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Reset to chart" })).not.toBeInTheDocument();
+    expect(screen.getByText(/6 combos/)).toBeInTheDocument();
+
+    rerender(
+      <RangeGrid
+        value={{ AA: 1 }}
+        onChange={() => {}}
+        reset={{ label: "Reset to chart", onClick: onReset }}
+        showSummary={false}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Reset to chart" }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/6 combos/)).not.toBeInTheDocument();
+  });
+});

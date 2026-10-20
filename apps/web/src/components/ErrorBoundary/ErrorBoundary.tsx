@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <p>{this.state.error.message}</p>
           <button
             type="button"
-            className="error-boundary__reset"
+            className="error-boundary__reset btn-primary"
             onClick={() => this.setState({ error: null })}
           >
             Try again

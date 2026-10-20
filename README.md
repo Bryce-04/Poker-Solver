@@ -11,9 +11,14 @@ everywhere a matched chart shows up, not just viewable. Three ways into a
 spot now converge on the same shapes: the button builder, Stage 3's
 plain-language entry, and Stage 4's hand-history paste import (one
 format, rule-based, not freeform — same philosophy as Stage 3). The app
-has a design-token visual pass (light + dark) and is routed into five
-screens (Builder / Saved / Type in / Import / Solve). Saved spots is wired
-end-to-end to `apps/api`'s `POST`/`GET /spots` (Postgres via Supabase).
+has a design-token visual pass (light + dark) and is routed into four
+destinations: Solve, Ranges (the builder, text entry and hand-history
+import, merged), Library (saved spots) and Drill. At 1024px and wider it
+has a dedicated desktop layout (a sidebar shell, a merged Ranges page, a
+two-pane Solve, and a Library with open / rename / duplicate / delete).
+Phones keep the original screens; see `docs/desktop-redesign.md`. Saved
+spots is wired end-to-end to `apps/api`'s `/spots` routes (save, list,
+rename, delete; Postgres via Supabase).
 Stage 6 auth works end to end for saved spots — Supabase sign-in in the
 app, and `apps/api` verifying the sign-in token and returning only your
 own saved spots. `apps/api` is

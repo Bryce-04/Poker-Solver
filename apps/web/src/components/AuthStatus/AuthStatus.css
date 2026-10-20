@@ -46,3 +46,70 @@
   color: var(--danger);
   font-size: 0.8rem;
 }
+
+/* The desktop sidebar's account row (variant="sidebar"; desktop only). */
+@media (min-width: 1024px) {
+  .sidebar-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 6px;
+  }
+
+  .sidebar-account__avatar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--surface-3);
+    color: var(--text-strong);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .sidebar-account__email {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  button.sidebar-account__signout {
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  button.sidebar-account__signin {
+    width: 100%;
+  }
+
+  .auth-status--stacked {
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0;
+    font-size: 13px;
+  }
+
+  .auth-status--stacked input {
+    max-width: none;
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .auth-status--stacked button[type="submit"] {
+    min-height: 40px;
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  .auth-status--stacked .auth-status__toggle {
+    align-self: center;
+  }
+}

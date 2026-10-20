@@ -6,6 +6,144 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-20 — Hand categories and "Why?" on live solves
+
+**Status:** proposed.
+
+**Context.** `docs/desktop-redesign.md` §7.4: the Solve result's
+hand panel should say what a hand is ("Top pair, strong kicker") and
+offer a "Why?". `drill_analysis.py` already classifies hands and writes
+rule-of-thumb reasons, but only offline, for the Drill deck.
+
+**Decision.** `POST /spots/solve` returns `hand_categories` and
+`hand_reasons`, built by `app/hand_notes.py` from the same classifier and
+`explain()`, so there's one source of truth. The equity inputs come from
+the trainer's own matrix (`RangeCfrTrainer.combo_equities`), so nothing is
+recomputed: about 16ms on wide flop ranges. Both fields are optional for
+clients and normalized to `{}` in `solveSpot`, because Render deploys
+separately from the web build.
+
+**Limits.**
+- Flop only, because `describe_hand` handles exactly three board cards.
+  Extending it to the turn and river is the natural follow-up, and it
+  needs its own tests so the Drill's wording doesn't drift.
+- Facing a raise or a jam, the categories still come back, but "Why?" is
+  left out: the price bullets need the bet size, which the bet menu alone
+  doesn't give there.
+- A 169-type label's category is what most of its live combos are, since
+  suits can differ (one AKs combo may be a flush draw).
+- The same honesty note as the Drill: the numbers are computed, the
+  sentence is a rule of thumb, and the UI says so.
+
+---
+
+## 2026-10-20 — Library: spot names, rename and delete
+
+**Status:** proposed.
+
+**Context.** `docs/desktop-redesign.md` §6.4 / §7.1–7.3: Saved was a
+dead end, with rows that all read alike and no way to open, rename or
+delete one.
+
+**Decision.**
+- **API.** `Spot.name` (optional, at most 120 characters).
+  `PATCH /spots/{id}` takes `{"name": ...}`, trimmed, 1–120 characters,
+  and returns the updated spot. `DELETE /spots/{id}` returns 204. Both
+  require auth and act only on the caller's own rows. A missing id,
+  someone else's spot, and an ownerless pre-auth row all get the same 404,
+  so the API never confirms that another user's spot exists. Ownerless
+  rows stay untouchable.
+- **No `name` column.** The spec asked for a nullable `SpotRow.name`
+  column plus an Alembic migration. Saved spots are stored whole as JSONB
+  (`SpotRow.data`), and nothing queries by name: Library search is
+  client-side. A column would be a second copy of the value that every
+  write must keep in sync. So the name lives in `data` like every other
+  `Spot` field, and rename rewrites it there. `created_by` is a column
+  because `GET /spots` filters on it. If a server-side search or sort by
+  name is ever needed, add the column then.
+- **Phones.** As with Ranges and Solve, phones keep the original Saved
+  list unchanged (the no-visual-change-under-1024px rule). The table,
+  preview, open, rename, delete and duplicate are desktop only.
+- **Open** passes the spot as route state. Duplicate is client-side: a
+  `POST /spots` of the spot with " (copy)" added to its name, and the
+  server assigns the copy a new id, owner and date.
+
+---
+
+## 2026-10-20 — Desktop Solve: one state hook, two layouts; how "Save spot" stores a hand
+
+**Status:** proposed.
+
+**Context.** Phase 4 of `docs/desktop-redesign.md` redesigns Solve for
+desktop. Phones must not change, and `SolvePage` was ~1,100 lines of state
+and markup together.
+
+**Decision.** Everything above the old `return` moved, unchanged, into
+`pages/solve/useSolveSetup.ts`. `SolvePage` calls it once and renders
+either the original phone markup (byte-identical, checked by diff and by
+screenshot) or `SolveWorkspace` at >= 1024px. Both layouts read one state,
+so resizing across the breakpoint keeps a half-built hand. Desktop-only
+additions to the hook are things the phone page never reads: `solve()`
+callable without a form event (returns whether it solved), `lastSolved`,
+solve timing, `loadedRanges` (each seat's last loaded range and where it
+came from), `preflopClosed`, `decisionPosition`, `autoLoadRanges`,
+`setupAsSpot`.
+
+**How a saved Solve setup is encoded** (`setupAsSpot`, for Phase 5's
+"open in Solve"). The setup is saved, not the result. Clicked-through
+hands store every street's actions in order (each `BettingAction` carries
+its `street` and `size_bb`), `effective_stack_bb` as the **starting**
+stack, `pot_bb` as the pot entering `current_street`, the board, and both
+ranges. Replaying the actions from the starting stack rebuilds the hand.
+A setup read from a hand history has no earlier-street log, so it stores
+only the current street's actions (at most OOP's check) and
+`effective_stack_bb` as the stack at the decision. Phase 5 tells the two
+apart by whether there are preflop actions. This differs from
+`/spots/solve`'s request, where `effective_stack_bb` is the stack entering
+the street, but a saved setup isn't a solve request.
+
+---
+
+## 2026-10-20 — Four destinations: Solve, Ranges, Library, Drill
+
+**Status:** proposed (the spec's §3 asks the team to confirm the mobile half).
+
+**Context.** `docs/desktop-redesign.md` §1: Builder, Type in and Import were
+three tabs for one feature (get a preflop chart and edit it), and the nav
+had six entries.
+
+**Decision.** Four routes: `/solve`, `/ranges` (Builder, Type in and Import
+merged, `?mode=pick|type|paste`, no mode meaning pick), `/library` (was
+Saved), `/drill`. The old routes redirect (`/` → `/solve`, `/saved` →
+`/library`, `/type-in` → `/ranges?mode=type`, `/import` →
+`/ranges?mode=paste`), so links and bookmarks still work. This applies at
+every width, which is the redesign's one exception to "nothing changes under
+1024px": a route can't exist on desktop only without keeping two IAs. The
+phone nav shows four links, and Ranges gets a small mode switch on phones,
+styled like Solve's existing toggle. The default route is now Solve, not
+Builder. Rejected alternative: keep the old routes on phones and merge only
+on desktop, which means two sets of routes to maintain.
+
+**Interim.** Until Phase 3, `/ranges` renders the unchanged old pages under
+the switch.
+
+**Update, same day (Phase 3) — phones keep the old pages.** The spec's §6.3
+says to delete `BuilderPage` / `TypeInPage` / `ImportPage` once the merged
+Ranges page exists, and to drop the "Get reference strategy" button in
+favor of auto-loading. Both would visibly change phones, and the
+redesign's hard rule (§2.1, and the user's explicit instruction) is that
+nothing changes visually under 1024px. The user chose to keep phones as
+they are. So the merged page (`RangesWorkspace`) renders at >= 1024px
+only, and under that `/ranges` keeps the three old pages under the mode
+switch. To avoid three-plus-one copies of the same logic, the fetch /
+editable-range / save state machine moved into `lib/useReferenceChart.ts`,
+used by all four. The old pages' markup is untouched, since their status
+copy differs slightly from page to page and sharing it would change phone
+text. Revisit if the team later wants the merged page on phones too: it
+would need a single-column layout, and the old pages could then go.
+
+---
+
 ## 2026-10-19 — Swipe Drill, first slice (`/drill`)
 
 **Status:** proposed (built on the `swipe-drill` branch, not yet tried on a device).

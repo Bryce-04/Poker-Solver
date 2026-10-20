@@ -72,7 +72,10 @@ src/poker_solver/
                       matrix-vector products against equity.py's matrix;
                       Discounted CFR updates; exploitability() and
                       train_until() for convergence; label_strategies() to
-                      roll combos back up to 169-type labels.
+                      roll combos back up to 169-type labels;
+                      combo_equities() for each combo's equity against the
+                      opponent's range, read off the same matrix (apps/api's
+                      hand_notes.py quotes it in the "Why?" text).
   postflop_mccfr.py   SUPERSEDED (2026-10-07) -- the old chance-sampled
                       Monte Carlo trainer. No longer used by apps/api;
                       kept intact as a known-good reference, a real

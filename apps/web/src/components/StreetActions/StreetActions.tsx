@@ -65,7 +65,7 @@ export function StreetActions({ street, ctx, actions, onChange, disabled }: Stre
       ) : state.isTerminal ? (
         <p className="street-actions__status">
           {streetLabel} action is closed. {actions.length > 0 && (
-            <button type="button" className="spot-builder__reset" onClick={undo}>
+            <button type="button" className="spot-builder__reset btn-secondary" onClick={undo}>
               Undo last action
             </button>
           )}
@@ -79,15 +79,15 @@ export function StreetActions({ street, ctx, actions, onChange, disabled }: Stre
           <div className="street-actions__buttons">
             {state.facingBet ? (
               <>
-                <button type="button" className="spot-builder__reset" onClick={() => add("fold")}>
+                <button type="button" className="spot-builder__reset btn-secondary" onClick={() => add("fold")}>
                   Fold
                 </button>
-                <button type="button" className="spot-builder__reset" onClick={() => add("call")}>
+                <button type="button" className="spot-builder__reset btn-secondary" onClick={() => add("call")}>
                   Call {state.toCallBb.toLocaleString()}bb
                 </button>
               </>
             ) : (
-              <button type="button" className="spot-builder__reset" onClick={() => add("check")}>
+              <button type="button" className="spot-builder__reset btn-secondary" onClick={() => add("check")}>
                 Check
               </button>
             )}
@@ -103,18 +103,18 @@ export function StreetActions({ street, ctx, actions, onChange, disabled }: Stre
             </label>
             <button
               type="button"
-              className="spot-builder__reset"
+              className="spot-builder__reset btn-secondary"
               onClick={() => add(state.aggressiveLabel, Number(sizeInput))}
               disabled={!Number.isFinite(Number(sizeInput)) || Number(sizeInput) <= 0}
             >
               {state.aggressiveLabel === "bet" ? "Bet" : "Raise"}
             </button>
-            <button type="button" className="spot-builder__reset" onClick={() => add("all_in")}>
+            <button type="button" className="spot-builder__reset btn-secondary" onClick={() => add("all_in")}>
               All-in
             </button>
           </div>
           {actions.length > 0 && (
-            <button type="button" className="spot-builder__reset" onClick={undo}>
+            <button type="button" className="spot-builder__reset btn-secondary" onClick={undo}>
               Undo last action
             </button>
           )}

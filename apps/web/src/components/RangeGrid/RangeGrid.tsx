@@ -25,6 +25,12 @@ export interface RangeGridProps {
   /** Board cards ("Ks", "7h"...) whose combos can't be held -- greyed out
    * in the suit editor. */
   deadCards?: readonly string[];
+  /** An extra toolbar button between Suits and Clear -- e.g. "Reset to
+   * chart" on Ranges. Omitted, the toolbar is unchanged. */
+  reset?: { label: string; onClick: () => void };
+  /** The "N combos · X% of hands" line under the grid. A page that shows
+   * those numbers itself (Ranges' stats card) turns it off. */
+  showSummary?: boolean;
 }
 
 // Preset brush frequencies for weighted selection. Painting writes the
@@ -51,7 +57,14 @@ const TOTAL_COMBOS = 1326;
  *
  * Read-only mode drops all of that and just renders the shaded grid.
  */
-export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }: RangeGridProps) {
+export function RangeGrid({
+  value,
+  onChange,
+  readOnly = false,
+  deadCards = [],
+  reset,
+  showSummary = true,
+}: RangeGridProps) {
   const [brush, setBrush] = useState<number>(1);
   const [focus, setFocus] = useState<[number, number]>([0, 0]);
   // Active drag direction, or null when not painting. Ref, not state --
@@ -175,6 +188,7 @@ export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }:
       "data-hand": hand,
       "data-selected": weight > 0,
       "data-tier": weight >= 0.5 ? "high" : "low",
+      "data-full": weight >= 1 || undefined,
       "data-diagonal": r === c || undefined,
       "data-partial": isPartial(index, hand) || undefined,
       "data-picked": hand === selectedHand || undefined,
@@ -201,37 +215,50 @@ export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }:
     <div className="range-grid-wrap">
       {!readOnly && (
         <div className="range-grid__brushes" role="group" aria-label="Brush weight">
-          {BRUSH_WEIGHTS.map((w) => (
+          {/* The label and the two wrapper spans only shape the desktop
+              toolbar (RangeGrid.css); under 1024px the label is hidden and
+              the spans are display: contents, so the row is as before. */}
+          <span className="range-grid__paint-label">Paint with</span>
+          <span className="range-grid__weights">
+            {BRUSH_WEIGHTS.map((w) => (
+              <button
+                type="button"
+                key={w}
+                className="range-grid__brush"
+                data-active={w === brush}
+                aria-pressed={w === brush}
+                onClick={() => setBrush(w)}
+              >
+                {Math.round(w * 100)}%
+              </button>
+            ))}
+          </span>
+          <span className="range-grid__tools">
             <button
               type="button"
-              key={w}
-              className="range-grid__brush"
-              data-active={w === brush}
-              aria-pressed={w === brush}
-              onClick={() => setBrush(w)}
+              className="range-grid__brush range-grid__brush--suits"
+              data-active={suitsMode}
+              aria-pressed={suitsMode}
+              onClick={() => {
+                setSuitsMode(!suitsMode);
+                if (suitsMode) setSelectedHand(null);
+              }}
             >
-              {Math.round(w * 100)}%
+              Suits
             </button>
-          ))}
-          <button
-            type="button"
-            className="range-grid__brush range-grid__brush--suits"
-            data-active={suitsMode}
-            aria-pressed={suitsMode}
-            onClick={() => {
-              setSuitsMode(!suitsMode);
-              if (suitsMode) setSelectedHand(null);
-            }}
-          >
-            Suits
-          </button>
-          <button
-            type="button"
-            className="range-grid__brush range-grid__brush--clear"
-            onClick={() => onChange({})}
-          >
-            Clear
-          </button>
+            {reset && (
+              <button type="button" className="range-grid__brush range-grid__brush--tool" onClick={reset.onClick}>
+                {reset.label}
+              </button>
+            )}
+            <button
+              type="button"
+              className="range-grid__brush range-grid__brush--clear"
+              onClick={() => onChange({})}
+            >
+              Clear
+            </button>
+          </span>
         </div>
       )}
 
@@ -288,11 +315,13 @@ export function RangeGrid({ value, onChange, readOnly = false, deadCards = [] }:
         )
       )}
 
-      <p className="range-grid__summary">
-        {summary.combos} combos
-        {summary.live !== null && <> (weighted, across {summary.live})</>}{" "}
-        <span aria-hidden="true">·</span> {summary.pct}% of hands
-      </p>
+      {showSummary && (
+        <p className="range-grid__summary">
+          {summary.combos} combos
+          {summary.live !== null && <> (weighted, across {summary.live})</>}{" "}
+          <span aria-hidden="true">·</span> {summary.pct}% of hands
+        </p>
+      )}
     </div>
   );
 }

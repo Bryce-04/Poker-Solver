@@ -16,8 +16,8 @@ first, not LLM-first." The 13×13 range grid (weighted-brush/drag-paint/
 keyboard selection with weight shading) is mounted editable everywhere a
 matched chart is shown (Builder, Type in, Import) — adjust before saving,
 not just view. The whole app has a design-token visual pass (light +
-dark, `index.css`) and is routed into four screens (Builder / Saved /
-Type in / Import). Saved spots is wired end-to-end: `apps/api` persists
+dark, `index.css`) and is routed into four destinations (Solve / Ranges /
+Library / Drill; see "Desktop redesign" below). Saved spots is wired end-to-end: `apps/api` persists
 Spots as JSONB (`app/db.py`'s `SpotRow`) behind `POST`/`GET /spots`,
 matching the contract `apps/web/src/lib/api.ts` was built against (see
 `docs/decisions.md`). Stage 6 auth works for saved spots. Frontend:
@@ -27,10 +27,12 @@ the header's `AuthStatus` component); the save button on all three entry
 screens gates on being signed in. Backend: `apps/api`
 verifies that header as a Supabase JWT (`app/auth.py`'s `current_user_id`
 dependency, checked against the project's public JWKS keys -- only
-`SUPABASE_URL` needed, no secret), `POST`/`GET /spots` require it, and
-`GET /spots` only returns the caller's own spots (`SpotRow.created_by`).
-Rows saved before auth have no owner and are deliberately left in place,
-listed for no one. The `spots` table is managed by Alembic
+`SUPABASE_URL` needed, no secret), `POST`/`GET /spots` and
+`PATCH`/`DELETE /spots/{id}` (rename / delete) require it, and every one
+only ever touches the caller's own spots (`SpotRow.created_by`). A spot
+that's missing, someone else's, or ownerless is the same 404 to
+PATCH/DELETE. Rows saved before auth have no owner and are deliberately
+left in place, listed for no one. The `spots` table is managed by Alembic
 (`apps/api/migrations`), not `create_all`. `apps/api` is deployed on
 Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
@@ -114,12 +116,10 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
-**Poker Drill (2026-10-19)** — branch status: `main` has only the first version
-(PR #27, the "Swipe Drill", with swiping). Everything below beyond that — tap-only
-actions, settings cog, table colors, the pot on the table, bb amounts, the "why"
-analysis and its tap-to-open row — is on an unmerged stack of branches, each
-built on the last: `drill-themes` → `drill-settings` → `drill-analysis` →
-`drill-why-dropdown` (one PR from the tip carries all of it). See
+**Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
+"Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
+colors, the pot on the table, bb amounts, and the "why" analysis with its
+tap-to-open row (PR #28), plus the iPhone build and haptics (PR #29). See
 `docs/decisions.md`:
 `/drill` (`apps/web/src/pages/DrillPage.tsx`) is a mobile-first practice
 game, rendered full screen *outside* the app shell (`App.tsx`: `/drill` is its
@@ -171,8 +171,136 @@ on Render after: wide-range river 16s, worst-case deep wide flop 90s —
 both fully converged, under the phone's 150s timeout. If that's still too
 slow, a host with a full CPU (e.g. Cloud Run) would be ~10x faster — see
 `docs/decisions.md`'s "Hardening /spots/solve" entry. `pytest apps/api`
-still hasn't been run against a real Postgres (no DB in the working
-session; route logic was exercised by calling `solve_spot` directly).
+has been run against the local docker-compose Postgres (2026-10-20, 129
+passed, including the solve route), so that's no longer an open gap.
+
+**Desktop redesign (all six phases done, 2026-10-20)**: `docs/desktop-redesign.md`
+is the agreed spec (six phases; built as one commit per phase on the
+`desktop-phase-1` branch, one PR at the end), with the design as clickable
+HTML in `docs/desktop-redesign/mockup/` (screenshots alongside). Read it
+before touching desktop layout. Hard rule: **nothing changes visually
+below 1024px wide** (phones, Capacitor builds), and the Drill isn't
+touched at all; the one agreed exception is the route merge in its §3.
+**Phase 1 (foundation) is done**: the new tokens in `index.css`
+(`--sidebar-bg`, `--divider`, `--surface-hover`, `--surface-3`,
+`--success-text`, `--warning`/`--warning-subtle`, `--card-face`/`--card-ink`/
+`--card-red`, light and dark), and `src/desktop.css` — every rule in it
+inside `@media (min-width: 1024px)`: `.btn-primary` / `.btn-secondary` /
+`.btn-ghost` / `.btn-danger`, `.section-label`, `.tabular-nums`. On desktop
+a bare `<button>` inside the shell is no longer accent-filled; give every
+new button a role class (one `btn-primary` per screen at most). The role
+classes are inert under 1024px. `components/SegmentedControl` carries its
+own CSS for both widths (under 1024px it copies SolvePage's existing
+toggle; the mockup's pill above). User-facing "Stage N MVP" copy is gone,
+and the uvicorn "is `apps/api` running?" hint only shows in dev builds
+(`import.meta.env.DEV`), everywhere.
+**Phase 2 (shell + routes) is done**: four nav destinations from
+`lib/navigation.ts` — `/solve`, `/ranges`, `/library`, `/drill` — with the
+old routes redirecting (`/` → `/solve`, `/saved` → `/library`, `/type-in` →
+`/ranges?mode=type`, `/import` → `/ranges?mode=paste`). This applies on
+phones too, the agreed §3 exception: the phone nav shows four links.
+`pages/RangesPage.tsx` is **interim**: a Pick / Type it / Hand history
+switch (`?mode=`) over the unchanged Builder / Type in / Import pages,
+until Phase 3 merges them. At >= 1024px, `App.tsx`'s shell swaps the top
+header for `components/Sidebar` (nav with subtitles, a beginner's-guide
+card with no link yet since the spec leaves its target TBD, and
+`AuthStatus variant="sidebar"`: avatar + email + ghost Sign out, or a
+Sign in button that opens the form) and adds a page-header bar per route.
+Which layout renders is `lib/useIsDesktop.ts`, not CSS. jsdom has no
+`matchMedia`, so tests see the phone shell unless they stub it
+(`App.test.tsx`'s "at desktop width"). `<main>` sits at the same tree
+position in both layouts, so crossing the breakpoint doesn't remount the
+page. Pages without their own desktop layout yet (Solve, Library) still
+render in their phone-width column (`.app-shell__main--narrow`); pages
+marked `workspace` in `PAGE_HEADERS` fill the content area edge to edge.
+**Phase 3 (Ranges) is done, desktop only**: `pages/RangesWorkspace.tsx` is
+the merged rail-and-chart page (Pick / Type it / Hand history in the rail,
+the chart, stats and save card on the right). There's no "get chart"
+button: Pick and Type it fetch on every change (250ms debounce), and
+"Read hand" loads a pasted hand. **Phones deliberately keep the old Builder
+/ Type in / Import pages** under the mode switch, unchanged. This departs
+from the spec's "delete them", because of the no-visual-change-under-1024px
+rule; see `docs/decisions.md`. `pages/RangesPage.tsx` picks the layout. All
+of them share `lib/useReferenceChart.ts`: fetch (only the latest request's
+response is applied), the editable copy of the chart's range, `edited`, and
+save. "Solve a flop from here" navigates to `/solve` with route state that
+`App.tsx`'s `SolveRoute` turns into `SolvePage`'s optional `prefill` prop
+(`lib/solvePrefill.ts`: both seats, one range, the stack). `RangeGrid` has
+two optional props: `reset` (a toolbar button) and `showSummary`. On
+desktop it gets the mockup's toolbar ("Paint with" pill, ghost Suits /
+Reset / Clear), bigger cells, and weight drawn as a bottom-up fill. That
+applies to Solve's grids on desktop too; phones are unchanged.
+Not done in Phase 3: the save card's "Save as" name field. It needs Phase
+5's `Spot.name`, and showing it before then would silently drop the name.
+**Phase 4 (Solve) is done, desktop only**: all of Solve's state, derived
+values and actions live in `pages/solve/useSolveSetup.ts`, called once in
+`SolvePage`. The phone layout (`SolvePhone` in `SolvePage.tsx`) has the
+original markup byte for byte, and phones are pixel-identical. At >= 1024px
+`SolveWorkspace.tsx` renders from the same hook, so crossing the breakpoint
+keeps the setup. Setup view:
+- `ActionTimeline` (a restyle of StreetActions over `lib/handBuilder`)
+- `BoardSlots` (five slots, `CardPicker` in a popover, "Or type it")
+- a "Ready to solve" checklist
+- a canvas with Ranges / Strategy tabs: one big `RangeGrid` with player
+  tabs, and "Both players" cards using `components/MiniRange`
+
+Ranges auto-load once preflop closes (`useSolveSetup`'s `autoLoadRanges`:
+the preflop line, else typical ranges). Result view: a spot summary, an
+accuracy card (`exploitability_pct` / `converged`, time measured
+client-side), and Keep exploring (`solveText.ts`'s `exploreOptions`, only
+legal moves; it appends an action and calls `solve(nextStreets)`, or opens
+the next card's slot). Then `StrategyResult.tsx`: headline sentence,
+stacked frequency bar, enlarged `StrategyGrid` (now with optional
+controlled `selected` / `onSelect`, `showDetail`, `showLegend`), and a
+selected-hand panel with advice rules and the suit view. Page header
+actions are "Start over" and "Save spot". Save stores the setup, not the
+result; see `docs/decisions.md` for how a saved hand is encoded.
+`components/PageHeader` is shared, and a page sets `ownHeader` in
+`PAGE_HEADERS` to render it with its own actions. Wording helpers (preflop
+line, roles, accuracy tiers, advice) are pure functions in
+`pages/solve/solveText.ts`, tested on their own. Not in Phase 4: hand
+category labels and "Why?" (Phase 6).
+**Phase 5 (Library + API) is done**:
+- `Spot.name` (optional, max 120) is in `packages/schema`, with the TS
+  regenerated. It lives in the JSONB `data` like every other `Spot` field,
+  so there's no new column or migration. This departs from the spec, which
+  asked for a column; see `docs/decisions.md`.
+- `apps/api` has `PATCH /spots/{id}` (`{name}`) and `DELETE /spots/{id}`,
+  owner-only, tested in `tests/test_spots_persistence.py`. `lib/api.ts`
+  has `renameSpot` / `deleteSpot`.
+- Desktop `/library` is `pages/library/LibraryWorkspace.tsx`: search, an
+  All / Preflop / Postflop filter, a table, and a preview panel with Open /
+  Duplicate / Rename / Delete (delete asks to confirm). Phones keep
+  `SavedSpotsPage` unchanged; `pages/LibraryPage.tsx` picks the layout.
+- Unnamed spots fall back to `lib/spotText.ts`'s `summarize()` (moved
+  there from SavedSpotsPage).
+- "Open" passes the spot as route state: preflop charts to Ranges
+  (`RangesWorkspace`'s `initialSpot`, which shows the *saved* range via
+  `useReferenceChart`'s `load(spot, startRange)` and keeps its name),
+  setups with a board to Solve (`lib/solvePrefill.ts`'s `seedFromSpot`
+  undoes `setupAsSpot`; `useSolveSetup(prefill, savedSpot)`).
+- Ranges' save card now has the "Save as" name field. Solve names a save
+  "{OOP} vs {IP} on {board}", or keeps an opened spot's name.
+
+**Phase 6 (hand categories and "Why?") is done**:
+- `POST /spots/solve` also returns `hand_categories` (169-type label to
+  "Top pair, strong kicker") and `hand_reasons` (label to the Drill's
+  rule-of-thumb bullets). They come from `apps/api/app/hand_notes.py`,
+  which reuses `drill_analysis.py`'s classifier and `explain()`, so web
+  and Drill share one source.
+- The equity numbers come from `RangeCfrTrainer.combo_equities` (new),
+  which reads the trainer's own payoff matrix, so nothing is recomputed.
+  The notes take about 16ms on wide flop ranges.
+- **Flop only**: `describe_hand` classifies against three board cards, so
+  turn and river solves return `{}` and the panel leaves the category and
+  the "Why?" out. Spots facing a raise or a jam get categories but no
+  "Why?", since the price isn't known from the bet menu.
+- A label's category is what most of its live combos are. The notes never
+  fail a finished solve (an exception is logged and they're dropped).
+- `solveSpot` normalizes both fields to `{}` for an older backend. The hand
+  panel shows the category under the hand and a collapsed "Why?" with the
+  honesty note ("the percentages come from the solve; the explanation is a
+  rule of thumb").
 
 ## Commands
 
@@ -186,6 +314,7 @@ pnpm install                 # from repo root, installs all JS workspace deps
 pnpm dev:web                 # dev server
 pnpm --filter web build      # production build (tsc -b && vite build)
 pnpm --filter web lint       # oxlint
+pnpm --filter web test       # vitest
 ```
 
 ### Schema (`packages/schema`) — the shared source of truth
@@ -311,11 +440,13 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not
   `main.tsx`) so `App.test.tsx`'s `render(<App />)` needs no extra wrapper.
+  Nav destinations and desktop page titles live in `lib/navigation.ts`.
   Screens live in `apps/web/src/pages/`; `apps/web/src/lib/api.ts` is the
   single fetch chokepoint (never throws — callers switch on a result's
-  `kind` instead of try/catch), currently backing the reference-strategy
-  lookup plus `saveSpot`/`listSpots` (both send the Supabase access
-  token as `Authorization: Bearer`, which `apps/api` requires). Those two
+  `kind` instead of try/catch), backing the reference-strategy lookup,
+  the solver routes, and `saveSpot` / `listSpots` / `renameSpot` /
+  `deleteSpot` (all four send the Supabase access token as
+  `Authorization: Bearer`, which `apps/api` requires). `saveSpot` / `listSpots`
   were built against an assumed `apps/api` contract ahead of the
   endpoints and the token check shipping, since confirmed — see
   `docs/decisions.md`.
