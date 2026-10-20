@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionLabel,
-  directionAction,
+  actionAmountBb,
+  actionParts,
+  actionText,
+  aggressiveActions,
+  betAmount,
+  formatBb,
   gradeAction,
+  passiveActions,
   shuffled,
   type DrillSpot,
 } from "./drill";
@@ -49,34 +54,72 @@ describe("gradeAction", () => {
   });
 });
 
-describe("directionAction", () => {
-  const facing = spot({
+const facingSmall = (overrides: Partial<DrillSpot> = {}) =>
+  spot({
     situation: "facing_bet",
     facing: "bet_small",
     actions: ["fold", "call", "bet_small", "bet_medium", "bet_large", "all_in"],
+    ...overrides,
   });
 
-  it("maps left to check when nothing is bet, fold when facing a bet", () => {
-    expect(directionAction(spot({}), "left")).toBe("check");
-    expect(directionAction(facing, "left")).toBe("fold");
-  });
-
-  it("only allows calling when facing a bet", () => {
-    expect(directionAction(spot({}), "right")).toBeNull();
-    expect(directionAction(facing, "right")).toBe("call");
-  });
-
-  it("asks for a size when several bets are legal", () => {
-    expect(directionAction(spot({}), "up")).toBe("size");
-    expect(directionAction(spot({ actions: ["check", "all_in"] }), "up")).toBe("all_in");
+describe("passiveActions / aggressiveActions", () => {
+  it("splits the legal actions into passive and bet/raise sizes", () => {
+    expect(passiveActions(spot({}))).toEqual(["check"]);
+    expect(aggressiveActions(spot({}))).toEqual(["bet_small", "bet_medium", "bet_large", "all_in"]);
+    expect(passiveActions(facingSmall())).toEqual(["fold", "call"]);
   });
 });
 
-describe("actionLabel", () => {
-  it("says Bet or Raise depending on whether a bet is faced", () => {
-    expect(actionLabel("bet_medium", false)).toBe("Bet 75%");
-    expect(actionLabel("bet_medium", true)).toBe("Raise 75%");
-    expect(actionLabel("all_in", true)).toBe("All-in");
+describe("actionAmountBb", () => {
+  it("sizes a bet as a fraction of the pot", () => {
+    expect(actionAmountBb(spot({}), "bet_small")).toBeCloseTo(1.375);
+    expect(actionAmountBb(spot({}), "bet_medium")).toBeCloseTo(4.125);
+    expect(actionAmountBb(spot({}), "bet_large")).toBeCloseTo(6.875);
+  });
+
+  it("matches the solver's raise arithmetic when facing a bet", () => {
+    // BB bets 25% of 5.5 = 1.375; a 75% raise is call + 0.75 * (pot + 2 * bet).
+    const s = facingSmall();
+    expect(betAmount(s)).toBeCloseTo(1.375);
+    expect(actionAmountBb(s, "call")).toBeCloseTo(1.375);
+    expect(actionAmountBb(s, "bet_medium")).toBeCloseTo(1.375 + 0.75 * (5.5 + 2 * 1.375));
+  });
+
+  it("is the whole stack for all-in, and nothing for fold/check", () => {
+    expect(actionAmountBb(spot({}), "all_in")).toBe(97.5);
+    expect(actionAmountBb(spot({}), "check")).toBeNull();
+    expect(actionAmountBb(facingSmall(), "fold")).toBeNull();
+  });
+
+  it("never exceeds the stack", () => {
+    expect(actionAmountBb(spot({ stackBb: 3 }), "bet_large")).toBe(3);
+  });
+});
+
+describe("actionParts / actionText", () => {
+  it("leads with bb or with percent depending on the setting", () => {
+    expect(actionParts(spot({}), "bet_medium", "bb")).toEqual({ main: "4.1bb", sub: "75% pot" });
+    expect(actionParts(spot({}), "bet_medium", "pct")).toEqual({ main: "75%", sub: "4.1bb" });
+  });
+
+  it("keeps fold, check, call, all-in the same either way", () => {
+    expect(actionParts(spot({}), "check", "bb")).toEqual({ main: "Check", sub: null });
+    expect(actionParts(facingSmall(), "call", "pct")).toEqual({ main: "Call", sub: "1.4bb" });
+    expect(actionParts(spot({}), "all_in", "bb")).toEqual({ main: "All-in", sub: "97.5bb" });
+  });
+
+  it("writes a one-line description, Bet vs Raise to", () => {
+    expect(actionText(spot({}), "bet_medium", "bb")).toBe("Bet 4.1bb (75%)");
+    expect(actionText(facingSmall(), "bet_medium", "pct")).toBe("Raise to 75% (7.6bb)");
+    expect(actionText(spot({}), "check", "bb")).toBe("Check");
+  });
+});
+
+describe("formatBb", () => {
+  it("trims to one decimal without a trailing .0", () => {
+    expect(formatBb(97.5)).toBe("97.5");
+    expect(formatBb(12)).toBe("12");
+    expect(formatBb(4.125)).toBe("4.1");
   });
 });
 

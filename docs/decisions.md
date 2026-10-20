@@ -63,6 +63,21 @@ and every other screen. Only the scene changes — verdict green/amber/red, the
 solver-bar colors and the white card faces are constant, so a color's meaning
 never depends on the theme. Remembered in localStorage (`drill.theme`).
 
+**Update, 2026-10-19 (later) — swiping removed, settings cog, pot on the
+table, bet sizes in bb.** Swiping is gone: every legal action is a button
+(Fold/Check/Call, then each bet or raise size), which also removes the hidden
+two-step "swipe up then pick a size" and puts the size on the button where it
+can be read. The name is now "Poker Drill" (the route is still `/drill`).
+A settings cog (top right, all screens) opens a bottom sheet with the table
+color (moved off the start screen) and a "Show bet sizes as" choice. The pot,
+the number every size is judged against, moved from a small chip to the middle
+of the table, large, with the faced bet under it. Bet and raise buttons show
+the amount in bb with the % of pot small, or the reverse (setting, default bb):
+`actionAmountBb` reproduces `betting_round.py`'s arithmetic (bet = fraction of
+pot; raise = call + fraction of the pot after calling, shown as "raise to"). The
+25/75/125 fractions are duplicated on the frontend and must follow the solver's
+`BET_SIZE_MENU` if it changes (bet menu still unchanged).
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;

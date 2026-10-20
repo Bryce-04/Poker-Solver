@@ -107,49 +107,88 @@ const SIZE_PCT: Record<string, number> = {
   bet_large: 125,
 };
 
-/** Human label. "Bet" vs "Raise" depends on whether a bet is being faced. */
-export function actionLabel(action: DrillAction, facingBet: boolean): string {
+// The solver's BET_SIZE_MENU as fractions; keep in step with betting_round.py.
+const SIZE_FRACTION: Record<string, number> = {
+  bet_small: 0.25,
+  bet_medium: 0.75,
+  bet_large: 1.25,
+};
+
+/** The passive choices (fold / check / call), in the solver's own order. */
+export function passiveActions(spot: DrillSpot): DrillAction[] {
+  return spot.actions.filter((a) => !AGGRESSIVE.has(a));
+}
+
+/** Every bet or raise size that's legal here, smallest first, all-in last. */
+export function aggressiveActions(spot: DrillSpot): DrillAction[] {
+  return spot.actions.filter((a) => AGGRESSIVE.has(a));
+}
+
+/** How bet sizes are written: bb first with the pot % small, or the reverse. */
+export type BetDisplay = "bb" | "pct";
+
+/** Trims a bb amount to one decimal without a trailing ".0" (97.5, 4.1, 12). */
+export function formatBb(amount: number): string {
+  return String(Number(amount.toFixed(1)));
+}
+
+/**
+ * The chips an action puts in on this street, in bb -- the same arithmetic as
+ * services/solver's betting_round.py, so the numbers shown match what was
+ * solved: a bet is a fraction of the pot, a raise is the call plus a fraction
+ * of the pot after calling (shown as the total, "raise to"), all-in is the
+ * whole stack. Null for fold / check.
+ */
+export function actionAmountBb(spot: DrillSpot, action: DrillAction): number | null {
+  const toCall = spot.situation === "facing_bet" ? betAmount(spot) : 0;
   switch (action) {
     case "fold":
-      return "Fold";
     case "check":
-      return "Check";
+      return null;
     case "call":
-      return "Call";
+      return toCall;
     case "all_in":
-      return "All-in";
-    default:
-      return `${facingBet ? "Raise" : "Bet"} ${SIZE_PCT[action]}%`;
+      return spot.stackBb;
+    default: {
+      const frac = SIZE_FRACTION[action];
+      const amount =
+        toCall > 0 ? toCall + frac * (spot.potBb + 2 * toCall) : frac * spot.potBb;
+      return Math.min(amount, spot.stackBb);
+    }
   }
 }
 
-/** The three swipe directions plus how each maps onto the legal actions. */
-export type SwipeDirection = "left" | "right" | "up";
+/** The villain's bet the hero is facing, in bb (0 when not facing one). */
+export function betAmount(spot: DrillSpot): number {
+  if (spot.situation !== "facing_bet" || !spot.facing) return 0;
+  return Math.min((SIZE_FRACTION[spot.facing] ?? 0) * spot.potBb, spot.stackBb);
+}
 
-/**
- * Left is the passive-and-free-or-losing choice (fold when facing a bet,
- * check otherwise), right is calling, up is any bet or raise (which then
- * asks for a size). Returns the single action a direction means, or "size"
- * when up needs a size picker, or null when that direction isn't legal here
- * (right with nothing to call).
- */
-export function directionAction(
-  spot: DrillSpot,
-  direction: SwipeDirection,
-): DrillAction | "size" | null {
-  if (direction === "left") {
-    return spot.actions.includes("fold")
-      ? "fold"
-      : spot.actions.includes("check")
-        ? "check"
-        : null;
+export interface ActionText {
+  main: string;
+  sub: string | null;
+}
+
+/** A button's two lines: the headline and the small secondary figure. */
+export function actionParts(spot: DrillSpot, action: DrillAction, mode: BetDisplay): ActionText {
+  const bb = actionAmountBb(spot, action);
+  if (action === "fold") return { main: "Fold", sub: null };
+  if (action === "check") return { main: "Check", sub: null };
+  if (action === "call") return { main: "Call", sub: bb ? `${formatBb(bb)}bb` : null };
+  if (action === "all_in") return { main: "All-in", sub: `${formatBb(spot.stackBb)}bb` };
+  const pct = `${SIZE_PCT[action]}%`;
+  const amount = `${formatBb(bb ?? 0)}bb`;
+  return mode === "bb" ? { main: amount, sub: `${pct} pot` } : { main: pct, sub: amount };
+}
+
+/** One-line description for the feedback list: "Bet 4.1bb (75%)". */
+export function actionText(spot: DrillSpot, action: DrillAction, mode: BetDisplay): string {
+  const { main, sub } = actionParts(spot, action, mode);
+  if (action === "fold" || action === "check" || action === "call" || action === "all_in") {
+    return sub ? `${main} ${sub}` : main;
   }
-  if (direction === "right") {
-    return spot.actions.includes("call") ? "call" : null;
-  }
-  const aggressive = spot.actions.filter((a) => AGGRESSIVE.has(a));
-  if (aggressive.length === 0) return null;
-  return aggressive.length === 1 ? aggressive[0] : "size";
+  const verb = isFacingBet(spot) ? "Raise to" : "Bet";
+  return `${verb} ${main} (${sub?.replace(" pot", "")})`;
 }
 
 export function isFacingBet(spot: DrillSpot): boolean {
