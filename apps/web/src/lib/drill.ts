@@ -22,6 +22,24 @@ export type DrillSituation =
   /** In position, villain bet. `facing` says which size. */
   | "facing_bet";
 
+/** The "why" for a hand, computed offline by apps/api's drill_analysis.py. */
+export interface DrillAnalysis {
+  /** Plain-text bullets, in reading order: the hand, the range, the reason, a caveat. */
+  bullets: string[];
+  facts: {
+    /** e.g. "top pair", "a nut flush draw", "ace high". */
+    hand: string;
+    draws: string[];
+    board: string;
+    /** This hand's equity against the opponent's range, %. */
+    equityPct: number;
+    /** Share of the player's range this hand beats on equity, %. */
+    rangePercentile: number;
+    /** The player's whole-range equity on this board, %. */
+    rangeEquityPct: number;
+  };
+}
+
 export interface DrillSpot {
   id: string;
   /** Flop, e.g. ["Ks", "7h", "2d"]. */
@@ -41,6 +59,8 @@ export interface DrillSpot {
   actions: DrillAction[];
   /** Solver frequency (0..1) for every legal action, for this exact hand. */
   mix: Record<string, number>;
+  /** Absent in a deck generated before analyses existed. */
+  analysis?: DrillAnalysis;
 }
 
 export interface DrillDeck {

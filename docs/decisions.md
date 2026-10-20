@@ -78,6 +78,24 @@ pot; raise = call + fraction of the pot after calling, shown as "raise to"). The
 25/75/125 fractions are duplicated on the frontend and must follow the solver's
 `BET_SIZE_MENU` if it changes (bet menu still unchanged).
 
+**Update, 2026-10-19 (later) — "why" explanations (option 1).** After each
+answer the feedback screen explains the solver's favorite play. Built offline in
+`apps/api/app/drill_analysis.py` and shipped as `analysis` on every deck spot:
+hand category and draws, board texture, equity against the opponent's whole
+range (from the same exact equity matrix the solver trains on, recomputed in the
+script), the hand's percentile within the player's range, whole-range equity and
+action frequencies on the board, and the pot-odds price when facing a bet. Rules
+turn those into bullets (value bet / semi-bluff / bluff / pot control / call /
+fold), and a close mix gets an explicit "this is close" note rather than an
+invented reason. **Honesty:** the numbers are computed, but the sentence linking
+them to the action is the standard poker rationale chosen by rules — a
+description of the mix, not something derived from the solver (which only outputs
+frequencies) — and the UI labels it a rule-of-thumb summary. Writing the tests
+caught a real wording bug (it could say "equity is below the price" when it was
+above), now fixed and covered. Not done: per-action EVs (needs the trainer to
+expose action values; would make the "why" much stronger), sizing reasoning
+(why 25% vs 75%), blockers, AI-written text.
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;

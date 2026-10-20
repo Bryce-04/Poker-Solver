@@ -582,6 +582,34 @@ function Feedback({
           ))}
         </ul>
         <p className="mix__legend">Your pick is bold. The solver's favorite has a ★.</p>
+
+        {spot.analysis && (
+          <section className="why" aria-labelledby="why-title">
+            <h2 id="why-title" className="why__title">
+              Why {actionText(spot, grade.topAction, betDisplay)}?
+            </h2>
+            <ul className="why__facts">
+              <li>
+                <strong>{spot.analysis.facts.equityPct}%</strong>
+                <span>equity</span>
+              </li>
+              <li>
+                <strong>{spot.analysis.facts.rangePercentile}%</strong>
+                <span>of range beaten</span>
+              </li>
+            </ul>
+            <ul className="why__bullets">
+              {spot.analysis.bullets.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+            <p className="why__note">
+              A rule-of-thumb summary of computed numbers (equity against the real range, pot
+              odds, how often the range takes each action). The solver itself only outputs the
+              mix.
+            </p>
+          </section>
+        )}
       </main>
       <footer className="controls">
         <button type="button" className="game__primary" onClick={onNext} autoFocus>

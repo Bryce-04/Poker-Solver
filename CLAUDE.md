@@ -137,6 +137,17 @@ phone home screen (`public/manifest.webmanifest`, apple-touch icons). The
 design plan lives on the `plan-swipe-drill` branch's `docs/plan.md`; the
 decision record is `docs/decisions.md`'s 2026-10-19 entry. Bet sizes are
 deliberately still 25/75/125 (33/66/100 was considered, deferred to the team).
+After each answer the feedback screen also explains **why the solver's
+favorite play is good**: `apps/api/app/drill_analysis.py` (run offline by the
+deck script, shipped as each spot's `analysis` in the deck JSON) classifies the
+hand (top pair, flush draw, ace high...) and the board, and computes equity
+against the opponent's real range, where the hand ranks in its range, how often
+the whole range takes each action, and the pot-odds price when facing a bet;
+rules then turn those numbers into 3-4 plain bullets (value bet, semi-bluff,
+pot control, ...), and it says outright when the solver is near-indifferent. The
+numbers are computed; the reasoning sentence is the standard rationale applied by
+rules, not derived from the solver, and the UI says so. Tests:
+`apps/api/tests/test_drill_analysis.py` (pure, no database).
 The settings sheet (cog) has a "Table color" picker (Purple / Midnight / Ocean /
 Emerald, `lib/drillTheme.ts`) and a "Show bet sizes as" choice (bb-first or
 %-first, `lib/drillSettings.ts`), both remembered in localStorage. Table color is

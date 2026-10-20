@@ -887,3 +887,57 @@
   outline: 3px solid var(--g-text);
   outline-offset: 3px;
 }
+
+/* --- the "why" behind the solver's play ------------------------------------ */
+
+.why {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border-radius: 16px;
+  background: var(--g-panel);
+  border: 1px solid var(--g-line);
+}
+.why__title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.why__facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.6rem;
+}
+.why__facts li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 5.2rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 12px;
+  background: var(--g-bet-bg);
+  line-height: 1.15;
+}
+.why__facts strong {
+  font-size: 1.3rem;
+}
+.why__facts span {
+  font-size: 0.72rem;
+  color: var(--g-text-muted);
+}
+.why__bullets {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.why__note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--g-text-muted);
+}

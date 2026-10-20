@@ -49,6 +49,15 @@ describe("DrillPage", () => {
     expect(screen.getByText(/2 \/ 15/)).toBeTruthy();
   });
 
+  it("explains why the solver's play is best, after answering", () => {
+    open();
+    play();
+    answerFirst();
+    expect(screen.getByRole("heading", { name: /^why /i })).toBeTruthy();
+    expect(screen.getByText("equity")).toBeTruthy();
+    expect(screen.getByText(/rule-of-thumb summary/i)).toBeTruthy();
+  });
+
   it("finishes with a score summary and remembers the best score", () => {
     open();
     play();
