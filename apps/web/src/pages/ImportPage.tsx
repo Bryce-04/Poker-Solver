@@ -159,7 +159,7 @@ export function ImportPage() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={chart.save}
+              onClick={() => chart.save()}
               disabled={saveState.kind === "saving"}
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}

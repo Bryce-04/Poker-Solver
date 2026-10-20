@@ -96,6 +96,11 @@ class Spot(BaseModel):
         default=None, description="Owning user's id. Null until Stage 6 auth exists."
     )
     created_at: datetime = Field(default_factory=_utcnow)
+    name: str | None = Field(
+        default=None,
+        max_length=120,
+        description="The user's name for a saved spot. Null for spots saved before names existed.",
+    )
 
     positions_in_hand: list[Position]
     effective_stack_bb: float = Field(gt=0)

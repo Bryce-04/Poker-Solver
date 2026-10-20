@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Position, Spot } from "@poker-solver/schema";
+import type { HandRange, Position, Spot } from "@poker-solver/schema";
 import { SegmentedControl } from "../components/SegmentedControl/SegmentedControl";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
@@ -47,6 +47,17 @@ function raiserOf(spot: Spot): Position | undefined {
   return (spot.actions ?? []).find((a) => a.action === "raise")?.position;
 }
 
+/** The Pick controls' spot, with the impossible combinations derived away:
+ * BB is never first in, UTG never faces an earlier raise, and the raiser
+ * must act before the seat. */
+function pickSpot(seat: Position, situationChoice: Situation, raiserChoice: Position, stackBb: number) {
+  const situation: Situation = seat === "BB" ? "defend" : seat === "UTG" ? "open" : situationChoice;
+  const raisers = earlierSeats(seat);
+  const raiser = raisers.includes(raiserChoice) ? raiserChoice : raisers[raisers.length - 1];
+  const spot = situation === "defend" ? buildVsRaiseSpot(seat, raiser, stackBb) : buildOpenSpot(seat, stackBb);
+  return { situation, raisers, raiser, spot };
+}
+
 /** A chart spot in words: the canvas title and the line under it. */
 function describeSpot(spot: Spot): { title: string; subline: string } {
   const hero = spot.positions_in_hand[0];
@@ -74,19 +85,32 @@ function describeSpot(spot: Spot): { title: string; subline: string } {
 export function RangesWorkspace({
   mode,
   onModeChange,
+  initialSpot,
 }: {
   mode: RangesMode;
   onModeChange: (mode: RangesMode) => void;
+  /** A saved chart opened from the Library: its spot fills Pick, and its
+   * saved range (not the standard chart's) shows once the chart loads. */
+  initialSpot?: Spot;
 }) {
   const navigate = useNavigate();
   const chart = useReferenceChart();
   const { load, clear } = chart;
 
   // Pick
-  const [seat, setSeat] = useState<Position>("BTN");
-  const [situationChoice, setSituationChoice] = useState<Situation>("open");
-  const [raiserChoice, setRaiserChoice] = useState<Position>("CO");
-  const [stackBb, setStackBb] = useState(100);
+  const openedRaiser = initialSpot ? raiserOf(initialSpot) : undefined;
+  const [seat, setSeat] = useState<Position>(initialSpot?.positions_in_hand[0] ?? "BTN");
+  const [situationChoice, setSituationChoice] = useState<Situation>(openedRaiser ? "defend" : "open");
+  const [raiserChoice, setRaiserChoice] = useState<Position>(openedRaiser ?? "CO");
+  const [stackBb, setStackBb] = useState(initialSpot?.effective_stack_bb ?? 100);
+  // The opened spot, recognized by the spot Pick builds from it: whenever
+  // Pick is back on it, its saved range and name come back too.
+  const [opened] = useState<{ key: string; range: HandRange; name: string | null } | null>(() => {
+    if (!initialSpot) return null;
+    const hero = initialSpot.positions_in_hand[0];
+    const { spot: built } = pickSpot(hero, openedRaiser ? "defend" : "open", openedRaiser ?? "CO", initialSpot.effective_stack_bb);
+    return { key: JSON.stringify(built), range: initialSpot.ranges?.[hero] ?? {}, name: initialSpot.name ?? null };
+  });
   // Type it
   const [typed, setTyped] = useState("");
   // Hand history
@@ -94,20 +118,15 @@ export function RangesWorkspace({
   const [pastedSpot, setPastedSpot] = useState<Spot | null>(null);
   const [pasteError, setPasteError] = useState<string | null>(null);
 
-  // The impossible combinations are derived away rather than stored: BB is
-  // never first in, UTG never faces an earlier raise, and the raiser must
-  // act before the seat. Going back to a seat restores the earlier choice.
-  const situation: Situation = seat === "BB" ? "defend" : seat === "UTG" ? "open" : situationChoice;
-  const raisers = earlierSeats(seat);
-  const raiser = raisers.includes(raiserChoice) ? raiserChoice : raisers[raisers.length - 1];
+  // Derived, not stored, so going back to a seat restores the earlier choice.
+  const picked = pickSpot(seat, situationChoice, raiserChoice, stackBb);
+  const { situation, raisers, raiser } = picked;
 
   const typedParse = typed.trim() === "" ? null : parseSpotText(typed);
 
   const spot: Spot | null =
     mode === "pick"
-      ? situation === "defend"
-        ? buildVsRaiseSpot(seat, raiser, stackBb)
-        : buildOpenSpot(seat, stackBb)
+      ? picked.spot
       : mode === "type"
         ? typedParse?.kind === "parsed"
           ? typedParse.spot
@@ -122,9 +141,10 @@ export function RangesWorkspace({
       clear();
       return;
     }
-    const timer = setTimeout(() => load(JSON.parse(spotKey) as Spot), AUTO_LOAD_MS);
+    const startRange = opened && spotKey === opened.key ? opened.range : undefined;
+    const timer = setTimeout(() => load(JSON.parse(spotKey) as Spot, startRange), AUTO_LOAD_MS);
     return () => clearTimeout(timer);
-  }, [spotKey, load, clear]);
+  }, [spotKey, load, clear, opened]);
 
   function readHand() {
     const parsed = parseHandHistory(pasted);
@@ -253,6 +273,7 @@ export function RangesWorkspace({
         {match ? (
           <ChartPanel
             match={match}
+            openedName={opened && JSON.stringify(match.spot) === opened.key ? opened.name : null}
             loading={loading}
             chart={chart}
             onSolve={() =>
@@ -355,11 +376,14 @@ function PickControls(props: {
 
 function ChartPanel({
   match,
+  openedName,
   loading,
   chart,
   onSolve,
 }: {
   match: ChartMatch;
+  /** The name of the saved chart this is, when it was opened from the Library. */
+  openedName: string | null;
   loading: boolean;
   chart: ReturnType<typeof useReferenceChart>;
   onSolve: () => void;
@@ -368,6 +392,13 @@ function ChartPanel({
   const combos = useMemo(() => totalCombos(indexRange(chart.editedRange)), [chart.editedRange]);
   const pct = ((combos / TOTAL_COMBOS) * 100).toFixed(1);
   const { saveState } = chart;
+  // "Save as": a typed name sticks to the spot it was typed for; otherwise the
+  // opened chart's own name, or one made from the spot.
+  const spotKey = JSON.stringify(match.spot);
+  const [draft, setDraft] = useState<{ key: string; value: string } | null>(null);
+  const defaultName =
+    openedName ?? `${title}${chart.edited ? " (my version)" : ""} · ${match.spot.effective_stack_bb}bb`;
+  const name = draft?.key === spotKey ? draft.value : defaultName;
 
   return (
     <div className="ranges-workspace__panel" aria-busy={loading || undefined} data-loading={loading || undefined}>
@@ -410,10 +441,20 @@ function ChartPanel({
           </div>
 
           <div className="ranges-workspace__card ranges-workspace__card--actions">
+            <label className="section-label" htmlFor="ranges-save-name">
+              Save as
+            </label>
+            <input
+              id="ranges-save-name"
+              type="text"
+              maxLength={120}
+              value={name}
+              onChange={(e) => setDraft({ key: spotKey, value: e.target.value })}
+            />
             <button
               type="button"
               className="btn-primary"
-              onClick={chart.save}
+              onClick={() => chart.save(name)}
               disabled={loading || saveState.kind === "saving"}
             >
               {saveState.kind === "saving" ? "Saving…" : "Save to Library"}

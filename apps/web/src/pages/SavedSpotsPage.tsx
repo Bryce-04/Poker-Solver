@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Spot } from "@poker-solver/schema";
 import { listSpots } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { summarize } from "../lib/spotText";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
@@ -12,15 +13,6 @@ type ListState =
   | { kind: "ok"; spots: Spot[] }
   | { kind: "network-error" }
   | { kind: "error"; status: number };
-
-function summarize(spot: Spot): string {
-  const positions = spot.positions_in_hand.join("/");
-  const raise = (spot.actions ?? []).find((a) => a.action === "raise");
-  const situation = raise
-    ? `facing a raise from ${raise.position}`
-    : "unopened pot";
-  return `${positions} — ${spot.effective_stack_bb}bb, ${situation}`;
-}
 
 function formatSavedAt(spot: Spot): string | null {
   if (!spot.created_at) return null;

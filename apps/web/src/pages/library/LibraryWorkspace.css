@@ -1,0 +1,302 @@
+/* Desktop Library (docs/desktop-redesign.md §6.4). Only rendered at
+   >= 1024px; gated too so the classes stay inert on phones. Values from
+   docs/desktop-redesign/mockup/library.html. */
+@media (min-width: 1024px) {
+  .library {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .library__body {
+    padding: 24px 32px;
+  }
+
+  .library__columns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 24px;
+  }
+
+  .library__main {
+    flex: 999 1 560px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .library__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  input.library__search {
+    flex: 0 1 360px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-strong);
+  }
+
+  .library__table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .library__table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .library__table th {
+    padding: 12px;
+    border-bottom: 1px solid var(--divider);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .library__table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--divider);
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .library__table tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .library__table tr[data-selected] td {
+    background: var(--surface-hover);
+  }
+
+  .library__table tr[data-selected] td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  button.library__name {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-strong);
+    font-weight: 600;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .library__pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--success-subtle);
+    color: var(--success-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .library__pill[data-kind="postflop"] {
+    background: var(--warning-subtle);
+    color: var(--warning);
+  }
+
+  .library__pill--start {
+    align-self: flex-start;
+  }
+
+  .library__row-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  button.library__open {
+    padding: 0 8px 0 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  button.library__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+  }
+
+  .library__sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .library__no-results {
+    padding: 16px 12px;
+    color: var(--text-muted);
+  }
+
+  .library__tip {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .library__preview {
+    flex: 1 1 280px;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px;
+    border: 1px solid var(--divider);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .library__preview-name {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .library__preview-desc {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .library__preview-range {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-strong);
+  }
+
+  .library__preview-board {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .library__cards {
+    display: flex;
+    gap: 6px;
+  }
+
+  .library .playing-card {
+    width: 40px;
+    height: 56px;
+    border: 0;
+    background: var(--card-face);
+    color: var(--card-ink);
+    font-size: 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+
+  .library .playing-card[data-suit="h"],
+  .library .playing-card[data-suit="d"] {
+    color: var(--card-red);
+  }
+
+  .library__preview-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .library__preview-actions--spread {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+
+  .library__preview-actions--spread button {
+    padding-inline: 10px;
+  }
+
+  .library__rename {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .library__rename input {
+    min-height: 40px;
+    border-radius: 8px;
+  }
+
+  .library__confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
+    border-radius: 8px;
+    background: var(--danger-subtle);
+    color: var(--text-strong);
+    font-size: 13px;
+  }
+
+  .library__message {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 34rem;
+    padding: 24px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 12px;
+  }
+
+  .library__message-title {
+    color: var(--text-strong);
+    font-size: 16px;
+    font-weight: 650;
+  }
+
+  .library__loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .library__table tr:hover td {
+    background: var(--surface-hover);
+  }
+
+  button.library__icon:hover:not(:disabled) {
+    background: var(--surface-3);
+    color: var(--text-strong);
+  }
+
+  button.library__name:hover:not(:disabled),
+  button.library__open:hover:not(:disabled) {
+    background: transparent;
+    color: var(--accent-hover);
+  }
+}

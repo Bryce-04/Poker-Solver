@@ -1,4 +1,4 @@
-import type { Position } from "@poker-solver/schema";
+import type { Position, Spot } from "@poker-solver/schema";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { STREET_ORDER } from "../lib/handBuilder";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
@@ -37,8 +37,8 @@ import { SolveWorkspace } from "./solve/SolveWorkspace";
  * entries, shared by both setup modes: 3/4/5 cards picked is what unlocks
  * the flop/turn/river action-builder sections in click mode.
  */
-export function SolvePage({ prefill }: { prefill?: SolvePrefill } = {}) {
-  const setup = useSolveSetup(prefill);
+export function SolvePage({ prefill, savedSpot }: { prefill?: SolvePrefill; savedSpot?: Spot } = {}) {
+  const setup = useSolveSetup(prefill, savedSpot);
   const isDesktop = useIsDesktop();
   return isDesktop ? <SolveWorkspace setup={setup} /> : <SolvePhone setup={setup} />;
 }

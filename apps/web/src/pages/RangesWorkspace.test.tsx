@@ -226,3 +226,47 @@ describe("RangesWorkspace (desktop Ranges)", () => {
     expect(await screen.findByText(/no standard chart for this spot yet/i)).toBeInTheDocument();
   });
 });
+
+describe("RangesWorkspace -- opened from the Library", () => {
+  it("restores the spot, shows the saved range rather than the chart's, and keeps its name", async () => {
+    const saved: Spot = {
+      id: "saved-1",
+      name: "My BB defense",
+      positions_in_hand: ["BB"],
+      effective_stack_bb: 100,
+      current_street: "preflop",
+      actions: [{ position: "CO", street: "preflop", action: "raise" }],
+      ranges: { BB: { AA: 1 } },
+    };
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/ranges", state: { spot: saved } }]}>
+        <Routes>
+          <Route path="/ranges" element={<RangesPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("heading", { name: "BB vs a CO raise" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "BB" })).toHaveAttribute("aria-pressed", "true");
+    // AA only (6 combos), not the chart's AA + KK.
+    expect(screen.getByText("0.5%")).toBeInTheDocument();
+    expect(screen.getByText(/edited from the standard chart/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Save as")).toHaveValue("My BB defense");
+  });
+
+  it("names a new save after the spot, and saves under the typed name", async () => {
+    const user = userEvent.setup();
+    mockSave.mockImplementation(async (spot) => ({ kind: "saved", spot }));
+    renderRanges();
+    await screen.findByRole("heading", { name: "BTN opening range" });
+    const field = screen.getByLabelText("Save as");
+    expect(field).toHaveValue("BTN opening range · 100bb");
+    await user.click(screen.getByRole("gridcell", { name: "QQ" }));
+    expect(field).toHaveValue("BTN opening range (my version) · 100bb");
+
+    await user.clear(field);
+    await user.type(field, "Wide BTN");
+    await user.click(screen.getByRole("button", { name: "Save to Library" }));
+    await screen.findByText(/saved to your library/i);
+    expect(mockSave.mock.calls[0][0].name).toBe("Wide BTN");
+  });
+});

@@ -34,5 +34,7 @@ export const PAGE_HEADERS: Record<
   "/library": {
     title: "Library",
     description: "Spots you've saved. Only you can see them.",
+    workspace: true,
+    ownHeader: true,
   },
 };

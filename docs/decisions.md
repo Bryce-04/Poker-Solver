@@ -6,6 +6,39 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-20 — Library: spot names, rename and delete
+
+**Status:** proposed.
+
+**Context.** `docs/desktop-redesign.md` §6.4 / §7.1–7.3: Saved was a
+dead end, with rows that all read alike and no way to open, rename or
+delete one.
+
+**Decision.**
+- **API.** `Spot.name` (optional, at most 120 characters).
+  `PATCH /spots/{id}` takes `{"name": ...}`, trimmed, 1–120 characters,
+  and returns the updated spot. `DELETE /spots/{id}` returns 204. Both
+  require auth and act only on the caller's own rows. A missing id,
+  someone else's spot, and an ownerless pre-auth row all get the same 404,
+  so the API never confirms that another user's spot exists. Ownerless
+  rows stay untouchable.
+- **No `name` column.** The spec asked for a nullable `SpotRow.name`
+  column plus an Alembic migration. Saved spots are stored whole as JSONB
+  (`SpotRow.data`), and nothing queries by name: Library search is
+  client-side. A column would be a second copy of the value that every
+  write must keep in sync. So the name lives in `data` like every other
+  `Spot` field, and rename rewrites it there. `created_by` is a column
+  because `GET /spots` filters on it. If a server-side search or sort by
+  name is ever needed, add the column then.
+- **Phones.** As with Ranges and Solve, phones keep the original Saved
+  list unchanged (the no-visual-change-under-1024px rule). The table,
+  preview, open, rename, delete and duplicate are desktop only.
+- **Open** passes the spot as route state. Duplicate is client-side: a
+  `POST /spots` of the spot with " (copy)" added to its name, and the
+  server assigns the copy a new id, owner and date.
+
+---
+
 ## 2026-10-20 — Desktop Solve: one state hook, two layouts; how "Save spot" stores a hand
 
 **Status:** proposed.

@@ -246,7 +246,7 @@ export function SpotBuilder() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={save}
+              onClick={() => save()}
               disabled={saveState.kind === "saving"}
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}

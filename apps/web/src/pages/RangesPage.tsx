@@ -1,6 +1,7 @@
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { SegmentedControl } from "../components/SegmentedControl/SegmentedControl";
 import { useIsDesktop } from "../lib/useIsDesktop";
+import { readSavedSpot } from "../lib/solvePrefill";
 import { BuilderPage } from "./BuilderPage";
 import { TypeInPage } from "./TypeInPage";
 import { ImportPage } from "./ImportPage";
@@ -36,11 +37,13 @@ function parseMode(raw: string | null): RangesMode {
  */
 export function RangesPage() {
   const isDesktop = useIsDesktop();
+  // A saved chart opened from the Library (desktop only, like the Library).
+  const savedSpot = readSavedSpot(useLocation().state);
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = parseMode(searchParams.get("mode"));
   const setMode = (next: RangesMode) => setSearchParams(next === "pick" ? {} : { mode: next });
 
-  if (isDesktop) return <RangesWorkspace mode={mode} onModeChange={setMode} />;
+  if (isDesktop) return <RangesWorkspace mode={mode} onModeChange={setMode} initialSpot={savedSpot} />;
 
   return (
     <div className="ranges-page">

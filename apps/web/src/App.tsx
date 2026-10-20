@@ -5,9 +5,9 @@ import { PageHeader } from "./components/PageHeader/PageHeader";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { AuthProvider } from "./lib/auth";
 import { NAV_ITEMS, PAGE_HEADERS } from "./lib/navigation";
-import { readSolvePrefill } from "./lib/solvePrefill";
+import { readSavedSpot, readSolvePrefill } from "./lib/solvePrefill";
 import { useIsDesktop } from "./lib/useIsDesktop";
-import { SavedSpotsPage } from "./pages/SavedSpotsPage";
+import { LibraryPage } from "./pages/LibraryPage";
 import { RangesPage } from "./pages/RangesPage";
 import { SolvePage } from "./pages/SolvePage";
 import { DrillPage } from "./pages/DrillPage";
@@ -51,10 +51,11 @@ function ShellPageHeader() {
   return <PageHeader title={header.title} description={header.description} />;
 }
 
-/** /solve, optionally seeded from another screen's "solve from here"
- * (route state; see lib/solvePrefill.ts). */
+/** /solve, optionally seeded from route state (lib/solvePrefill.ts): Ranges'
+ * "solve from here", or a spot opened from the Library. */
 function SolveRoute() {
-  return <SolvePage prefill={readSolvePrefill(useLocation().state)} />;
+  const { state } = useLocation();
+  return <SolvePage prefill={readSolvePrefill(state)} savedSpot={readSavedSpot(state)} />;
 }
 
 /**
@@ -83,15 +84,13 @@ function Shell() {
       {isDesktop ? <Sidebar /> : <MobileHeader />}
       <div className={isDesktop ? "app-shell__content" : undefined}>
         {isDesktop && <ShellPageHeader />}
-        {/* Pages not yet laid out for desktop (Library) still sit in their
-            phone-width column until their own phase. */}
         <main className={mainClass}>
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/solve" replace />} />
               <Route path="/solve" element={<SolveRoute />} />
               <Route path="/ranges" element={<RangesPage />} />
-              <Route path="/library" element={<SavedSpotsPage />} />
+              <Route path="/library" element={<LibraryPage />} />
               <Route path="/saved" element={<Navigate to="/library" replace />} />
               <Route path="/type-in" element={<Navigate to="/ranges?mode=type" replace />} />
               <Route path="/import" element={<Navigate to="/ranges?mode=paste" replace />} />

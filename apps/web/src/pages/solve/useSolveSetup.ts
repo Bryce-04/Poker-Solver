@@ -14,7 +14,8 @@ import {
 } from "../../lib/handBuilder";
 import type { BuilderAction } from "../../lib/handBuilder";
 import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, solveSpot, type LiveSolveResponse, type SpotValidationIssue } from "../../lib/api";
-import type { SolvePrefill } from "../../lib/solvePrefill";
+import { seedFromSpot, type SolvePrefill } from "../../lib/solvePrefill";
+import { boardText as cardsInWords } from "../../lib/spotText";
 import { buildNarrowSpot, describeStreets, streetsToNarrow, unlikelyLineWarning } from "../../lib/chaining";
 
 export type BoardMode = "pick" | "text";
@@ -94,22 +95,24 @@ const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
  * and the desktop workspace (SolveWorkspace.tsx). Lives in SolvePage, so
  * crossing the 1024px breakpoint keeps a half-built spot.
  */
-export function useSolveSetup(prefill?: SolvePrefill) {
-  const [setupMode, setSetupMode] = useState<SetupMode>("click");
+export function useSolveSetup(prefill?: SolvePrefill, savedSpot?: Spot) {
+  // A spot opened from the Library seeds the whole setup (read on mount).
+  const [seed] = useState(() => (savedSpot ? seedFromSpot(savedSpot) : null));
+  const [setupMode, setSetupMode] = useState<SetupMode>(seed?.setupMode ?? "click");
   // The two heads-up seats, in whichever order they were picked -- who is
   // out of position / in position is derived from them, never chosen.
   // `prefill` (another screen's "solve from here") seeds them, one range and
   // the stack; it's only read on mount.
-  const [seatA, setSeatA] = useState<Position>(prefill?.hero ?? "BB");
-  const [seatB, setSeatB] = useState<Position>(prefill?.villain ?? "BTN");
+  const [seatA, setSeatA] = useState<Position>(seed?.seatA ?? prefill?.hero ?? "BB");
+  const [seatB, setSeatB] = useState<Position>(seed?.seatB ?? prefill?.villain ?? "BTN");
   const { oop: oopPosition, ip: ipPosition } = assignPostflopSeats(seatA, seatB);
   const [boardMode, setBoardMode] = useState<BoardMode>("pick");
   const [boardText, setBoardText] = useState("");
-  const [pickedCards, setPickedCards] = useState<string[]>([]);
+  const [pickedCards, setPickedCards] = useState<string[]>(seed?.pickedCards ?? []);
   // Ranges and "Load typical range" status are kept per SEAT, not per role,
   // so changing the other player never leaves a range on the wrong player.
   const [ranges, setRanges] = useState<Partial<Record<Position, HandRange>>>(() =>
-    prefill ? { [prefill.hero]: prefill.heroRange } : {},
+    seed ? seed.ranges : prefill ? { [prefill.hero]: prefill.heroRange } : {},
   );
   const [chartStates, setChartStates] = useState<Partial<Record<Position, ChartLoadState>>>({});
   // The last range each seat was given by a load (preflop action, typical
@@ -117,7 +120,15 @@ export function useSolveSetup(prefill?: SolvePrefill) {
   // what desktop's "Reset" goes back to and its "Both players" cards describe.
   const [loadedRanges, setLoadedRanges] = useState<
     Partial<Record<Position, { range: HandRange; source: string }>>
-  >(() => (prefill ? { [prefill.hero]: { range: prefill.heroRange, source: "From your Ranges chart" } } : {}));
+  >(() =>
+    seed
+      ? Object.fromEntries(
+          Object.entries(seed.ranges).map(([p, range]) => [p, { range, source: "From your Library" }]),
+        )
+      : prefill
+        ? { [prefill.hero]: { range: prefill.heroRange, source: "From your Ranges chart" } }
+        : {},
+  );
   function markLoaded(entries: [Position, HandRange, string][]) {
     setLoadedRanges((prev) => {
       const next = { ...prev };
@@ -154,8 +165,8 @@ export function useSolveSetup(prefill?: SolvePrefill) {
   // these, never typed in directly (see docs/decisions.md's 2026-10-07
   // entry on why the old flat pot_bb=100/effective_stack_bb=33 defaults
   // didn't make sense).
-  const [startingStackBb, setStartingStackBb] = useState(prefill?.startingStackBb ?? 100);
-  const [streets, setStreets] = useState<Record<Street, BuilderAction[]>>(EMPTY_STREETS);
+  const [startingStackBb, setStartingStackBb] = useState(seed?.startingStackBb ?? prefill?.startingStackBb ?? 100);
+  const [streets, setStreets] = useState<Record<Street, BuilderAction[]>>(seed?.streets ?? EMPTY_STREETS);
   // Actions stepped back over (via Back or a street's own Undo), newest
   // last -- what "Forward" re-applies. Any fresh action clears it.
   const [redoStack, setRedoStack] = useState<{ street: Street; action: BuilderAction }[]>([]);
@@ -165,10 +176,10 @@ export function useSolveSetup(prefill?: SolvePrefill) {
   // the point it stops, so there's nothing to click through.
   const [handHistoryText, setHandHistoryText] = useState("");
   const [handHistoryError, setHandHistoryError] = useState<string | null>(null);
-  const [pastedPotBb, setPastedPotBb] = useState(0);
-  const [pastedStackBb, setPastedStackBb] = useState(0);
-  const [oopAlreadyChecked, setOopAlreadyChecked] = useState(false);
-  const [pasteLoaded, setPasteLoaded] = useState(false);
+  const [pastedPotBb, setPastedPotBb] = useState(seed?.pastedPotBb ?? 0);
+  const [pastedStackBb, setPastedStackBb] = useState(seed?.pastedStackBb ?? 0);
+  const [oopAlreadyChecked, setOopAlreadyChecked] = useState(seed?.oopAlreadyChecked ?? false);
+  const [pasteLoaded, setPasteLoaded] = useState(seed?.setupMode === "paste");
 
   function loadFromHandHistory() {
     const result = parseHandHistoryToPostflopSetup(handHistoryText);
@@ -564,7 +575,14 @@ export function useSolveSetup(prefill?: SolvePrefill) {
       setupMode === "click"
         ? STREET_ORDER.flatMap((st) => toBettingActions(st, streets[st]))
         : toBettingActions(currentStreet, currentStreetActions);
+    // A spot opened from the Library keeps its name; a new one is named by
+    // what's in it (renamable in the Library).
+    const cards = board.kind === "ok" ? board.cards : [];
+    const name =
+      savedSpot?.name ??
+      (cards.length > 0 ? `${oopPosition} vs ${ipPosition} on ${cardsInWords(cards)}` : `${oopPosition} vs ${ipPosition}, preflop`);
     return {
+      name,
       positions_in_hand: [oopPosition, ipPosition],
       effective_stack_bb: setupMode === "click" ? startingStackBb : effectiveStackBb,
       pot_bb: potBb,

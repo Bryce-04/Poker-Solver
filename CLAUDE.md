@@ -27,10 +27,12 @@ the header's `AuthStatus` component); the save button on all three entry
 screens gates on being signed in. Backend: `apps/api`
 verifies that header as a Supabase JWT (`app/auth.py`'s `current_user_id`
 dependency, checked against the project's public JWKS keys -- only
-`SUPABASE_URL` needed, no secret), `POST`/`GET /spots` require it, and
-`GET /spots` only returns the caller's own spots (`SpotRow.created_by`).
-Rows saved before auth have no owner and are deliberately left in place,
-listed for no one. The `spots` table is managed by Alembic
+`SUPABASE_URL` needed, no secret), `POST`/`GET /spots` and
+`PATCH`/`DELETE /spots/{id}` (rename / delete) require it, and every one
+only ever touches the caller's own spots (`SpotRow.created_by`). A spot
+that's missing, someone else's, or ownerless is the same 404 to
+PATCH/DELETE. Rows saved before auth have no owner and are deliberately
+left in place, listed for no one. The `spots` table is managed by Alembic
 (`apps/api/migrations`), not `create_all`. `apps/api` is deployed on
 Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
@@ -171,8 +173,8 @@ on Render after: wide-range river 16s, worst-case deep wide flop 90s —
 both fully converged, under the phone's 150s timeout. If that's still too
 slow, a host with a full CPU (e.g. Cloud Run) would be ~10x faster — see
 `docs/decisions.md`'s "Hardening /spots/solve" entry. `pytest apps/api`
-still hasn't been run against a real Postgres (no DB in the working
-session; route logic was exercised by calling `solve_spot` directly).
+has been run against the local docker-compose Postgres (2026-10-20, 129
+passed, including the solve route), so that's no longer an open gap.
 
 **Desktop redesign (in progress, 2026-10-20)**: `docs/desktop-redesign.md`
 is the agreed spec (six phases; built as one commit per phase on the
@@ -259,7 +261,30 @@ result; see `docs/decisions.md` for how a saved hand is encoded.
 `PAGE_HEADERS` to render it with its own actions. Wording helpers (preflop
 line, roles, accuracy tiers, advice) are pure functions in
 `pages/solve/solveText.ts`, tested on their own. Not in Phase 4: hand
-category labels and "Why?" (Phase 6). Next: Phase 5 (Library + API).
+category labels and "Why?" (Phase 6).
+**Phase 5 (Library + API) is done**:
+- `Spot.name` (optional, max 120) is in `packages/schema`, with the TS
+  regenerated. It lives in the JSONB `data` like every other `Spot` field,
+  so there's no new column or migration. This departs from the spec, which
+  asked for a column; see `docs/decisions.md`.
+- `apps/api` has `PATCH /spots/{id}` (`{name}`) and `DELETE /spots/{id}`,
+  owner-only, tested in `tests/test_spots_persistence.py`. `lib/api.ts`
+  has `renameSpot` / `deleteSpot`.
+- Desktop `/library` is `pages/library/LibraryWorkspace.tsx`: search, an
+  All / Preflop / Postflop filter, a table, and a preview panel with Open /
+  Duplicate / Rename / Delete (delete asks to confirm). Phones keep
+  `SavedSpotsPage` unchanged; `pages/LibraryPage.tsx` picks the layout.
+- Unnamed spots fall back to `lib/spotText.ts`'s `summarize()` (moved
+  there from SavedSpotsPage).
+- "Open" passes the spot as route state: preflop charts to Ranges
+  (`RangesWorkspace`'s `initialSpot`, which shows the *saved* range via
+  `useReferenceChart`'s `load(spot, startRange)` and keeps its name),
+  setups with a board to Solve (`lib/solvePrefill.ts`'s `seedFromSpot`
+  undoes `setupAsSpot`; `useSolveSetup(prefill, savedSpot)`).
+- Ranges' save card now has the "Save as" name field. Solve names a save
+  "{OOP} vs {IP} on {board}", or keeps an opened spot's name.
+
+Next: Phase 6 (hand categories and "Why?").
 
 ## Commands
 

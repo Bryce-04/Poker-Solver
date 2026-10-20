@@ -63,7 +63,9 @@ export function useReferenceChart() {
 
   // Stable identities (no deps beyond setters and a ref), so a page can call
   // these from an effect without re-running it every render.
-  const load = useCallback(async (spot: Spot) => {
+  /** `startRange`: show this range instead of the chart's own once it
+   * loads -- a saved, edited chart being reopened. */
+  const load = useCallback(async (spot: Spot, startRange?: HandRange) => {
     const request = ++latest.current;
     setOutcome((prev) => ({
       kind: "loading",
@@ -74,7 +76,7 @@ export function useReferenceChart() {
     if (request !== latest.current) return;
     if (result.kind === "match") {
       setOutcome({ kind: "match", data: result.data, spot });
-      setEditedRange(chartRangeFor(result.data, spot));
+      setEditedRange(startRange ?? chartRangeFor(result.data, spot));
     } else {
       setOutcome(result);
     }
@@ -92,7 +94,7 @@ export function useReferenceChart() {
   }
 
   /** Save the matched spot with the range as edited, not the untouched chart. */
-  async function save() {
+  async function save(name?: string) {
     if (outcome.kind !== "match") return;
     if (auth.status !== "signed-in") {
       setSaveState({ kind: "not-signed-in" });
@@ -100,7 +102,11 @@ export function useReferenceChart() {
     }
     setSaveState({ kind: "saving" });
     const { spot } = outcome;
-    const result = await saveSpot({ ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } });
+    const result = await saveSpot({
+      ...spot,
+      ...(name?.trim() ? { name: name.trim() } : {}),
+      ranges: { [spot.positions_in_hand[0]]: editedRange },
+    });
     setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
   }
 

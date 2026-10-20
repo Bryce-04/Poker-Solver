@@ -253,3 +253,61 @@ describe("SolveWorkspace (desktop Solve)", () => {
     expect(mockSave).not.toHaveBeenCalled();
   });
 });
+
+describe("SolveWorkspace -- opened from the Library", () => {
+  it("rebuilds a clicked-through hand: actions, board and both ranges", async () => {
+    const saved = {
+      id: "s1",
+      name: "BB vs BTN on Q♠ 5♣ 2♣",
+      positions_in_hand: ["BB", "BTN"],
+      effective_stack_bb: 100,
+      pot_bb: 5.5,
+      board: ["Qs", "5c", "2c"],
+      current_street: "flop",
+      actions: [
+        { position: "BTN", street: "preflop", action: "raise", size_bb: 2.5 },
+        { position: "BB", street: "preflop", action: "call" },
+      ],
+      ranges: { BB: { AA: 1 }, BTN: { KK: 1 } },
+    } as const;
+    render(<SolvePage savedSpot={structuredClone(saved) as never} />);
+    expect(screen.getByText("BTN raises to 2.5bb")).toBeInTheDocument();
+    expect(screen.getByLabelText(/or type it/i)).toHaveValue("Qs 5c 2c");
+    expect(screen.getAllByText("From your Library")).toHaveLength(2);
+    const ready = screen.getByRole("region", { name: "Ready to solve" });
+    expect(ready).toHaveTextContent("Both ranges loaded");
+    expect(within(ready).getByRole("button", { name: "Solve BB's flop decision" })).toBeEnabled();
+    // Ranges came with it: nothing is auto-loaded over them.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockPreflop).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds a hand-history setup: pot, stack and the first player's check", () => {
+    const saved = {
+      id: "s2",
+      positions_in_hand: ["BB", "BTN"],
+      effective_stack_bb: 97.5,
+      pot_bb: 5.5,
+      board: ["Qs", "5c", "2c"],
+      current_street: "flop",
+      actions: [{ position: "BB", street: "flop", action: "check" }],
+      ranges: { BB: { AA: 1 }, BTN: { KK: 1 } },
+    } as const;
+    render(<SolvePage savedSpot={structuredClone(saved) as never} />);
+    expect(screen.getByRole("button", { name: "Hand history" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Pot (bb)")).toHaveValue(5.5);
+    expect(screen.getByLabelText("Stacks (bb)")).toHaveValue(97.5);
+    expect(screen.getByLabelText(/BB already checked/)).toBeChecked();
+    expect(screen.getByRole("button", { name: "Solve BTN's flop decision" })).toBeEnabled();
+  });
+
+  it("names a fresh save after the board", async () => {
+    const user = userEvent.setup();
+    mockSave.mockImplementation(async (spot) => ({ kind: "saved", spot }));
+    render(<SolvePage />);
+    await setUpTheMockupSpot(user);
+    await user.click(screen.getByRole("button", { name: "Save spot" }));
+    await screen.findByText("Saved to your Library.");
+    expect(mockSave.mock.calls[0][0].name).toBe("BB vs BTN on Q♠ 5♣ 2♣");
+  });
+});
