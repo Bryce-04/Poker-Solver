@@ -29,6 +29,21 @@ on desktop, which means two sets of routes to maintain.
 **Interim.** Until Phase 3, `/ranges` renders the unchanged old pages under
 the switch.
 
+**Update, same day (Phase 3) — phones keep the old pages.** The spec's §6.3
+says to delete `BuilderPage` / `TypeInPage` / `ImportPage` once the merged
+Ranges page exists, and to drop the "Get reference strategy" button in
+favor of auto-loading. Both would visibly change phones, and the
+redesign's hard rule (§2.1, and the user's explicit instruction) is that
+nothing changes visually under 1024px. The user chose to keep phones as
+they are. So the merged page (`RangesWorkspace`) renders at >= 1024px
+only, and under that `/ranges` keeps the three old pages under the mode
+switch. To avoid three-plus-one copies of the same logic, the fetch /
+editable-range / save state machine moved into `lib/useReferenceChart.ts`,
+used by all four. The old pages' markup is untouched, since their status
+copy differs slightly from page to page and sharing it would change phone
+text. Revisit if the team later wants the merged page on phones too: it
+would need a single-column layout, and the old pages could then go.
+
 ---
 
 ## 2026-10-19 — Swipe Drill, first slice (`/drill`)

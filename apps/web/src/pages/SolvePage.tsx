@@ -28,6 +28,7 @@ import {
 } from "../lib/chaining";
 import { formatMix, overallMix } from "../lib/strategySummary";
 import { handMass, indexRange } from "../lib/rangeCombos";
+import type { SolvePrefill } from "../lib/solvePrefill";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./SolvePage.css";
 
@@ -121,19 +122,23 @@ const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
  * entries, shared by both setup modes: 3/4/5 cards picked is what unlocks
  * the flop/turn/river action-builder sections in click mode.
  */
-export function SolvePage() {
+export function SolvePage({ prefill }: { prefill?: SolvePrefill } = {}) {
   const [setupMode, setSetupMode] = useState<SetupMode>("click");
   // The two heads-up seats, in whichever order they were picked -- who is
   // out of position / in position is derived from them, never chosen.
-  const [seatA, setSeatA] = useState<Position>("BB");
-  const [seatB, setSeatB] = useState<Position>("BTN");
+  // `prefill` (another screen's "solve from here") seeds them, one range and
+  // the stack; it's only read on mount.
+  const [seatA, setSeatA] = useState<Position>(prefill?.hero ?? "BB");
+  const [seatB, setSeatB] = useState<Position>(prefill?.villain ?? "BTN");
   const { oop: oopPosition, ip: ipPosition } = assignPostflopSeats(seatA, seatB);
   const [boardMode, setBoardMode] = useState<BoardMode>("pick");
   const [boardText, setBoardText] = useState("");
   const [pickedCards, setPickedCards] = useState<string[]>([]);
   // Ranges and "Load typical range" status are kept per SEAT, not per role,
   // so changing the other player never leaves a range on the wrong player.
-  const [ranges, setRanges] = useState<Partial<Record<Position, HandRange>>>({});
+  const [ranges, setRanges] = useState<Partial<Record<Position, HandRange>>>(() =>
+    prefill ? { [prefill.hero]: prefill.heroRange } : {},
+  );
   const [chartStates, setChartStates] = useState<Partial<Record<Position, ChartLoadState>>>({});
   const oopRange = ranges[oopPosition] ?? {};
   const ipRange = ranges[ipPosition] ?? {};
@@ -161,7 +166,7 @@ export function SolvePage() {
   // these, never typed in directly (see docs/decisions.md's 2026-10-07
   // entry on why the old flat pot_bb=100/effective_stack_bb=33 defaults
   // didn't make sense).
-  const [startingStackBb, setStartingStackBb] = useState(100);
+  const [startingStackBb, setStartingStackBb] = useState(prefill?.startingStackBb ?? 100);
   const [streets, setStreets] = useState<Record<Street, BuilderAction[]>>(EMPTY_STREETS);
   // Actions stepped back over (via Back or a street's own Undo), newest
   // last -- what "Forward" re-applies. Any fresh action clears it.

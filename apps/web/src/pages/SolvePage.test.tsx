@@ -811,3 +811,19 @@ describe("SolvePage -- ranges from the preflop action", () => {
     expect(within(rangeGrids()[0]).getByRole("gridcell", { name: "KJo" })).toHaveAttribute("aria-pressed", "true");
   });
 });
+
+describe("SolvePage -- prefill from another screen", () => {
+  it("starts from the given seats, one player's range and the stack", () => {
+    render(
+      <SolvePage
+        prefill={{ hero: "BB", villain: "CO", heroRange: { AA: 1, KK: 1 }, startingStackBb: 40 }}
+      />,
+    );
+    expect(screen.getByLabelText(/^player 1$/i)).toHaveValue("BB");
+    expect(screen.getByLabelText(/^player 2$/i)).toHaveValue("CO");
+    expect(screen.getByLabelText(/starting stack/i)).toHaveValue(40);
+    // BB (out of position) has the two hands; CO starts empty.
+    expect(screen.getByText("2 of 169 hand types selected")).toBeInTheDocument();
+    expect(screen.getByText("0 of 169 hand types selected")).toBeInTheDocument();
+  });
+});

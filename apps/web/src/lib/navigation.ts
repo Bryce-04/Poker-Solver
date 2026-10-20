@@ -11,8 +11,10 @@ export const NAV_ITEMS = [
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];
 
-/** The desktop page header's title and one-line description, by route. */
-export const PAGE_HEADERS: Record<string, { title: string; description: string }> = {
+/** The desktop page header's title and one-line description, by route.
+ * `workspace` pages lay themselves out edge to edge (rail + canvas); the
+ * rest still sit in the padded phone-width column. */
+export const PAGE_HEADERS: Record<string, { title: string; description: string; workspace?: boolean }> = {
   "/solve": {
     title: "Solve",
     description: "Set up a hand, then let the solver find the best mix of plays for whoever is to act.",
@@ -21,6 +23,7 @@ export const PAGE_HEADERS: Record<string, { title: string; description: string }
     title: "Ranges",
     description:
       "Standard preflop charts: which hands to play from each seat. Edit one and save it as your own.",
+    workspace: true,
   },
   "/library": {
     title: "Library",

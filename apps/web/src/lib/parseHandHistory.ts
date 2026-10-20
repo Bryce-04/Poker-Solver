@@ -31,6 +31,24 @@ import { buildOpenSpot, buildVsRaiseSpot } from "./spot";
  * a second site's format is a second module, not a rewrite of this one.
  */
 
+/** A working example for "Use an example": Hero opens from the button. */
+export const EXAMPLE_HAND_HISTORY = `PokerStars Hand #1:  Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/01 12:00:00 ET
+Table 'Atlas' 6-max Seat #4 is the button
+Seat 1: Alice ($100 in chips)
+Seat 2: Bob ($100 in chips)
+Seat 3: Carol ($100 in chips)
+Seat 4: Hero ($100 in chips)
+Seat 5: Eve ($100 in chips)
+Seat 6: Frank ($100 in chips)
+Eve: posts small blind $0.50
+Frank: posts big blind $1
+*** HOLE CARDS ***
+Dealt to Hero [Ah Kh]
+Alice: folds
+Bob: folds
+Carol: folds
+Hero: raises $2 to $3`;
+
 export type HandHistoryParseResult =
   | { kind: "parsed"; spot: Spot }
   | { kind: "unrecognized"; reason: string };

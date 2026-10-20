@@ -1,14 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { HandRange, Spot } from "@poker-solver/schema";
-import {
-  fetchReferenceStrategy,
-  saveSpot,
-  type ReferenceStrategyResponse,
-  type SpotValidationIssue,
-} from "../lib/api";
-import { parseHandHistory } from "../lib/parseHandHistory";
-import { useAuth } from "../lib/auth";
+import { EXAMPLE_HAND_HISTORY as EXAMPLE_HH, parseHandHistory } from "../lib/parseHandHistory";
+import { useReferenceChart, type ChartOutcome } from "../lib/useReferenceChart";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import "../components/SpotBuilder/SpotBuilder.css";
 
@@ -18,39 +11,7 @@ import "../components/SpotBuilder/SpotBuilder.css";
 // difference from TypeInPage is `unrecognized` carrying a `reason` --
 // see lib/parseHandHistory.ts for why a multi-line paste can be specific
 // about what didn't parse where a short typed phrase can't.
-type Outcome =
-  | { kind: "idle" }
-  | { kind: "unrecognized"; reason: string }
-  | { kind: "loading" }
-  | { kind: "match"; data: ReferenceStrategyResponse; spot: Spot }
-  | { kind: "no-match" }
-  | { kind: "invalid"; issues: SpotValidationIssue[] }
-  | { kind: "network-error" }
-  | { kind: "error"; status: number };
-
-type SaveState =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "saved" }
-  | { kind: "error" }
-  | { kind: "not-signed-in" };
-
-const EXAMPLE_HH = `PokerStars Hand #1:  Hold'em No Limit ($0.50/$1.00 USD) - 2024/01/01 12:00:00 ET
-Table 'Atlas' 6-max Seat #4 is the button
-Seat 1: Alice ($100 in chips)
-Seat 2: Bob ($100 in chips)
-Seat 3: Carol ($100 in chips)
-Seat 4: Hero ($100 in chips)
-Seat 5: Eve ($100 in chips)
-Seat 6: Frank ($100 in chips)
-Eve: posts small blind $0.50
-Frank: posts big blind $1
-*** HOLE CARDS ***
-Dealt to Hero [Ah Kh]
-Alice: folds
-Bob: folds
-Carol: folds
-Hero: raises $2 to $3`;
+type Outcome = ChartOutcome | { kind: "unrecognized"; reason: string };
 
 /**
  * Stage 4's hand-history import -- a small, rule-based parser
@@ -61,53 +22,25 @@ Hero: raises $2 to $3`;
  * comes back with a specific reason, not a generic failure.
  */
 export function ImportPage() {
-  const auth = useAuth();
   const [text, setText] = useState("");
-  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
-  const [editedRange, setEditedRange] = useState<HandRange>({});
+  // Fetch, the editable copy of the chart's range, and save come from
+  // lib/useReferenceChart.ts; a parse failure is this page's own state.
+  const chart = useReferenceChart();
+  const { saveState, editedRange, setEditedRange } = chart;
+  const [unrecognizedReason, setUnrecognizedReason] = useState<string | null>(null);
+  const outcome: Outcome =
+    unrecognizedReason !== null ? { kind: "unrecognized", reason: unrecognizedReason } : chart.outcome;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setSaveState({ kind: "idle" });
-
     const parsed = parseHandHistory(text);
     if (parsed.kind === "unrecognized") {
-      setOutcome({ kind: "unrecognized", reason: parsed.reason });
+      chart.clear();
+      setUnrecognizedReason(parsed.reason);
       return;
     }
-
-    setOutcome({ kind: "loading" });
-    const result = await fetchReferenceStrategy(parsed.spot);
-    switch (result.kind) {
-      case "match":
-        setOutcome({ kind: "match", data: result.data, spot: parsed.spot });
-        setEditedRange(result.data.ranges[parsed.spot.positions_in_hand[0]] ?? {});
-        return;
-      case "no-match":
-        setOutcome({ kind: "no-match" });
-        return;
-      case "invalid":
-        setOutcome({ kind: "invalid", issues: result.issues });
-        return;
-      case "network-error":
-        setOutcome({ kind: "network-error" });
-        return;
-      case "error":
-        setOutcome({ kind: "error", status: result.status });
-        return;
-    }
-  }
-
-  async function handleSave(spot: Spot) {
-    if (auth.status !== "signed-in") {
-      setSaveState({ kind: "not-signed-in" });
-      return;
-    }
-    setSaveState({ kind: "saving" });
-    const toSave: Spot = { ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } };
-    const result = await saveSpot(toSave);
-    setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
+    setUnrecognizedReason(null);
+    await chart.load(parsed.spot);
   }
 
   return (
@@ -226,7 +159,7 @@ export function ImportPage() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => handleSave(outcome.spot)}
+              onClick={chart.save}
               disabled={saveState.kind === "saving"}
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}

@@ -111,3 +111,13 @@
     max-width: 44rem;
   }
 }
+
+@media (min-width: 1024px) {
+  /* Pages with their own desktop layout (rail + canvas) fill the content
+     area edge to edge and stretch to its full height. */
+  .app-shell__main--workspace {
+    flex: 1;
+    display: flex;
+    padding: 0;
+  }
+}

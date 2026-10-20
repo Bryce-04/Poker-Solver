@@ -1,36 +1,14 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { HandRange, Spot } from "@poker-solver/schema";
-import {
-  fetchReferenceStrategy,
-  saveSpot,
-  type ReferenceStrategyResponse,
-  type SpotValidationIssue,
-} from "../lib/api";
 import { parseSpotText } from "../lib/parseSpotText";
-import { useAuth } from "../lib/auth";
+import { useReferenceChart, type ChartOutcome } from "../lib/useReferenceChart";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Stage 3 MVP -- reuses SpotBuilder's outcome-rendering shape and CSS
 // rather than a shared component, per the ♥-lane plan ("duplicate it once;
 // don't over-engineer a stretch item").
-type Outcome =
-  | { kind: "idle" }
-  | { kind: "unrecognized" }
-  | { kind: "loading" }
-  | { kind: "match"; data: ReferenceStrategyResponse; spot: Spot }
-  | { kind: "no-match" }
-  | { kind: "invalid"; issues: SpotValidationIssue[] }
-  | { kind: "network-error" }
-  | { kind: "error"; status: number };
-
-type SaveState =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "saved" }
-  | { kind: "error" }
-  | { kind: "not-signed-in" };
+type Outcome = ChartOutcome | { kind: "unrecognized" };
 
 const EXAMPLES = ["BTN opens 100bb", "BB defends CO open, 100bb"];
 
@@ -40,54 +18,25 @@ const EXAMPLES = ["BTN opens 100bb", "BB defends CO open, 100bb"];
  * supports. Freeform text is out of scope for this MVP; see docs/plan.md.
  */
 export function TypeInPage() {
-  const auth = useAuth();
   const [text, setText] = useState("");
-  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
-  // Same pattern as SpotBuilder: the chart's range, editable before saving.
-  const [editedRange, setEditedRange] = useState<HandRange>({});
+  // Same pattern as SpotBuilder: fetch, the editable copy of the chart's
+  // range, and save come from lib/useReferenceChart.ts. A parse failure is
+  // this page's own state, shown in place of the chart's.
+  const chart = useReferenceChart();
+  const { saveState, editedRange, setEditedRange } = chart;
+  const [unrecognized, setUnrecognized] = useState(false);
+  const outcome: Outcome = unrecognized ? { kind: "unrecognized" } : chart.outcome;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setSaveState({ kind: "idle" });
-
     const parsed = parseSpotText(text);
     if (parsed.kind === "unrecognized") {
-      setOutcome({ kind: "unrecognized" });
+      chart.clear();
+      setUnrecognized(true);
       return;
     }
-
-    setOutcome({ kind: "loading" });
-    const result = await fetchReferenceStrategy(parsed.spot);
-    switch (result.kind) {
-      case "match":
-        setOutcome({ kind: "match", data: result.data, spot: parsed.spot });
-        setEditedRange(result.data.ranges[parsed.spot.positions_in_hand[0]] ?? {});
-        return;
-      case "no-match":
-        setOutcome({ kind: "no-match" });
-        return;
-      case "invalid":
-        setOutcome({ kind: "invalid", issues: result.issues });
-        return;
-      case "network-error":
-        setOutcome({ kind: "network-error" });
-        return;
-      case "error":
-        setOutcome({ kind: "error", status: result.status });
-        return;
-    }
-  }
-
-  async function handleSave(spot: Spot) {
-    if (auth.status !== "signed-in") {
-      setSaveState({ kind: "not-signed-in" });
-      return;
-    }
-    setSaveState({ kind: "saving" });
-    const toSave: Spot = { ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } };
-    const result = await saveSpot(toSave);
-    setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
+    setUnrecognized(false);
+    await chart.load(parsed.spot);
   }
 
   return (
@@ -208,7 +157,7 @@ export function TypeInPage() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => handleSave(outcome.spot)}
+              onClick={chart.save}
               disabled={saveState.kind === "saving"}
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}

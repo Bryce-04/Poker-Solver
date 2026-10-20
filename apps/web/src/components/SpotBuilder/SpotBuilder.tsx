@@ -1,15 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import type { HandRange, Position, Spot } from "@poker-solver/schema";
+import type { Position, Spot } from "@poker-solver/schema";
 import { OPENABLE_POSITIONS, SIX_MAX_POSITIONS } from "../../lib/positions";
-import {
-  fetchReferenceStrategy,
-  saveSpot,
-  type ReferenceStrategyResponse,
-  type SpotValidationIssue,
-} from "../../lib/api";
 import { buildOpenSpot, buildVsRaiseSpot } from "../../lib/spot";
-import { useAuth } from "../../lib/auth";
+import { useReferenceChart } from "../../lib/useReferenceChart";
 import { RangeGrid } from "../RangeGrid/RangeGrid";
 import "./SpotBuilder.css";
 
@@ -40,39 +34,15 @@ import "./SpotBuilder.css";
 
 type Situation = "unopened" | "vs-raise";
 
-// UI state machine: the api result tags plus idle/loading. `match` carries
-// the exact Spot that produced it (not just the current form state) so
-// "Save this spot" saves what was actually matched, even if the form's
-// been tweaked since.
-type Outcome =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "match"; data: ReferenceStrategyResponse; spot: Spot }
-  | { kind: "no-match" }
-  | { kind: "invalid"; issues: SpotValidationIssue[] }
-  | { kind: "network-error" }
-  | { kind: "error"; status: number };
-
-type SaveState =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "saved" }
-  | { kind: "error" }
-  | { kind: "not-signed-in" };
-
 export function SpotBuilder() {
-  const auth = useAuth();
   // "BTN" + "unopened" is a supported spot, so a first submit is a 200.
   const [position, setPosition] = useState<Position>("BTN");
   const [effectiveStackBb, setEffectiveStackBb] = useState(100);
   const [situation, setSituation] = useState<Situation>("unopened");
   const [raiser, setRaiser] = useState<Position>("CO");
-  const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
-  // The chart's range, editable before saving. Re-seeded from the chart
-  // every time a fresh match comes in (handleSubmit); RangeGrid owns no
-  // range state itself (see components/RangeGrid), so this is that state.
-  const [editedRange, setEditedRange] = useState<HandRange>({});
+  // Fetch, the editable copy of the chart's range, and save -- shared with
+  // the other chart entry paths (lib/useReferenceChart.ts).
+  const { outcome, saveState, editedRange, setEditedRange, load, save } = useReferenceChart();
 
   // BB is never first to act, so it's not a valid hero seat in an unopened
   // pot. The seat list narrows with the situation, and switching to
@@ -101,42 +71,7 @@ export function SpotBuilder() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!stackIsValid) return;
-    setOutcome({ kind: "loading" });
-    setSaveState({ kind: "idle" });
-
-    const spot = buildSpot();
-    const result = await fetchReferenceStrategy(spot);
-    switch (result.kind) {
-      case "match":
-        setOutcome({ kind: "match", data: result.data, spot });
-        setEditedRange(result.data.ranges[position] ?? {});
-        return;
-      case "no-match":
-        setOutcome({ kind: "no-match" });
-        return;
-      case "invalid":
-        setOutcome({ kind: "invalid", issues: result.issues });
-        return;
-      case "network-error":
-        setOutcome({ kind: "network-error" });
-        return;
-      case "error":
-        setOutcome({ kind: "error", status: result.status });
-        return;
-    }
-  }
-
-  async function handleSave(spot: Spot) {
-    if (auth.status !== "signed-in") {
-      setSaveState({ kind: "not-signed-in" });
-      return;
-    }
-    setSaveState({ kind: "saving" });
-    // Save whatever the range grid currently shows, not the untouched
-    // chart -- the whole point of making it editable here.
-    const toSave: Spot = { ...spot, ranges: { [spot.positions_in_hand[0]]: editedRange } };
-    const result = await saveSpot(toSave);
-    setSaveState(result.kind === "saved" ? { kind: "saved" } : { kind: "error" });
+    await load(buildSpot());
   }
 
   return (
@@ -311,7 +246,7 @@ export function SpotBuilder() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => handleSave(outcome.spot)}
+              onClick={save}
               disabled={saveState.kind === "saving"}
             >
               {saveState.kind === "saving" ? "Saving…" : "Save this spot"}

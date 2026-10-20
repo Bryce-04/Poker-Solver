@@ -12,6 +12,8 @@ export interface SegmentedControlProps<T extends string> {
   options: readonly SegmentedOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Fill the row, options sharing the width equally (a seat picker). */
+  stretch?: boolean;
 }
 
 /**
@@ -28,9 +30,10 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  stretch = false,
 }: SegmentedControlProps<T>) {
   return (
-    <div className="seg" role="group" aria-label={label}>
+    <div className={stretch ? "seg seg--stretch" : "seg"} role="group" aria-label={label}>
       {options.map((option) => (
         <button
           key={option.value}

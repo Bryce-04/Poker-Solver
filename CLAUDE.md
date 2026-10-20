@@ -210,9 +210,29 @@ Which layout renders is `lib/useIsDesktop.ts`, not CSS. jsdom has no
 `matchMedia`, so tests see the phone shell unless they stub it
 (`App.test.tsx`'s "at desktop width"). `<main>` sits at the same tree
 position in both layouts, so crossing the breakpoint doesn't remount the
-page. Pages still render in their phone-width column on desktop
-(`.app-shell__main--narrow`) until their own phase. Next: Phase 3 (the
-merged Ranges page).
+page. Pages without their own desktop layout yet (Solve, Library) still
+render in their phone-width column (`.app-shell__main--narrow`); pages
+marked `workspace` in `PAGE_HEADERS` fill the content area edge to edge.
+**Phase 3 (Ranges) is done, desktop only**: `pages/RangesWorkspace.tsx` is
+the merged rail-and-chart page (Pick / Type it / Hand history in the rail,
+the chart, stats and save card on the right). There's no "get chart"
+button: Pick and Type it fetch on every change (250ms debounce), and
+"Read hand" loads a pasted hand. **Phones deliberately keep the old Builder
+/ Type in / Import pages** under the mode switch, unchanged. This departs
+from the spec's "delete them", because of the no-visual-change-under-1024px
+rule; see `docs/decisions.md`. `pages/RangesPage.tsx` picks the layout. All
+of them share `lib/useReferenceChart.ts`: fetch (only the latest request's
+response is applied), the editable copy of the chart's range, `edited`, and
+save. "Solve a flop from here" navigates to `/solve` with route state that
+`App.tsx`'s `SolveRoute` turns into `SolvePage`'s optional `prefill` prop
+(`lib/solvePrefill.ts`: both seats, one range, the stack). `RangeGrid` has
+two optional props: `reset` (a toolbar button) and `showSummary`. On
+desktop it gets the mockup's toolbar ("Paint with" pill, ghost Suits /
+Reset / Clear), bigger cells, and weight drawn as a bottom-up fill. That
+applies to Solve's grids on desktop too; phones are unchanged.
+Not done in Phase 3: the save card's "Save as" name field. It needs Phase
+5's `Spot.name`, and showing it before then would silently drop the name.
+Next: Phase 4 (Solve).
 
 ## Commands
 

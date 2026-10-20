@@ -4,6 +4,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { AuthProvider } from "./lib/auth";
 import { NAV_ITEMS, PAGE_HEADERS } from "./lib/navigation";
+import { readSolvePrefill } from "./lib/solvePrefill";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { SavedSpotsPage } from "./pages/SavedSpotsPage";
 import { RangesPage } from "./pages/RangesPage";
@@ -56,6 +57,12 @@ function PageHeader() {
   );
 }
 
+/** /solve, optionally seeded from another screen's "solve from here"
+ * (route state; see lib/solvePrefill.ts). */
+function SolveRoute() {
+  return <SolvePage prefill={readSolvePrefill(useLocation().state)} />;
+}
+
 /**
  * The router shell. BrowserRouter lives in App (not main.tsx) so
  * App.test.tsx's `render(<App />)` keeps working with no extra wrapper.
@@ -71,18 +78,24 @@ function PageHeader() {
  */
 function Shell() {
   const isDesktop = useIsDesktop();
+  const workspace = PAGE_HEADERS[useLocation().pathname]?.workspace === true;
+  const mainClass = !isDesktop
+    ? undefined
+    : workspace
+      ? "app-shell__main app-shell__main--workspace"
+      : "app-shell__main app-shell__main--narrow";
   return (
     <div className={isDesktop ? "app-shell" : "app"}>
       {isDesktop ? <Sidebar /> : <MobileHeader />}
       <div className={isDesktop ? "app-shell__content" : undefined}>
         {isDesktop && <PageHeader />}
-        {/* Interim: the pages are still their phone-width single column
-            until each one's own phase (3-5) lays it out for desktop. */}
-        <main className={isDesktop ? "app-shell__main app-shell__main--narrow" : undefined}>
+        {/* Pages not yet laid out for desktop (Solve, Library) still sit in
+            their phone-width column until their own phase. */}
+        <main className={mainClass}>
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/solve" replace />} />
-              <Route path="/solve" element={<SolvePage />} />
+              <Route path="/solve" element={<SolveRoute />} />
               <Route path="/ranges" element={<RangesPage />} />
               <Route path="/library" element={<SavedSpotsPage />} />
               <Route path="/saved" element={<Navigate to="/library" replace />} />

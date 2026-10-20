@@ -73,3 +73,14 @@
     background: var(--surface-3);
   }
 }
+
+.seg--stretch {
+  display: flex;
+  align-self: stretch;
+}
+
+.seg--stretch .seg-item {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 4px;
+}
