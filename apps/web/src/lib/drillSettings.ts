@@ -22,3 +22,22 @@ export function writeBetDisplay(mode: BetDisplay): void {
     // A remembered setting is a nicety; private mode shouldn't break the game.
   }
 }
+
+// Haptics are opt-in: off until the player turns them on.
+const HAPTICS_KEY = "drill.haptics";
+
+export function readHaptics(): boolean {
+  try {
+    return localStorage.getItem(HAPTICS_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+export function writeHaptics(on: boolean): void {
+  try {
+    localStorage.setItem(HAPTICS_KEY, on ? "on" : "off");
+  } catch {
+    // A remembered setting is a nicety; private mode shouldn't break the game.
+  }
+}

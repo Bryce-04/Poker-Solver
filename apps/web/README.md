@@ -91,7 +91,7 @@ src/
                               solver's bet sizing), labels, shuffle
     drillSettings.ts           the drill's remembered bet-size display (bb or %)
     drillTheme.ts              the drill's table-color choices + remembered pick
-    haptics.ts                 vibration on the drill's verdict (no-op on iOS Safari)
+    haptics.ts                 opt-in haptics on the drill's verdict (native taps / Vibration API)
     positions.ts               POSITIONS (+ SIX_MAX_POSITIONS / OPENABLE_POSITIONS)
                               — runtime spellings of the schema's
                               compile-time-only string unions
@@ -408,7 +408,7 @@ depend on the theme. To add a theme, add a block there and an entry in
 `DRILL_THEMES` (the swatch colors are repeated in the TS entry). **On a phone:**
 `index.html` plus `public/manifest.webmanifest` and the apple-touch icons let you
 Add to Home Screen (it opens on `/drill`); to try it on a LAN device, `pnpm exec
-vite --host`. Haptics need a native build — iOS Safari has no Vibration API.
+vite --host`. Haptics are a settings toggle (off by default); on iPhone they only work in the native build (`@capacitor/haptics`), since iOS Safari has no Vibration API.
 
 ## RangeGrid
 
