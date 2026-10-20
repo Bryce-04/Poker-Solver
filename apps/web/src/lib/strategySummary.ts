@@ -21,6 +21,17 @@ export const ACTION_LABEL: Record<string, string> = {
   all_in: "All-in",
 };
 
+/** The color token for each action (StrategyGrid cells, frequency bars). */
+export const ACTION_COLOR_VAR: Record<string, string> = {
+  fold: "--strategy-fold",
+  check: "--strategy-passive",
+  call: "--strategy-passive",
+  bet_small: "--strategy-bet-small",
+  bet_medium: "--strategy-bet-mid",
+  bet_large: "--strategy-bet-big",
+  all_in: "--strategy-allin",
+};
+
 export type Strategy = Record<string, Record<string, number>>;
 
 /**

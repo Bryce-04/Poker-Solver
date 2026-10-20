@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthStatus } from "./components/AuthStatus/AuthStatus";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
+import { PageHeader } from "./components/PageHeader/PageHeader";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { AuthProvider } from "./lib/auth";
 import { NAV_ITEMS, PAGE_HEADERS } from "./lib/navigation";
@@ -42,19 +43,12 @@ function MobileHeader() {
   );
 }
 
-/** Desktop: the bar at the top of the content area -- page title and a
- * one-line description (docs/desktop-redesign.md §4). */
-function PageHeader() {
+/** Desktop: the bar at the top of the content area (docs/desktop-redesign.md
+ * §4), unless the page renders its own to hold page actions. */
+function ShellPageHeader() {
   const header = PAGE_HEADERS[useLocation().pathname];
-  if (!header) return null;
-  return (
-    <header className="page-header">
-      <div>
-        <h1 className="page-header__title">{header.title}</h1>
-        <p className="page-header__description">{header.description}</p>
-      </div>
-    </header>
-  );
+  if (!header || header.ownHeader) return null;
+  return <PageHeader title={header.title} description={header.description} />;
 }
 
 /** /solve, optionally seeded from another screen's "solve from here"
@@ -88,9 +82,9 @@ function Shell() {
     <div className={isDesktop ? "app-shell" : "app"}>
       {isDesktop ? <Sidebar /> : <MobileHeader />}
       <div className={isDesktop ? "app-shell__content" : undefined}>
-        {isDesktop && <PageHeader />}
-        {/* Pages not yet laid out for desktop (Solve, Library) still sit in
-            their phone-width column until their own phase. */}
+        {isDesktop && <ShellPageHeader />}
+        {/* Pages not yet laid out for desktop (Library) still sit in their
+            phone-width column until their own phase. */}
         <main className={mainClass}>
           <ErrorBoundary>
             <Routes>

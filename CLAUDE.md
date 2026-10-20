@@ -232,7 +232,34 @@ Reset / Clear), bigger cells, and weight drawn as a bottom-up fill. That
 applies to Solve's grids on desktop too; phones are unchanged.
 Not done in Phase 3: the save card's "Save as" name field. It needs Phase
 5's `Spot.name`, and showing it before then would silently drop the name.
-Next: Phase 4 (Solve).
+**Phase 4 (Solve) is done, desktop only**: all of Solve's state, derived
+values and actions live in `pages/solve/useSolveSetup.ts`, called once in
+`SolvePage`. The phone layout (`SolvePhone` in `SolvePage.tsx`) has the
+original markup byte for byte, and phones are pixel-identical. At >= 1024px
+`SolveWorkspace.tsx` renders from the same hook, so crossing the breakpoint
+keeps the setup. Setup view:
+- `ActionTimeline` (a restyle of StreetActions over `lib/handBuilder`)
+- `BoardSlots` (five slots, `CardPicker` in a popover, "Or type it")
+- a "Ready to solve" checklist
+- a canvas with Ranges / Strategy tabs: one big `RangeGrid` with player
+  tabs, and "Both players" cards using `components/MiniRange`
+
+Ranges auto-load once preflop closes (`useSolveSetup`'s `autoLoadRanges`:
+the preflop line, else typical ranges). Result view: a spot summary, an
+accuracy card (`exploitability_pct` / `converged`, time measured
+client-side), and Keep exploring (`solveText.ts`'s `exploreOptions`, only
+legal moves; it appends an action and calls `solve(nextStreets)`, or opens
+the next card's slot). Then `StrategyResult.tsx`: headline sentence,
+stacked frequency bar, enlarged `StrategyGrid` (now with optional
+controlled `selected` / `onSelect`, `showDetail`, `showLegend`), and a
+selected-hand panel with advice rules and the suit view. Page header
+actions are "Start over" and "Save spot". Save stores the setup, not the
+result; see `docs/decisions.md` for how a saved hand is encoded.
+`components/PageHeader` is shared, and a page sets `ownHeader` in
+`PAGE_HEADERS` to render it with its own actions. Wording helpers (preflop
+line, roles, accuracy tiers, advice) are pure functions in
+`pages/solve/solveText.ts`, tested on their own. Not in Phase 4: hand
+category labels and "Why?" (Phase 6). Next: Phase 5 (Library + API).
 
 ## Commands
 

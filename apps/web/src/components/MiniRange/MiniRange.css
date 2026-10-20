@@ -1,0 +1,17 @@
+.mini-range {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  gap: 1px;
+  width: 100%;
+}
+
+.mini-range__cell {
+  --w: 0;
+  aspect-ratio: 1;
+  border-radius: 1px;
+  background: linear-gradient(
+    to top,
+    var(--range-in) calc(var(--w) * 100%),
+    var(--range-empty) calc(var(--w) * 100%)
+  );
+}

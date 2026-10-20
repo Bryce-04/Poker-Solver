@@ -6,6 +6,40 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-20 — Desktop Solve: one state hook, two layouts; how "Save spot" stores a hand
+
+**Status:** proposed.
+
+**Context.** Phase 4 of `docs/desktop-redesign.md` redesigns Solve for
+desktop. Phones must not change, and `SolvePage` was ~1,100 lines of state
+and markup together.
+
+**Decision.** Everything above the old `return` moved, unchanged, into
+`pages/solve/useSolveSetup.ts`. `SolvePage` calls it once and renders
+either the original phone markup (byte-identical, checked by diff and by
+screenshot) or `SolveWorkspace` at >= 1024px. Both layouts read one state,
+so resizing across the breakpoint keeps a half-built hand. Desktop-only
+additions to the hook are things the phone page never reads: `solve()`
+callable without a form event (returns whether it solved), `lastSolved`,
+solve timing, `loadedRanges` (each seat's last loaded range and where it
+came from), `preflopClosed`, `decisionPosition`, `autoLoadRanges`,
+`setupAsSpot`.
+
+**How a saved Solve setup is encoded** (`setupAsSpot`, for Phase 5's
+"open in Solve"). The setup is saved, not the result. Clicked-through
+hands store every street's actions in order (each `BettingAction` carries
+its `street` and `size_bb`), `effective_stack_bb` as the **starting**
+stack, `pot_bb` as the pot entering `current_street`, the board, and both
+ranges. Replaying the actions from the starting stack rebuilds the hand.
+A setup read from a hand history has no earlier-street log, so it stores
+only the current street's actions (at most OOP's check) and
+`effective_stack_bb` as the stack at the decision. Phase 5 tells the two
+apart by whether there are preflop actions. This differs from
+`/spots/solve`'s request, where `effective_stack_bb` is the stack entering
+the street, but a saved setup isn't a solve request.
+
+---
+
 ## 2026-10-20 — Four destinations: Solve, Ranges, Library, Drill
 
 **Status:** proposed (the spec's §3 asks the team to confirm the mobile half).
