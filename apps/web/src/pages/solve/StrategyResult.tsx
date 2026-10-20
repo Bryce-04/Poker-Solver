@@ -82,6 +82,8 @@ export function StrategyResult({
           player={player}
           opponent={opponent}
           comboStrategy={data.combo_strategy ?? {}}
+          category={selected ? data.hand_categories?.[selected] : undefined}
+          reasons={selected ? data.hand_reasons?.[selected] : undefined}
           deadCards={deadCards}
           comboWeight={selected ? comboWeights(index, selected) : undefined}
         />
@@ -120,6 +122,8 @@ function HandPanel({
   comboStrategy,
   deadCards,
   comboWeight,
+  category,
+  reasons,
 }: {
   hand: string | null;
   mix: Record<string, number> | undefined;
@@ -129,6 +133,10 @@ function HandPanel({
   comboStrategy: Record<string, Record<string, number>>;
   deadCards: readonly string[];
   comboWeight: Record<string, number> | undefined;
+  /** "Top pair, strong kicker" -- flop solves only; omitted when absent. */
+  category?: string;
+  /** The Drill's rule-of-thumb bullets for this hand, flop solves only. */
+  reasons?: string[];
 }) {
   if (!hand) {
     return (
@@ -145,6 +153,7 @@ function HandPanel({
     <aside className="hand-panel" aria-label="Selected hand">
       <div>
         <p className="hand-panel__hand">{hand}</p>
+        {inRange && category && <p className="hand-panel__category">{category}</p>}
         {inRange && (
           <p className="hand-panel__combos tabular-nums">
             {Math.round(combos * 10) / 10} combos in {player}&rsquo;s range
@@ -170,6 +179,20 @@ function HandPanel({
             ))}
           </div>
           <p className="hand-panel__advice">{handAdvice(mix, opponent)}</p>
+          {reasons && reasons.length > 0 && (
+            <details className="hand-panel__why">
+              <summary>Why?</summary>
+              <ul>
+                {reasons.map((reason, i) => (
+                  <li key={i}>{reason}</li>
+                ))}
+              </ul>
+              <p className="hand-panel__why-note">
+                The percentages come from the solve. This explanation is a standard rule of thumb for
+                this kind of hand.
+              </p>
+            </details>
+          )}
           <SuitStrategy
             hand={hand}
             handMix={mix}

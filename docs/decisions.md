@@ -6,6 +6,37 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-20 — Hand categories and "Why?" on live solves
+
+**Status:** proposed.
+
+**Context.** `docs/desktop-redesign.md` §7.4: the Solve result's
+hand panel should say what a hand is ("Top pair, strong kicker") and
+offer a "Why?". `drill_analysis.py` already classifies hands and writes
+rule-of-thumb reasons, but only offline, for the Drill deck.
+
+**Decision.** `POST /spots/solve` returns `hand_categories` and
+`hand_reasons`, built by `app/hand_notes.py` from the same classifier and
+`explain()`, so there's one source of truth. The equity inputs come from
+the trainer's own matrix (`RangeCfrTrainer.combo_equities`), so nothing is
+recomputed: about 16ms on wide flop ranges. Both fields are optional for
+clients and normalized to `{}` in `solveSpot`, because Render deploys
+separately from the web build.
+
+**Limits.**
+- Flop only, because `describe_hand` handles exactly three board cards.
+  Extending it to the turn and river is the natural follow-up, and it
+  needs its own tests so the Drill's wording doesn't drift.
+- Facing a raise or a jam, the categories still come back, but "Why?" is
+  left out: the price bullets need the bet size, which the bet menu alone
+  doesn't give there.
+- A 169-type label's category is what most of its live combos are, since
+  suits can differ (one AKs combo may be a flush draw).
+- The same honesty note as the Drill: the numbers are computed, the
+  sentence is a rule of thumb, and the UI says so.
+
+---
+
 ## 2026-10-20 — Library: spot names, rename and delete
 
 **Status:** proposed.

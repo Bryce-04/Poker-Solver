@@ -256,6 +256,11 @@ export interface LiveSolveResponse {
   // apps/api/app/solve.py's _replay_street_actions. Empty when nothing
   // needed bucketing (e.g. the seeded action was only a check).
   bucketed_actions: string[];
+  // Flop solves only (apps/api/app/hand_notes.py), else {}: each hand type's
+  // category ("Top pair, strong kicker") and the rule-of-thumb "why" bullets
+  // the Drill uses. Normalized to {} for an older backend -- see solveSpot.
+  hand_categories?: Record<string, string>;
+  hand_reasons?: Record<string, string[]>;
 }
 
 // /spots/solve's 422s aren't one shape: a schema-invalid Spot (missing
@@ -345,6 +350,8 @@ export async function solveSpot(spot: Spot): Promise<SolveSpotResult> {
       ...data,
       bucketed_actions: data.bucketed_actions ?? [],
       combo_strategy: data.combo_strategy ?? {},
+      hand_categories: data.hand_categories ?? {},
+      hand_reasons: data.hand_reasons ?? {},
     },
   };
 }

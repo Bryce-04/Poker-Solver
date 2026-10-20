@@ -1,6 +1,9 @@
 # Desktop redesign — spec
 
-Status: agreed with the team on 2026-10-20, not started.
+Status: agreed with the team on 2026-10-20. All six phases implemented on the
+`desktop-phase-1` branch the same day. Where the build departs from this spec
+(phones keep the old Ranges/Solve/Saved screens, no `name` column, flop-only
+hand categories), the reason is in `docs/decisions.md`.
 Scope: the desktop web UI for every screen **except the Drill**, plus the API,
 schema and frontend-logic changes the new screens need.
 Audience: anyone (or any Claude Code session) implementing it. Read this whole

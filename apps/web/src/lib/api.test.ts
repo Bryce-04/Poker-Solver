@@ -234,8 +234,16 @@ describe('solveSpot', () => {
     mockResponse(200, solveBody)
     await expect(solveSpot(spot)).resolves.toEqual({
       kind: 'solved',
-      data: { ...solveBody, bucketed_actions: [], combo_strategy: {} },
+      data: { ...solveBody, bucketed_actions: [], combo_strategy: {}, hand_categories: {}, hand_reasons: {} },
     })
+  })
+
+  it('passes hand categories and reasons through, and defaults them to {} for an older backend', async () => {
+    const notes = { hand_categories: { AQo: 'Top pair, strong kicker' }, hand_reasons: { AQo: ['You have top pair.'] } }
+    mockResponse(200, { ...solveBody, ...notes })
+    const result = await solveSpot(spot)
+    expect(result.kind === 'solved' && result.data.hand_categories).toEqual(notes.hand_categories)
+    expect(result.kind === 'solved' && result.data.hand_reasons).toEqual(notes.hand_reasons)
   })
 
   it('normalizes a missing bucketed_actions to an empty array -- a deployed backend older than the web build is a real, recurring state (Render and the web app deploy separately), not a hypothetical', async () => {

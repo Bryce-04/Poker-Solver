@@ -35,6 +35,8 @@ from poker_solver.range_cfr import RangeCfrTrainer, RangeSpotConfig
 
 from poker_solver_schema import ActionType, BettingAction, Spot
 
+from .hand_notes import hand_notes
+
 _EPS = 1e-9
 
 logger = logging.getLogger(__name__)
@@ -266,6 +268,19 @@ def solve_spot(
         spot.board,
     )
 
+    strategy = trainer.label_strategies()
+    hero = spot.positions_in_hand[deciding_player]
+    villain = spot.positions_in_hand[1 - deciding_player]
+    try:
+        # .value: the bullets are prose, and str() of a Position is "Position.BTN".
+        categories, reasons = hand_notes(
+            trainer, config.board, config.pot_bb, deciding_player, hero.value, villain.value, strategy,
+            config.prior_history,
+        )
+    except Exception:  # noqa: BLE001 -- extras; never fail a finished solve over them
+        logger.exception("hand notes failed; returning the solve without them")
+        categories, reasons = {}, {}
+
     return {
         "source": "live_solve",
         "iterations": trainer.iterations,
@@ -274,13 +289,18 @@ def solve_spot(
         # before the precision target -- the UI says so rather than
         # presenting a rougher answer as a fully converged one.
         "converged": exploitability_pct < target_exploitability_pct,
-        "position": spot.positions_in_hand[deciding_player],
-        "strategy": trainer.label_strategies(),
+        "position": hero,
+        "strategy": strategy,
         # Per-suit strategies for hand types whose combos play differently
         # (flush draws, blockers); every other hand type is in "strategy"
         # alone. Keyed by specific combo ('AhKh').
         "combo_strategy": trainer.combo_strategies(),
         "bucketed_actions": bucket_notes,
+        # Flop only (see hand_notes.py), else empty: each hand type's
+        # category ("Top pair, strong kicker") and the Drill's rule-of-thumb
+        # "why" bullets. Optional for clients -- an older backend omits them.
+        "hand_categories": categories,
+        "hand_reasons": reasons,
     }
 
 

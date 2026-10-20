@@ -311,3 +311,45 @@ describe("SolveWorkspace -- opened from the Library", () => {
     expect(mockSave.mock.calls[0][0].name).toBe("BB vs BTN on Q♠ 5♣ 2♣");
   });
 });
+
+describe("SolveWorkspace -- hand categories and Why?", () => {
+  it("shows a hand's category and the rule-of-thumb reasons when the server sends them", async () => {
+    mockSolve.mockResolvedValue({
+      ...SOLVED,
+      data: {
+        ...SOLVED.data,
+        hand_categories: { AA: "Overpair", KK: "Overpair" },
+        hand_reasons: { AA: ["You have an overpair.", "Betting is the main play for value."] },
+      },
+    });
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await setUpTheMockupSpot(user);
+    await screen.findAllByText("From the preflop action: BTN opens, BB calls");
+    await user.click(screen.getByRole("button", { name: "Solve BB's flop decision" }));
+    await screen.findByText("Very accurate");
+
+    await user.click(screen.getByRole("gridcell", { name: /^AA:/ }));
+    const panel = screen.getByRole("complementary", { name: "Selected hand" });
+    expect(within(panel).getByText("Overpair")).toBeInTheDocument();
+    expect(within(panel).getByText("Why?")).toBeInTheDocument();
+    expect(within(panel).getByText("Betting is the main play for value.")).toBeInTheDocument();
+    expect(panel).toHaveTextContent(/rule of thumb/);
+
+    // KK has a category but no reasons: no Why? section.
+    await user.click(screen.getByRole("gridcell", { name: /^KK:/ }));
+    expect(within(panel).getByText("Overpair")).toBeInTheDocument();
+    expect(within(panel).queryByText("Why?")).not.toBeInTheDocument();
+  });
+
+  it("leaves both out for a backend that doesn't send them", async () => {
+    const user = userEvent.setup();
+    render(<SolvePage />);
+    await setUpTheMockupSpot(user);
+    await screen.findAllByText("From the preflop action: BTN opens, BB calls");
+    await user.click(screen.getByRole("button", { name: "Solve BB's flop decision" }));
+    await screen.findByText("Very accurate");
+    await user.click(screen.getByRole("gridcell", { name: /^AA:/ }));
+    expect(within(screen.getByRole("complementary", { name: "Selected hand" })).queryByText("Why?")).not.toBeInTheDocument();
+  });
+});

@@ -176,7 +176,7 @@ slow, a host with a full CPU (e.g. Cloud Run) would be ~10x faster — see
 has been run against the local docker-compose Postgres (2026-10-20, 129
 passed, including the solve route), so that's no longer an open gap.
 
-**Desktop redesign (in progress, 2026-10-20)**: `docs/desktop-redesign.md`
+**Desktop redesign (all six phases done, 2026-10-20)**: `docs/desktop-redesign.md`
 is the agreed spec (six phases; built as one commit per phase on the
 `desktop-phase-1` branch, one PR at the end), with the design as clickable
 HTML in `docs/desktop-redesign/mockup/` (screenshots alongside). Read it
@@ -284,7 +284,25 @@ category labels and "Why?" (Phase 6).
 - Ranges' save card now has the "Save as" name field. Solve names a save
   "{OOP} vs {IP} on {board}", or keeps an opened spot's name.
 
-Next: Phase 6 (hand categories and "Why?").
+**Phase 6 (hand categories and "Why?") is done**:
+- `POST /spots/solve` also returns `hand_categories` (169-type label to
+  "Top pair, strong kicker") and `hand_reasons` (label to the Drill's
+  rule-of-thumb bullets). They come from `apps/api/app/hand_notes.py`,
+  which reuses `drill_analysis.py`'s classifier and `explain()`, so web
+  and Drill share one source.
+- The equity numbers come from `RangeCfrTrainer.combo_equities` (new),
+  which reads the trainer's own payoff matrix, so nothing is recomputed.
+  The notes take about 16ms on wide flop ranges.
+- **Flop only**: `describe_hand` classifies against three board cards, so
+  turn and river solves return `{}` and the panel leaves the category and
+  the "Why?" out. Spots facing a raise or a jam get categories but no
+  "Why?", since the price isn't known from the bet menu.
+- A label's category is what most of its live combos are. The notes never
+  fail a finished solve (an exception is logged and they're dropped).
+- `solveSpot` normalizes both fields to `{}` for an older backend. The hand
+  panel shows the category under the hand and a collapsed "Why?" with the
+  honesty note ("the percentages come from the solve; the explanation is a
+  rule of thumb").
 
 ## Commands
 

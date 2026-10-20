@@ -290,6 +290,20 @@ class RangeCfrTrainer:
             raise KeyError(f"no node trained at history {history!r} -- train() first, or unreachable")
         return node.actions, node.average_strategy()
 
+    def combo_equities(self, player: int) -> tuple[np.ndarray, float]:
+        """Each of `player`'s combos' showdown equity against the opponent's
+        whole weighted range (every runout counted, card-sharing pairs
+        excluded), plus the range's overall equity -- read off the same
+        matrix training uses, so nothing is recomputed. NaN for a combo that
+        can't be dealt against any of the opponent's range."""
+        n = len(self.combos[player])
+        shares = self._payoff[player].astype(np.float64) @ self.weights[1 - player]
+        wins, totals = shares[:n], shares[n:]
+        equities = np.divide(wins, totals, out=np.full(n, np.nan), where=totals > 0)
+        mine = self.weights[player]
+        overall = float(mine @ wins) / float(mine @ totals)
+        return equities, overall
+
     def label_strategies(self, history: tuple[str, ...] | None = None) -> dict[str, dict[str, float]]:
         """Combo-level average strategies rolled up to 169-type labels,
         averaged uniformly over each label's unblocked combos -- same
