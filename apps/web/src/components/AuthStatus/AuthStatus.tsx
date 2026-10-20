@@ -19,9 +19,15 @@ type SubmitState =
  *
  * One form serves both sign-in and sign-up (toggled), rather than two
  * screens, per the "don't overbuild this" scope.
+ *
+ * `variant="sidebar"` is the desktop shell's account row
+ * (docs/desktop-redesign.md §4): an initial avatar, the email truncated, and
+ * a ghost "Sign out"; signed out, a "Sign in" button that opens the same
+ * form, stacked.
  */
-export function AuthStatus() {
+export function AuthStatus({ variant = "header" }: { variant?: "header" | "sidebar" }) {
   const auth = useAuth();
+  const [formOpen, setFormOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,6 +56,23 @@ export function AuthStatus() {
   // still in flight.
   if (auth.status === "loading") return null;
 
+  if (auth.status === "signed-in" && variant === "sidebar") {
+    const accountEmail = auth.email ?? "unknown";
+    return (
+      <div className="sidebar-account">
+        <span className="sidebar-account__avatar" aria-hidden="true">
+          {accountEmail.charAt(0).toUpperCase()}
+        </span>
+        <span className="sidebar-account__email" title={accountEmail}>
+          {accountEmail}
+        </span>
+        <button type="button" className="sidebar-account__signout btn-ghost" onClick={handleSignOut}>
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
   if (auth.status === "signed-in") {
     return (
       <div className="auth-status">
@@ -61,8 +84,19 @@ export function AuthStatus() {
     );
   }
 
+  if (variant === "sidebar" && !formOpen) {
+    return (
+      <button type="button" className="sidebar-account__signin btn-primary" onClick={() => setFormOpen(true)}>
+        Sign in
+      </button>
+    );
+  }
+
   return (
-    <form className="auth-status auth-status--form" onSubmit={handleSubmit}>
+    <form
+      className={`auth-status auth-status--form${variant === "sidebar" ? " auth-status--stacked" : ""}`}
+      onSubmit={handleSubmit}
+    >
       <input
         type="email"
         value={email}

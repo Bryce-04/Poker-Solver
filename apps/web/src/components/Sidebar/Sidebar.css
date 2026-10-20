@@ -1,0 +1,118 @@
+/* Desktop only: the sidebar never renders under 1024px (App.tsx), and
+   these rules are gated too so the classes stay inert on phones. Values
+   from docs/desktop-redesign/mockup. */
+@media (min-width: 1024px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    /* The spec says 232px; the mockup grows it to ~260px at 1440 wide, and
+       the mockup wins on visual detail (desktop-redesign.md §0). */
+    flex: 0 0 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    height: 100svh;
+    overflow-y: auto;
+    padding: 20px 14px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--divider);
+    font-size: 14px;
+  }
+
+  .sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px;
+    color: var(--accent);
+  }
+
+  .sidebar__brand span {
+    color: var(--text-strong);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .sidebar__nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sidebar__link {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    color: var(--text);
+    text-decoration: none;
+    line-height: 1.5;
+  }
+
+  .sidebar__link[aria-current="page"] {
+    background: var(--accent-subtle);
+    color: var(--text-strong);
+  }
+
+  .sidebar__icon {
+    flex: none;
+    margin-top: 2px;
+  }
+
+  .sidebar__text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar__label {
+    font-weight: 600;
+  }
+
+  .sidebar__subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .sidebar__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: auto;
+  }
+
+  /* Accent-tinted surface, derived from tokens so it works in both themes
+     (the mockup's dark #1f1d2b / #34304a). */
+  .sidebar__guide {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px;
+    border-radius: 10px;
+    background: color-mix(in oklab, var(--accent) 7%, var(--surface));
+    border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--border));
+  }
+
+  .sidebar__guide-title {
+    color: var(--text-strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .sidebar__guide-body {
+    color: var(--text);
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .sidebar__link:hover {
+    background: var(--surface-hover);
+    color: var(--text-strong);
+  }
+
+  .sidebar__link[aria-current="page"]:hover {
+    background: var(--accent-subtle);
+  }
+}

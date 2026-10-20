@@ -16,8 +16,8 @@ first, not LLM-first." The 13×13 range grid (weighted-brush/drag-paint/
 keyboard selection with weight shading) is mounted editable everywhere a
 matched chart is shown (Builder, Type in, Import) — adjust before saving,
 not just view. The whole app has a design-token visual pass (light +
-dark, `index.css`) and is routed into four screens (Builder / Saved /
-Type in / Import). Saved spots is wired end-to-end: `apps/api` persists
+dark, `index.css`) and is routed into four destinations (Solve / Ranges /
+Library / Drill; see "Desktop redesign" below). Saved spots is wired end-to-end: `apps/api` persists
 Spots as JSONB (`app/db.py`'s `SpotRow`) behind `POST`/`GET /spots`,
 matching the contract `apps/web/src/lib/api.ts` was built against (see
 `docs/decisions.md`). Stage 6 auth works for saved spots. Frontend:
@@ -175,7 +175,8 @@ still hasn't been run against a real Postgres (no DB in the working
 session; route logic was exercised by calling `solve_spot` directly).
 
 **Desktop redesign (in progress, 2026-10-20)**: `docs/desktop-redesign.md`
-is the agreed spec (six phases, one PR each), with the design as clickable
+is the agreed spec (six phases; built as one commit per phase on the
+`desktop-phase-1` branch, one PR at the end), with the design as clickable
 HTML in `docs/desktop-redesign/mockup/` (screenshots alongside). Read it
 before touching desktop layout. Hard rule: **nothing changes visually
 below 1024px wide** (phones, Capacitor builds), and the Drill isn't
@@ -185,15 +186,33 @@ touched at all; the one agreed exception is the route merge in its §3.
 `--success-text`, `--warning`/`--warning-subtle`, `--card-face`/`--card-ink`/
 `--card-red`, light and dark), and `src/desktop.css` — every rule in it
 inside `@media (min-width: 1024px)`: `.btn-primary` / `.btn-secondary` /
-`.btn-ghost` / `.btn-danger`, the `.seg` segmented control
-(`components/SegmentedControl`, not used by any screen yet), `.section-label`,
-`.tabular-nums`. On desktop a bare `<button>` inside `.app` is no longer
-accent-filled; give every new button a role class (one `btn-primary` per
-screen at most). The classes are inert under 1024px, so a screen that needs
-`.seg` on mobile has to add mobile styling for it first. User-facing
-"Stage N MVP" copy is gone, and the uvicorn "is `apps/api` running?" hint
-only shows in dev builds (`import.meta.env.DEV`), everywhere. Next: Phase 2
-(sidebar shell + the four-route IA).
+`.btn-ghost` / `.btn-danger`, `.section-label`, `.tabular-nums`. On desktop
+a bare `<button>` inside the shell is no longer accent-filled; give every
+new button a role class (one `btn-primary` per screen at most). The role
+classes are inert under 1024px. `components/SegmentedControl` carries its
+own CSS for both widths (under 1024px it copies SolvePage's existing
+toggle; the mockup's pill above). User-facing "Stage N MVP" copy is gone,
+and the uvicorn "is `apps/api` running?" hint only shows in dev builds
+(`import.meta.env.DEV`), everywhere.
+**Phase 2 (shell + routes) is done**: four nav destinations from
+`lib/navigation.ts` — `/solve`, `/ranges`, `/library`, `/drill` — with the
+old routes redirecting (`/` → `/solve`, `/saved` → `/library`, `/type-in` →
+`/ranges?mode=type`, `/import` → `/ranges?mode=paste`). This applies on
+phones too, the agreed §3 exception: the phone nav shows four links.
+`pages/RangesPage.tsx` is **interim**: a Pick / Type it / Hand history
+switch (`?mode=`) over the unchanged Builder / Type in / Import pages,
+until Phase 3 merges them. At >= 1024px, `App.tsx`'s shell swaps the top
+header for `components/Sidebar` (nav with subtitles, a beginner's-guide
+card with no link yet since the spec leaves its target TBD, and
+`AuthStatus variant="sidebar"`: avatar + email + ghost Sign out, or a
+Sign in button that opens the form) and adds a page-header bar per route.
+Which layout renders is `lib/useIsDesktop.ts`, not CSS. jsdom has no
+`matchMedia`, so tests see the phone shell unless they stub it
+(`App.test.tsx`'s "at desktop width"). `<main>` sits at the same tree
+position in both layouts, so crossing the breakpoint doesn't remount the
+page. Pages still render in their phone-width column on desktop
+(`.app-shell__main--narrow`) until their own phase. Next: Phase 3 (the
+merged Ranges page).
 
 ## Commands
 
@@ -333,6 +352,7 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   generated TS types in `packages/schema/generated`. Routed via
   `react-router-dom`, with `BrowserRouter` nested inside `App.tsx` (not
   `main.tsx`) so `App.test.tsx`'s `render(<App />)` needs no extra wrapper.
+  Nav destinations and desktop page titles live in `lib/navigation.ts`.
   Screens live in `apps/web/src/pages/`; `apps/web/src/lib/api.ts` is the
   single fetch chokepoint (never throws — callers switch on a result's
   `kind` instead of try/catch), currently backing the reference-strategy

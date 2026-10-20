@@ -1,0 +1,75 @@
+/* Under 1024px: the same look as SolvePage's existing "Click through the
+   hand / From a hand history" toggle, so phones get nothing new-looking. */
+.seg {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.seg-item {
+  padding: 0.4rem 0.8rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.seg-item[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+  .seg-item:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+
+  .seg-item[aria-pressed="true"]:hover:not(:disabled) {
+    background: var(--accent-subtle);
+  }
+}
+
+/* Desktop: the mockup's inset pill (docs/desktop-redesign/mockup). */
+@media (min-width: 1024px) {
+  .seg {
+    gap: 2px;
+    padding: 3px;
+    background: var(--bg);
+    border-color: var(--border);
+    border-radius: 9px;
+    overflow: visible;
+  }
+
+  .seg-item {
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 1;
+  }
+
+  .seg-item[aria-pressed="true"] {
+    background: var(--surface-3);
+    font-weight: 550;
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) {
+  .seg-item:hover:not(:disabled) {
+    background: transparent;
+    color: var(--text-strong);
+  }
+
+  .seg-item[aria-pressed="true"]:hover:not(:disabled) {
+    background: var(--surface-3);
+  }
+}

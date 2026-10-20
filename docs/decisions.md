@@ -6,6 +6,31 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-20 — Four destinations: Solve, Ranges, Library, Drill
+
+**Status:** proposed (the spec's §3 asks the team to confirm the mobile half).
+
+**Context.** `docs/desktop-redesign.md` §1: Builder, Type in and Import were
+three tabs for one feature (get a preflop chart and edit it), and the nav
+had six entries.
+
+**Decision.** Four routes: `/solve`, `/ranges` (Builder, Type in and Import
+merged, `?mode=pick|type|paste`, no mode meaning pick), `/library` (was
+Saved), `/drill`. The old routes redirect (`/` → `/solve`, `/saved` →
+`/library`, `/type-in` → `/ranges?mode=type`, `/import` →
+`/ranges?mode=paste`), so links and bookmarks still work. This applies at
+every width, which is the redesign's one exception to "nothing changes under
+1024px": a route can't exist on desktop only without keeping two IAs. The
+phone nav shows four links, and Ranges gets a small mode switch on phones,
+styled like Solve's existing toggle. The default route is now Solve, not
+Builder. Rejected alternative: keep the old routes on phones and merge only
+on desktop, which means two sets of routes to maintain.
+
+**Interim.** Until Phase 3, `/ranges` renders the unchanged old pages under
+the switch.
+
+---
+
 ## 2026-10-19 — Swipe Drill, first slice (`/drill`)
 
 **Status:** proposed (built on the `swipe-drill` branch, not yet tried on a device).

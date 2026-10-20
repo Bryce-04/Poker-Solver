@@ -11,9 +11,9 @@
 @media (min-width: 1024px) {
   /* A bare button in the app shell is no longer accent-filled by default:
      buttons opt in to a role below, so each screen has at most one primary.
-     :where() keeps .app from adding specificity, and the Drill renders
-     outside .app (App.tsx), so its buttons are untouched. */
-  :where(.app) button:not([class]) {
+     :where() keeps the shell class from adding specificity, and the Drill
+     renders outside the shell (App.tsx), so its buttons are untouched. */
+  :where(.app, .app-shell) button:not([class]) {
     background: var(--surface-2);
     color: var(--text-strong);
     border-color: var(--border-strong);
@@ -66,35 +66,8 @@
     color: var(--danger);
   }
 
-  /* Segmented control (components/SegmentedControl): one look for every
-     small set of mutually exclusive choices. */
-  .seg {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-  }
-
-  button.seg-item {
-    min-height: 32px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 550;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  button.seg-item[aria-pressed='true'] {
-    background: var(--surface-3);
-    color: var(--text-strong);
-    box-shadow: var(--shadow-sm);
-  }
+  /* The segmented control's styles live with it, in
+     components/SegmentedControl/SegmentedControl.css. */
 
   /* Small uppercase label above a group of controls ("YOUR SEAT"). */
   .section-label {
@@ -112,7 +85,7 @@
 
 /* Hover only where a pointer can really hover, as index.css does. */
 @media (min-width: 1024px) and (hover: hover) {
-  :where(.app) button:not([class]):hover:not(:disabled) {
+  :where(.app, .app-shell) button:not([class]):hover:not(:disabled) {
     background: var(--surface-3);
   }
 
@@ -138,14 +111,5 @@
   a.btn-danger:hover {
     background: var(--danger-subtle);
     color: var(--danger);
-  }
-
-  button.seg-item:hover:not(:disabled) {
-    background: transparent;
-    color: var(--text-strong);
-  }
-
-  button.seg-item[aria-pressed='true']:hover:not(:disabled) {
-    background: var(--surface-3);
   }
 }

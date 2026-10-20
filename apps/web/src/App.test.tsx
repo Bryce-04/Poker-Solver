@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import App from './App'
 import { listSpots } from './lib/api'
 
@@ -25,14 +25,14 @@ vi.mock('./lib/auth', () => ({
   useAuth: () => ({ status: 'signed-out' as const, email: null }),
   getAccessToken: vi.fn().mockResolvedValue(null),
 }))
-
 // Shell-level smoke test only. Behavioural tests for SpotBuilder and
 // RangeGrid belong with those components (their owners) -- this just proves
-// the app mounts and wires the builder in without throwing.
+// the app mounts, routes, and redirects without throwing.
 describe('<App />', () => {
   beforeEach(() => {
     mockListSpots.mockReset()
     mockListSpots.mockResolvedValue({ kind: 'ok', spots: [] })
+    window.history.pushState({}, '', '/')
   })
 
   it('renders the shell heading', () => {
@@ -40,27 +40,90 @@ describe('<App />', () => {
     expect(screen.getByRole('heading', { name: /poker solver/i })).toBeInTheDocument()
   })
 
-  it('mounts the spot builder on the default route (position control is present)', () => {
+  it('sends the default route to Solve', () => {
     render(<App />)
-    expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(1)
+    expect(window.location.pathname).toBe('/solve')
+    expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
   })
 
-  it('navigates to the saved-spots, type-in, and import routes without throwing', async () => {
+  it('has exactly the four nav destinations', () => {
+    render(<App />)
+    const links = screen.getAllByRole('link').map((link) => link.textContent)
+    expect(links).toEqual(['Solve', 'Ranges', 'Library', 'Drill'])
+  })
+
+  it('navigates to Ranges (all three modes), Library and Solve without throwing', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    // Signed out (see the auth mock above), so Saved shows its sign-in
-    // notice rather than fetching -- GET /spots requires sign-in.
-    await user.click(screen.getByRole('link', { name: /saved/i }))
-    expect(await screen.findByText(/not signed in/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+    // Pick mode by default: the button builder's position control.
+    expect(screen.getByLabelText(/your position/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('link', { name: /type in/i }))
+    await user.click(screen.getByRole('button', { name: /^type it$/i }))
+    expect(window.location.search).toBe('?mode=type')
     expect(screen.getByText(/describe the spot/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('link', { name: /^import$/i }))
+    await user.click(screen.getByRole('button', { name: /^hand history$/i }))
+    expect(window.location.search).toBe('?mode=paste')
     expect(screen.getByLabelText(/paste a hand history/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^pick$/i }))
+    expect(window.location.search).toBe('')
+
+    // Signed out (see the auth mock above), so Library shows its sign-in
+    // notice rather than fetching -- GET /spots requires sign-in.
+    await user.click(screen.getByRole('link', { name: /^library$/i }))
+    expect(await screen.findByText(/not signed in/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: /^solve$/i }))
     expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['/saved', '/library', ''],
+    ['/type-in', '/ranges', '?mode=type'],
+    ['/import', '/ranges', '?mode=paste'],
+  ])('redirects the old %s route', (from, pathname, search) => {
+    window.history.pushState({}, '', from)
+    render(<App />)
+    expect(window.location.pathname).toBe(pathname)
+    expect(window.location.search).toBe(search)
+  })
+
+  describe('at desktop width', () => {
+    beforeEach(() => {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query === '(min-width: 1024px)',
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }))
+    })
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('swaps the top header for the sidebar and a page header', () => {
+      render(<App />)
+      const nav = screen.getByRole('navigation', { name: 'Main' })
+      expect(within(nav).getByRole('link', { name: /solve.*best play after the flop/i })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      expect(within(nav).getAllByRole('link')).toHaveLength(4)
+      expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
+      // The phone header (and its tagline) isn't rendered at all.
+      expect(screen.queryByText(/manual hand builder/i)).not.toBeInTheDocument()
+    })
+
+    it('opens the sign-in form from the sidebar', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /^sign in$/i }))
+      expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    })
   })
 })

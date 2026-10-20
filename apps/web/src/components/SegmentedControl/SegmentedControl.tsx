@@ -1,3 +1,5 @@
+import "./SegmentedControl.css";
+
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
@@ -18,9 +20,8 @@ export interface SegmentedControlProps<T extends string> {
  * aria-pressed rather than radios, matching the mockup and RangeGrid's
  * brush buttons.
  *
- * The `.seg` styling lives in desktop.css and only applies at >= 1024px;
- * a screen that also shows this under that width needs mobile styling for
- * it first.
+ * Under 1024px it looks like SolvePage's existing segmented toggle; at
+ * >= 1024px, the mockup's inset pill (SegmentedControl.css).
  */
 export function SegmentedControl<T extends string>({
   label,
