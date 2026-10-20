@@ -9,6 +9,13 @@
   --surface-2: #f3f3f7;
   --border: #e5e4ea;
   --border-strong: #cecdd6;
+  /* Desktop shell (docs/desktop-redesign.md): the sidebar, a softer divider
+     between page panes, and the hover/raised fills buttons and segmented
+     controls use. Only desktop.css references these. */
+  --sidebar-bg: #f5f5f8;
+  --divider: #ebeaf0;
+  --surface-hover: #ececf1;
+  --surface-3: #e6e6ec;
 
   /* Text */
   --text: #46434f;
@@ -30,7 +37,18 @@
      this palette already uses a positive color. */
   --success: var(--range-in);
   --success-subtle: rgba(63, 157, 90, 0.1);
+  /* Text on a --success-subtle / --warning-subtle pill (Library's
+     Preflop/Postflop type, Solve's "Rough" accuracy). */
+  --success-text: #2c7a45;
+  --warning: #a86b00;
+  --warning-subtle: rgba(217, 164, 65, 0.16);
   --focus: var(--accent);
+
+  /* Playing-card faces are white with red/black ink in both themes, the
+     way the Drill and the desktop mockup draw them. */
+  --card-face: #ffffff;
+  --card-ink: #141319;
+  --card-red: #d32f2f;
 
   /* Range grid: an empty cell, and the full-weight "in range" fill. Cells
      between the two are a color-mix of these by weight (see RangeGrid.css),
@@ -86,6 +104,10 @@
     --surface-2: #24242e;
     --border: #2f2f3a;
     --border-strong: #43424f;
+    --sidebar-bg: #17171e;
+    --divider: #2a2a34;
+    --surface-hover: #22222b;
+    --surface-3: #2c2c38;
 
     --text: #b7b5c3;
     --text-strong: #f4f3f8;
@@ -101,6 +123,9 @@
     --danger-subtle: rgba(240, 133, 122, 0.14);
     --success: var(--range-in);
     --success-subtle: rgba(70, 176, 106, 0.14);
+    --success-text: #7fd39b;
+    --warning: #f0c766;
+    --warning-subtle: rgba(240, 185, 61, 0.15);
 
     --range-empty: #2b2b34;
     --range-in: #46b06a;

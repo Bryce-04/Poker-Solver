@@ -54,7 +54,7 @@ export function AuthStatus() {
     return (
       <div className="auth-status">
         <span className="auth-status__email">Signed in as {auth.email ?? "unknown"}</span>
-        <button type="button" className="auth-status__signout" onClick={handleSignOut}>
+        <button type="button" className="auth-status__signout btn-ghost" onClick={handleSignOut}>
           Sign out
         </button>
       </div>
@@ -82,7 +82,7 @@ export function AuthStatus() {
         minLength={6}
         required
       />
-      <button type="submit" disabled={submitState.kind === "submitting"}>
+      <button type="submit" className="btn-primary" disabled={submitState.kind === "submitting"}>
         {mode === "sign-in" ? "Sign in" : "Sign up"}
       </button>
       <button

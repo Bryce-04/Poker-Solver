@@ -549,7 +549,7 @@ export function SolvePage() {
                   placeholder="Paste up through the point just before the decision you want to look at"
                 />
               </label>
-              <button type="button" className="spot-builder__reset" onClick={loadFromHandHistory}>
+              <button type="button" className="spot-builder__reset btn-secondary" onClick={loadFromHandHistory}>
                 Load from hand history
               </button>
               {handHistoryError && <p className="spot-builder__field-error">{handHistoryError}</p>}
@@ -641,7 +641,7 @@ export function SolvePage() {
             <div className="solve-page__history">
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={goBack}
                 disabled={!hasActions}
                 aria-label="Back one action"
@@ -650,7 +650,7 @@ export function SolvePage() {
               </button>
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={goForward}
                 disabled={redoStack.length === 0}
                 aria-label="Forward one action"
@@ -806,7 +806,7 @@ export function SolvePage() {
               <div className="solve-page__chart-load">
                 <button
                   type="button"
-                  className="spot-builder__reset"
+                  className="spot-builder__reset btn-secondary"
                   onClick={loadRangesFromPreflopAction}
                   disabled={preflopLoad.kind === "loading"}
                 >
@@ -839,7 +839,7 @@ export function SolvePage() {
               <div className="solve-page__chart-load">
                 <button
                   type="button"
-                  className="spot-builder__reset"
+                  className="spot-builder__reset btn-secondary"
                   onClick={narrowByEarlierStreets}
                   disabled={
                     narrowState.kind === "loading" ||
@@ -852,7 +852,7 @@ export function SolvePage() {
                     : `Narrow ranges by ${describeStreets(narrowStreets)} action`}
                 </button>
                 {rangesBeforeNarrow && narrowState.kind === "done" && (
-                  <button type="button" className="spot-builder__reset" onClick={undoNarrowing}>
+                  <button type="button" className="spot-builder__reset btn-secondary" onClick={undoNarrowing}>
                     Undo
                   </button>
                 )}
@@ -876,7 +876,7 @@ export function SolvePage() {
             <div className="solve-page__chart-load">
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={() =>
                   loadReferenceRange(
                     oopPosition,
@@ -912,7 +912,7 @@ export function SolvePage() {
             <div className="solve-page__chart-load">
               <button
                 type="button"
-                className="spot-builder__reset"
+                className="spot-builder__reset btn-secondary"
                 onClick={() =>
                   loadReferenceRange(
                     ipPosition,
@@ -958,10 +958,10 @@ export function SolvePage() {
             </ul>
           )}
           <div className="solve-page__actions">
-            <button type="submit" disabled={!canSubmit || outcome.kind === "loading"}>
+            <button type="submit" className="btn-primary" disabled={!canSubmit || outcome.kind === "loading"}>
               Solve
             </button>
-            <button type="button" className="spot-builder__reset" onClick={resetAll}>
+            <button type="button" className="spot-builder__reset btn-ghost" onClick={resetAll}>
               Reset
             </button>
           </div>

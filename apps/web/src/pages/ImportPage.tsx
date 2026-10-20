@@ -124,18 +124,17 @@ export function ImportPage() {
           />
         </label>
         <p className="spot-builder__hint">
-          Stage 4 MVP &mdash; one format (a PokerStars-style export), a full
-          6-handed 6-max table, and hands that reduce to an unopened pot or
-          Hero facing a single raise. Paste up to Hero&rsquo;s own decision.{" "}
+          PokerStars format, 6-max. Paste up to your own decision. We&rsquo;ll
+          work out your seat and what happened before you.{" "}
           <button
             type="button"
-            className="spot-builder__reset"
+            className="spot-builder__reset btn-ghost"
             onClick={() => setText(EXAMPLE_HH)}
           >
             Use example
           </button>
         </p>
-        <button type="submit" disabled={outcome.kind === "loading" || text.trim() === ""}>
+        <button type="submit" className="btn-primary" disabled={outcome.kind === "loading" || text.trim() === ""}>
           Parse &amp; get reference strategy
         </button>
       </form>
@@ -193,9 +192,15 @@ export function ImportPage() {
           <div className="spot-builder__status-block spot-builder__status-block--error">
             <p className="spot-builder__status-title">Couldn&rsquo;t reach the API.</p>
             <p>
-              Is <code>apps/api</code> running? Start it with{" "}
-              <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+              Check your connection and try again. The server may also be
+              waking up &mdash; give it a minute.
             </p>
+            {import.meta.env.DEV && (
+              <p>
+                Dev: is <code>apps/api</code> running? Start it with{" "}
+                <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+              </p>
+            )}
           </div>
         )}
 
@@ -220,6 +225,7 @@ export function ImportPage() {
           <div className="spot-builder__save">
             <button
               type="button"
+              className="btn-secondary"
               onClick={() => handleSave(outcome.spot)}
               disabled={saveState.kind === "saving"}
             >
@@ -227,7 +233,7 @@ export function ImportPage() {
             </button>
             <button
               type="button"
-              className="spot-builder__reset"
+              className="spot-builder__reset btn-ghost"
               onClick={() =>
                 setEditedRange(outcome.data.ranges[outcome.spot.positions_in_hand[0]] ?? {})
               }

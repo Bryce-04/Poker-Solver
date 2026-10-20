@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Ranges — Builder + Type in + Import merged</title>
+<!-- Design mockup for docs/desktop-redesign.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#131318}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.nav{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:8px;text-decoration:none;color:#b7b5c3}
+.nav:hover{background:#22222b;color:#f4f3f8}
+.nav[aria-current=page]{background:rgba(167,139,250,.14);color:#f4f3f8}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:8px 16px;border-radius:8px;font:600 14px/1.3 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;border:1px solid transparent;box-sizing:border-box}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.btn-primary:hover{background:#c4b5fd;color:#1a1030}
+.btn-secondary{background:#24242e;color:#f4f3f8;border-color:#43424f}
+.btn-secondary:hover{background:#2c2c38;color:#f4f3f8}
+.btn-ghost{background:transparent;color:#b7b5c3}
+.btn-ghost:hover{background:#22222b;color:#f4f3f8}
+.seg{display:inline-flex;flex-wrap:wrap;padding:3px;gap:2px;background:#131318;border:1px solid #2f2f3a;border-radius:9px}
+.seg-item{min-height:34px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:#b7b5c3;font:550 13px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.seg-item:hover{color:#f4f3f8}
+.seg-item[aria-pressed=true]{background:#2c2c38;color:#f4f3f8;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.seg-item[disabled]{opacity:.4;cursor:not-allowed}
+.choice{display:flex;flex-direction:column;gap:2px;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid #2f2f3a;background:#1b1b23;color:#b7b5c3;cursor:pointer;font:inherit}
+.choice:hover{border-color:#43424f}
+.choice[aria-pressed=true]{border-color:rgba(167,139,250,.6);background:rgba(167,139,250,.1)}
+.choice[disabled]{opacity:.45;cursor:not-allowed}
+.chip{min-height:32px;padding:0 12px;border-radius:16px;border:1px solid #43424f;background:transparent;color:#f4f3f8;font:500 12px/1 ui-monospace,Consolas,monospace;cursor:pointer}
+.chip:hover{border-color:#a78bfa}
+.cell{border:0;padding:0;aspect-ratio:1/1;border-radius:4px;font:650 12px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:0}
+.cell:hover{outline:2px solid #a78bfa;outline-offset:-2px}
+.label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a8899}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+input,textarea{width:100%;min-width:0;font:inherit;color:#f4f3f8;background:#131318;border:1px solid #43424f;border-radius:8px;padding:0 12px;min-height:40px;box-sizing:border-box}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #131318; color: #b7b5c3; font: 14px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif">
+
+  <nav aria-label="Main" style="flex: 1 1 232px; box-sizing: border-box; background: #17171e; border-right: 1px solid #2a2a34; padding: 20px 14px; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 10px">
+      <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2 4 14h6.5L9 22l11-13h-6.5L14 2z" fill="#a78bfa"></path></svg>
+      <span style="font-size: 17px; font-weight: 700; color: #f4f3f8; letter-spacing: -0.01em">Poker Solver</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <a class="nav" href="solve-setup.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="margin-top: 2px; flex: none"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+        <span style="display: flex; flex-direction: column"><span style="font-weight: 600">Solve</span><span style="font-size: 12px; color: #8a8899">Best play after the flop</span></span>
+      </a>
+      <a class="nav" href="ranges.html" aria-current="page">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-top: 2px; flex: none"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>
+        <span style="display: flex; flex-direction: column"><span style="font-weight: 600">Ranges</span><span style="font-size: 12px; color: #8a8899">Which hands to play preflop</span></span>
+      </a>
+      <a class="nav" href="library.html">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" style="margin-top: 2px; flex: none"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>
+        <span style="display: flex; flex-direction: column"><span style="font-weight: 600">Library</span><span style="font-size: 12px; color: #8a8899">Your saved spots</span></span>
+      </a>
+      <a class="nav" href="#drill">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true" style="margin-top: 2px; flex: none"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>
+        <span style="display: flex; flex-direction: column"><span style="font-weight: 600">Drill</span><span style="font-size: 12px; color: #8a8899">Practice game · full screen</span></span>
+      </a>
+    </div>
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 14px">
+      <a href="#guide" style="display: block; text-decoration: none; padding: 14px; border-radius: 10px; background: #1f1d2b; border: 1px solid #34304a">
+        <span style="display: block; color: #f4f3f8; font-weight: 600; font-size: 13px">New to solvers?</span>
+        <span style="display: block; color: #b7b5c3; font-size: 12px; margin-top: 2px">A 2-minute guide to reading the charts</span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 0 6px">
+        <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 50%; background: #2c2c38; color: #f4f3f8; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex: none">P</span>
+        <span style="flex: 1; min-width: 0; font-size: 12px; color: #b7b5c3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">peyt0303@gmail.com</span>
+        <button type="button" class="btn btn-ghost" style="min-height: 32px; padding: 0 8px; font-size: 12px">Sign out</button>
+      </div>
+    </div>
+  </nav>
+
+  <main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column">
+    <header style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 22px 32px; border-bottom: 1px solid #2a2a34">
+      <div>
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #f4f3f8; letter-spacing: -0.01em">Ranges</h1>
+        <p style="margin: 2px 0 0; color: #8a8899">Standard preflop charts: which hands to play from each seat. Edit one and save it as your own.</p>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; flex: 1">
+      <aside aria-label="Describe the spot" style="flex: 1 1 340px; box-sizing: border-box; border-right: 1px solid #2a2a34; padding: 24px; display: flex; flex-direction: column; gap: 24px">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 650; color: #f4f3f8">Describe the spot</h2>
+          <div class="seg" role="group" aria-label="How to describe the spot" style="align-self: flex-start">
+            <sc-for list="{{modes}}" as="m" hint-placeholder-count="3">
+              <button type="button" class="seg-item" aria-pressed="{{m.pressed}}" onClick="{{m.pick}}">{{m.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{isPick}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 22px">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span class="label">Your seat</span>
+              <div class="seg" role="group" aria-label="Your seat" style="display: flex; flex-wrap: nowrap; width: 100%; box-sizing: border-box">
+                <sc-for list="{{positions}}" as="p" hint-placeholder-count="6">
+                  <button type="button" class="seg-item" aria-pressed="{{p.pressed}}" onClick="{{p.pick}}" style="flex: 1 1 0; min-width: 0; padding: 0 4px">{{p.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span class="label">What happened before you</span>
+              <sc-for list="{{situations}}" as="s" hint-placeholder-count="2">
+                <button type="button" class="choice" aria-pressed="{{s.pressed}}" disabled="{{s.disabled}}" onClick="{{s.pick}}">
+                  <span style="color: #f4f3f8; font-weight: 600">{{s.title}}</span>
+                  <span style="font-size: 12px; color: #8a8899">{{s.sub}}</span>
+                </button>
+              </sc-for>
+            </div>
+            <sc-if value="{{showRaiser}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <span class="label">Who raised?</span>
+                <div class="seg" role="group" aria-label="Who raised" style="display: flex; flex-wrap: nowrap; width: 100%; box-sizing: border-box">
+                  <sc-for list="{{raisers}}" as="p" hint-placeholder-count="3">
+                    <button type="button" class="seg-item" aria-pressed="{{p.pressed}}" onClick="{{p.pick}}" style="flex: 1 1 0; min-width: 0; padding: 0 4px">{{p.label}}</button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span class="label">Stack size</span>
+              <div class="seg" role="group" aria-label="Stack size" style="align-self: flex-start">
+                <sc-for list="{{stacks}}" as="s" hint-placeholder-count="2">
+                  <button type="button" class="seg-item" aria-pressed="{{s.pressed}}" onClick="{{s.pick}}">{{s.label}}</button>
+                </sc-for>
+              </div>
+              <span style="font-size: 12px; color: #8a8899">Charts are available for about 40bb and 100bb.</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isType}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <label for="spot-text" style="font-size: 13px; color: #f4f3f8">Type the spot in plain words</label>
+            <input id="spot-text" type="text" value="{{typed}}">
+            <span style="font-size: 12px; color: #8a8899">For now we understand two kinds of phrase. Try one:</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{examples}}" as="e" hint-placeholder-count="3">
+                <button type="button" class="chip" onClick="{{e.pick}}">{{e.label}}</button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: #46b06a">Understood: {{spotTitle}}, {{stackLabel}}</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isPaste}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <label for="hh" style="font-size: 13px; color: #f4f3f8">Paste a hand history</label>
+            <textarea id="hh" rows="9" style="padding: 10px 12px; font: 12px/1.5 ui-monospace, Consolas, monospace; resize: vertical">PokerStars Hand #1: Hold'em No Limit ($0.50/$1.00 USD)
+Table 'Atlas' 6-max Seat #4 is the button
+Seat 1: Alice ($100 in chips)
+Seat 4: Hero ($100 in chips)
+Eve: posts small blind $0.50
+Frank: posts big blind $1
+...</textarea>
+            <span style="font-size: 12px; color: #8a8899">PokerStars format, 6-max. Paste up to your own decision. We'll work out your seat and what happened before you.</span>
+            <div style="display: flex; gap: 8px">
+              <button type="button" class="btn btn-secondary">Read hand</button>
+              <button type="button" class="btn btn-ghost">Use an example</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <p style="margin: auto 0 0; font-size: 12px; color: #8a8899">The chart on the right updates as soon as you change the spot.</p>
+      </aside>
+
+      <section aria-label="Chart" style="flex: 999 1 600px; min-width: 0; padding: 24px 32px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between">
+          <div>
+            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #f4f3f8; letter-spacing: -0.01em">{{spotTitle}}</h2>
+            <p style="margin: 2px 0 0; color: #8a8899">{{spotSub}}</p>
+          </div>
+          <span style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #24242e; border: 1px solid #43424f; font-size: 12px; color: #f4f3f8">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16h.01"></path></svg>
+            Standard chart: a starting point, not a live solve
+          </span>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+          <div style="flex: 999 1 440px; min-width: 0; max-width: 640px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <span style="font-size: 12px; color: #8a8899">Paint with</span>
+                <div class="seg" role="group" aria-label="Brush weight">
+                  <sc-for list="{{brushes}}" as="b" hint-placeholder-count="4">
+                    <button type="button" class="seg-item" aria-pressed="{{b.pressed}}" onClick="{{b.pick}}">{{b.label}}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px">
+                <button type="button" class="btn btn-ghost" style="min-height: 34px; font-size: 13px">Suits</button>
+                <button type="button" class="btn btn-ghost" style="min-height: 34px; font-size: 13px" onClick="{{reset}}">Reset to chart</button>
+                <button type="button" class="btn btn-ghost" style="min-height: 34px; font-size: 13px">Clear</button>
+              </div>
+            </div>
+            <div role="grid" aria-label="{{spotTitle}}" style="display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 3px; padding: 6px; background: #1b1b23; border-radius: 10px; border: 1px solid #2a2a34">
+              <sc-for list="{{cells}}" as="cell" hint-placeholder-count="169">
+                <button type="button" role="gridcell" class="cell" aria-label="{{cell.aria}}" onClick="{{cell.pick}}" style="background: {{cell.bg}}; color: {{cell.fg}}">{{cell.label}}</button>
+              </sc-for>
+            </div>
+            <p style="margin: 0; font-size: 12px; color: #8a8899">Pairs run down the middle. Suited hands are above them and offsuit hands below. Click or drag to add or remove hands.</p>
+          </div>
+
+          <div style="flex: 1 1 200px; min-width: 0; max-width: 320px; display: flex; flex-direction: column; gap: 16px">
+            <div style="padding: 16px; border-radius: 12px; background: #1b1b23; border: 1px solid #2a2a34; display: flex; flex-direction: column; gap: 4px">
+              <span class="label">This range</span>
+              <span style="font-size: 30px; font-weight: 750; color: #f4f3f8; font-variant-numeric: tabular-nums">{{pct}}%</span>
+              <span style="font-size: 13px">of all starting hands · {{combos}} combos</span>
+              <sc-if value="{{edited}}" hint-placeholder-val="{{ false }}">
+                <span style="margin-top: 6px; font-size: 12px; color: #c4b5fd">Edited from the standard chart</span>
+              </sc-if>
+            </div>
+            <div style="padding: 16px; border-radius: 12px; background: #1b1b23; border: 1px solid #2a2a34; display: flex; flex-direction: column; gap: 12px">
+              <label for="spot-name" class="label">Save as</label>
+              <input id="spot-name" type="text" value="{{saveName}}">
+              <button type="button" class="btn btn-primary">Save to Library</button>
+              <a href="solve-setup.html" class="btn btn-secondary" style="justify-content: space-between">Solve a flop from here<span aria-hidden="true">→</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+var R = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+var SEATS = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+function ix(c) { return R.indexOf(c); }
+function handAt(r, c) {
+  if (r === c) return R[r] + R[c];
+  return r < c ? R[r] + R[c] + 's' : R[c] + R[r] + 'o';
+}
+function buildRange(pairMin, suited, off, over) {
+  var m = {};
+  for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+    var h = handAt(r, c), w = 0;
+    if (r === c) w = r <= ix(pairMin) ? 1 : 0;
+    else if (r < c) w = suited[R[r]] && c <= ix(suited[R[r]]) ? 1 : 0;
+    else w = off[R[c]] && r <= ix(off[R[c]]) ? 1 : 0;
+    if (over && over[h] !== undefined) w = over[h];
+    if (w > 0) m[h] = w;
+  }
+  return m;
+}
+function combosOf(h) { return h.length === 2 ? 6 : (h[2] === 's' ? 4 : 12); }
+function cellLook(w) {
+  if (!w) return { bg: '#2b2b34', fg: '#b7b5c3' };
+  if (w >= 1) return { bg: '#46b06a', fg: '#0f1a12' };
+  var p = Math.round(w * 100);
+  return { bg: 'linear-gradient(to top, #46b06a ' + p + '%, #33333d ' + p + '%)', fg: '#f4f3f8' };
+}
+var OPEN = {
+  UTG: buildRange('4', { A: '2', K: '9', Q: 'T', J: 'T', T: '9' }, { A: 'T', K: 'J', Q: 'J' }),
+  HJ: buildRange('3', { A: '2', K: '7', Q: '9', J: '9', T: '8', '9': '8', '8': '7' }, { A: '9', K: 'T', Q: 'T', J: 'T' }),
+  CO: buildRange('2', { A: '2', K: '5', Q: '8', J: '8', T: '7', '9': '7', '8': '7', '7': '6', '6': '5', '5': '4' }, { A: '7', K: '9', Q: 'T', J: 'T' }),
+  BTN: buildRange('2', { A: '2', K: '2', Q: '5', J: '7', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' }, { A: '2', K: '7', Q: '9', J: 'T' }),
+  SB: buildRange('2', { A: '2', K: '2', Q: '4', J: '6', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' }, { A: '2', K: '8', Q: '9', J: '9', T: '9' })
+};
+var DEFEND_BB = buildRange('2',
+  { A: '2', K: '2', Q: '4', J: '6', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' },
+  { A: '2', K: '8', Q: '9', J: '9', T: '9' },
+  { AA: 0.25, KK: 0.25, QQ: 0.5, AKs: 0.25, AKo: 0.25 });
+var DEFEND = buildRange('2',
+  { A: '2', K: '9', Q: 'T', J: 'T', T: '9', '9': '8', '8': '7', '7': '6', '6': '5' },
+  { A: 'J', K: 'Q' },
+  { A5s: 0.5, A4s: 0.5, '22': 0.5, '33': 0.5 });
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: 'pick', pos: 'BTN', sit: 'open', raiser: 'CO', stack: 100, brush: 1, edits: {} };
+  }
+  setSpot(patch) { this.setState(Object.assign({ edits: {} }, patch)); }
+  renderVals() {
+    var self = this, st = this.state;
+    var seatIx = SEATS.indexOf(st.pos);
+    var sit = st.pos === 'BB' ? 'defend' : (st.pos === 'UTG' ? 'open' : st.sit);
+    var earlier = SEATS.slice(0, seatIx);
+    var raiser = earlier.indexOf(st.raiser) >= 0 ? st.raiser : earlier[earlier.length - 1];
+    var base = sit === 'open' ? OPEN[st.pos] : (st.pos === 'BB' ? DEFEND_BB : DEFEND);
+    var range = Object.assign({}, base), edited = false;
+    for (var k in st.edits) { edited = true; if (st.edits[k] > 0) range[k] = st.edits[k]; else delete range[k]; }
+    var n = 0;
+    for (var h in range) n += combosOf(h) * range[h];
+    var cells = [];
+    for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+      (function (hand) {
+        var w = range[hand] || 0, look = cellLook(w);
+        cells.push({ label: hand, bg: look.bg, fg: look.fg,
+          aria: hand + (w ? ', in range ' + Math.round(w * 100) + '%' : ', not in range'),
+          pick: function () {
+            var e = Object.assign({}, self.state.edits);
+            e[hand] = (w === self.state.brush) ? 0 : self.state.brush;
+            self.setState({ edits: e });
+          } });
+      })(handAt(r, c));
+    }
+    var title = sit === 'open' ? st.pos + ' opening range' : st.pos + ' vs a ' + raiser + ' raise';
+    var sub = sit === 'open'
+      ? 'Nobody has raised yet · about ' + st.stack + 'bb · 6-max'
+      : raiser + ' raised and it’s on you · about ' + st.stack + 'bb · 6-max. Green hands continue (call or 3-bet); the rest fold.';
+    var typed = sit === 'open' ? st.pos + ' opens ' + st.stack + 'bb' : st.pos + ' defends ' + raiser + ' open, ' + st.stack + 'bb';
+    return {
+      modes: [['pick', 'Pick'], ['type', 'Type it'], ['paste', 'Hand history']].map(function (m) {
+        return { label: m[1], pressed: String(st.mode === m[0]), pick: function () { self.setState({ mode: m[0] }); } };
+      }),
+      isPick: st.mode === 'pick', isType: st.mode === 'type', isPaste: st.mode === 'paste',
+      positions: SEATS.map(function (p) {
+        return { label: p, pressed: String(st.pos === p), pick: function () { self.setSpot({ pos: p }); } };
+      }),
+      situations: [
+        { key: 'open', title: 'Nobody has raised yet', sub: 'You’re first in. Which hands should you raise?', disabled: st.pos === 'BB' },
+        { key: 'defend', title: 'Someone raised before you', sub: 'Which hands should continue against a single raise?', disabled: st.pos === 'UTG' }
+      ].map(function (s) {
+        return { title: s.title, sub: s.sub, disabled: s.disabled, pressed: String(sit === s.key),
+          pick: function () { self.setSpot({ sit: s.key }); } };
+      }),
+      showRaiser: sit === 'defend',
+      raisers: earlier.map(function (p) {
+        return { label: p, pressed: String(raiser === p), pick: function () { self.setSpot({ raiser: p }); } };
+      }),
+      stacks: [40, 100].map(function (s) {
+        return { label: s + 'bb', pressed: String(st.stack === s), pick: function () { self.setSpot({ stack: s }); } };
+      }),
+      examples: [
+        { label: 'BTN opens 100bb', pos: 'BTN', sit: 'open', raiser: 'CO' },
+        { label: 'BB defends CO open, 100bb', pos: 'BB', sit: 'defend', raiser: 'CO' },
+        { label: 'CO opens 40bb', pos: 'CO', sit: 'open', raiser: 'HJ', stack: 40 }
+      ].map(function (e) {
+        return { label: e.label, pick: function () { self.setSpot({ pos: e.pos, sit: e.sit, raiser: e.raiser, stack: e.stack || 100 }); } };
+      }),
+      typed: typed, stackLabel: 'about ' + st.stack + 'bb',
+      brushes: [1, 0.75, 0.5, 0.25].map(function (b) {
+        return { label: Math.round(b * 100) + '%', pressed: String(st.brush === b), pick: function () { self.setState({ brush: b }); } };
+      }),
+      cells: cells,
+      spotTitle: title, spotSub: sub,
+      pct: (n / 1326 * 100).toFixed(1), combos: Math.round(n), edited: edited,
+      saveName: title + (edited ? ' (my version)' : '') + ' · ' + st.stack + 'bb',
+      reset: function () { self.setState({ edits: {} }); }
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>

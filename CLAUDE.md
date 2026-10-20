@@ -174,6 +174,27 @@ slow, a host with a full CPU (e.g. Cloud Run) would be ~10x faster — see
 still hasn't been run against a real Postgres (no DB in the working
 session; route logic was exercised by calling `solve_spot` directly).
 
+**Desktop redesign (in progress, 2026-10-20)**: `docs/desktop-redesign.md`
+is the agreed spec (six phases, one PR each), with the design as clickable
+HTML in `docs/desktop-redesign/mockup/` (screenshots alongside). Read it
+before touching desktop layout. Hard rule: **nothing changes visually
+below 1024px wide** (phones, Capacitor builds), and the Drill isn't
+touched at all; the one agreed exception is the route merge in its §3.
+**Phase 1 (foundation) is done**: the new tokens in `index.css`
+(`--sidebar-bg`, `--divider`, `--surface-hover`, `--surface-3`,
+`--success-text`, `--warning`/`--warning-subtle`, `--card-face`/`--card-ink`/
+`--card-red`, light and dark), and `src/desktop.css` — every rule in it
+inside `@media (min-width: 1024px)`: `.btn-primary` / `.btn-secondary` /
+`.btn-ghost` / `.btn-danger`, the `.seg` segmented control
+(`components/SegmentedControl`, not used by any screen yet), `.section-label`,
+`.tabular-nums`. On desktop a bare `<button>` inside `.app` is no longer
+accent-filled; give every new button a role class (one `btn-primary` per
+screen at most). The classes are inert under 1024px, so a screen that needs
+`.seg` on mobile has to add mobile styling for it first. User-facing
+"Stage N MVP" copy is gone, and the uvicorn "is `apps/api` running?" hint
+only shows in dev builds (`import.meta.env.DEV`), everywhere. Next: Phase 2
+(sidebar shell + the four-route IA).
+
 ## Commands
 
 This is a pnpm workspace (`apps/*`, `packages/*`) plus two standalone
@@ -186,6 +207,7 @@ pnpm install                 # from repo root, installs all JS workspace deps
 pnpm dev:web                 # dev server
 pnpm --filter web build      # production build (tsc -b && vite build)
 pnpm --filter web lint       # oxlint
+pnpm --filter web test       # vitest
 ```
 
 ### Schema (`packages/schema`) — the shared source of truth

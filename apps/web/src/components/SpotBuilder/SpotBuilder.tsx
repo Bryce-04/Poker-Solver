@@ -218,7 +218,7 @@ export function SpotBuilder() {
           )}
         </section>
 
-        <button type="submit" disabled={outcome.kind === "loading" || !stackIsValid}>
+        <button type="submit" className="btn-primary" disabled={outcome.kind === "loading" || !stackIsValid}>
           Get reference strategy
         </button>
       </form>
@@ -277,9 +277,15 @@ export function SpotBuilder() {
           <div className="spot-builder__status-block spot-builder__status-block--error">
             <p className="spot-builder__status-title">Couldn&rsquo;t reach the API.</p>
             <p>
-              Is <code>apps/api</code> running? Start it with{" "}
-              <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+              Check your connection and try again. The server may also be
+              waking up &mdash; give it a minute.
             </p>
+            {import.meta.env.DEV && (
+              <p>
+                Dev: is <code>apps/api</code> running? Start it with{" "}
+                <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
+              </p>
+            )}
           </div>
         )}
 
@@ -304,6 +310,7 @@ export function SpotBuilder() {
           <div className="spot-builder__save">
             <button
               type="button"
+              className="btn-secondary"
               onClick={() => handleSave(outcome.spot)}
               disabled={saveState.kind === "saving"}
             >
@@ -311,7 +318,7 @@ export function SpotBuilder() {
             </button>
             <button
               type="button"
-              className="spot-builder__reset"
+              className="spot-builder__reset btn-ghost"
               onClick={() => setEditedRange(outcome.data.ranges[position] ?? {})}
             >
               Reset to chart
