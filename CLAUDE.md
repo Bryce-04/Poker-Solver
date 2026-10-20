@@ -114,14 +114,22 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
-**Swipe Drill (2026-10-19, on the `swipe-drill` branch, not yet merged)**:
+**Poker Drill (2026-10-19)** — branch status: `main` has only the first version
+(PR #27, the "Swipe Drill", with swiping). Everything below beyond that — tap-only
+actions, settings cog, table colors, the pot on the table, bb amounts, the "why"
+analysis and its tap-to-open row — is on an unmerged stack of branches, each
+built on the last: `drill-themes` → `drill-settings` → `drill-analysis` →
+`drill-why-dropdown` (one PR from the tip carries all of it). See
+`docs/decisions.md`:
 `/drill` (`apps/web/src/pages/DrillPage.tsx`) is a mobile-first practice
 game, rendered full screen *outside* the app shell (`App.tsx`: `/drill` is its
 own route; every other path is `Shell`) with its own purple look, an X back to
-the app, a start screen, and a summary. A card is a felt-table scene — a big
-"You BB / out of position" seat badge, chips for what's owed, the board and
-your hand — and you swipe (left fold/check, right call, up bet/raise → size
-picker; buttons and arrow keys too). Each answer is graded against the
+the app, a settings cog (top right), a start screen, and a summary. A hand is a
+felt-table scene — a big "You BB / out of position" seat badge, chips for what's
+owed, the pot in the middle of the table, the board and your hand — and you
+**tap** an action: Fold/Check/Call, then every legal bet or raise size as its
+own button, labelled in bb with the % pot small (or the reverse; see settings).
+There is no swiping. Each answer is graded against the
 solver's mixed strategy for that exact hand (`lib/drill.ts`: best at >= 40% or
 the solver's top action, acceptable at 10-40%, miss below) and the full mix is
 shown. The deck is **pre-solved app data, not live solves**:
@@ -135,6 +143,25 @@ phone home screen (`public/manifest.webmanifest`, apple-touch icons). The
 design plan lives on the `plan-swipe-drill` branch's `docs/plan.md`; the
 decision record is `docs/decisions.md`'s 2026-10-19 entry. Bet sizes are
 deliberately still 25/75/125 (33/66/100 was considered, deferred to the team).
+After each answer the feedback screen also has a tap-to-open (inline `<details>`,
+collapsed by default) explanation of **why the solver's favorite play is good**: `apps/api/app/drill_analysis.py` (run offline by the
+deck script, shipped as each spot's `analysis` in the deck JSON) classifies the
+hand (top pair, flush draw, ace high...) and the board, and computes equity
+against the opponent's real range, where the hand ranks in its range, how often
+the whole range takes each action, and the pot-odds price when facing a bet;
+rules then turn those numbers into 3-4 plain bullets (value bet, semi-bluff,
+pot control, ...), and it says outright when the solver is near-indifferent. The
+numbers are computed; the reasoning sentence is the standard rationale applied by
+rules, not derived from the solver, and the UI says so. Tests:
+`apps/api/tests/test_drill_analysis.py` (pure, no database).
+The settings sheet (cog) has a "Table color" picker (Purple / Midnight / Ocean /
+Emerald, `lib/drillTheme.ts`) and a "Show bet sizes as" choice (bb-first or
+%-first, `lib/drillSettings.ts`), both remembered in localStorage. Table color is
+drill-only and themes only the scene via CSS variables under
+`.game[data-theme=...]`; verdict colors, solver-bar colors and the white card
+faces are fixed on purpose. Bet amounts in bb come from `lib/drill.ts`'s
+`actionAmountBb`, which mirrors `betting_round.py`'s sizing arithmetic (a raise
+is shown as "raise to") — keep the two in step if the bet menu changes.
 
 The new solver is merged (PR #21) and deployed, hardened for Render's
 free tier in PR #22 (single-threaded BLAS, one solve at a time with a 503
@@ -180,7 +207,7 @@ pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 
 cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
-cd apps/api && python scripts/make_drill_deck.py             # regenerate the Swipe Drill deck (~1 min)
+cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 ```

@@ -52,6 +52,56 @@ purple felt oval with a padded rail, and the board and hand sit directly on it
 (the playing cards keep white faces and a small shadow). Purely visual; the
 swipe, tint, and throw-off behavior is unchanged.
 
+**Update, same day — choosable table color (drill only).** A "Table color"
+picker on the start screen: Purple (default, the brand color), Midnight
+(near-black, silver accent), Ocean, Emerald. Four curated themes rather than a
+free color picker, because each is tuned for text contrast (fills that carry
+white text use separate `--g-btn-*` tokens) and a free picker invites
+unreadable combinations. Drill-only on purpose: the drill is a mode you enter
+with its own look; recoloring the whole app would fight the light/dark tokens
+and every other screen. Only the scene changes — verdict green/amber/red, the
+solver-bar colors and the white card faces are constant, so a color's meaning
+never depends on the theme. Remembered in localStorage (`drill.theme`).
+
+**Update, 2026-10-19 (later) — swiping removed, settings cog, pot on the
+table, bet sizes in bb.** Swiping is gone: every legal action is a button
+(Fold/Check/Call, then each bet or raise size), which also removes the hidden
+two-step "swipe up then pick a size" and puts the size on the button where it
+can be read. The name is now "Poker Drill" (the route is still `/drill`).
+A settings cog (top right, all screens) opens a bottom sheet with the table
+color (moved off the start screen) and a "Show bet sizes as" choice. The pot,
+the number every size is judged against, moved from a small chip to the middle
+of the table, large, with the faced bet under it. Bet and raise buttons show
+the amount in bb with the % of pot small, or the reverse (setting, default bb):
+`actionAmountBb` reproduces `betting_round.py`'s arithmetic (bet = fraction of
+pot; raise = call + fraction of the pot after calling, shown as "raise to"). The
+25/75/125 fractions are duplicated on the frontend and must follow the solver's
+`BET_SIZE_MENU` if it changes (bet menu still unchanged).
+
+**Update, 2026-10-19 (later) — "why" explanations (option 1).** After each
+answer the feedback screen explains the solver's favorite play. Built offline in
+`apps/api/app/drill_analysis.py` and shipped as `analysis` on every deck spot:
+hand category and draws, board texture, equity against the opponent's whole
+range (from the same exact equity matrix the solver trains on, recomputed in the
+script), the hand's percentile within the player's range, whole-range equity and
+action frequencies on the board, and the pot-odds price when facing a bet. Rules
+turn those into bullets (value bet / semi-bluff / bluff / pot control / call /
+fold), and a close mix gets an explicit "this is close" note rather than an
+invented reason. **Honesty:** the numbers are computed, but the sentence linking
+them to the action is the standard poker rationale chosen by rules — a
+description of the mix, not something derived from the solver (which only outputs
+frequencies) — and the UI labels it a rule-of-thumb summary. Writing the tests
+caught a real wording bug (it could say "equity is below the price" when it was
+above), now fixed and covered. Not done: per-action EVs (needs the trainer to
+expose action values; would make the "why" much stronger), sizing reasoning
+(why 25% vs 75%), blockers, AI-written text.
+
+**Update, same day — the "why" is a tap-to-open row.** Shown in full it pushed
+the mix and the Next button down a screen; it is now a single collapsed row ("Why
+Bet 4.1bb (75%)?") that drops open in place (native `<details>`, so no JS state,
+accessible by default, nothing navigates away) and is closed again on every new
+hand. Opening it scrolls the new text into view.
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;

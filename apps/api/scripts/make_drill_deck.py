@@ -32,11 +32,14 @@ from pathlib import Path
 
 import numpy as np
 
+from poker_solver.betting_round import BET_SIZE_MENU
 from poker_solver.cards import parse_card
 from poker_solver.combos import combo_key
+from poker_solver.equity import compute_equity_matrix
 from poker_solver.range_cfr import RangeCfrTrainer, RangeSpotConfig
 from poker_solver_schema import Position
 
+from app.drill_analysis import AnalysisInput, describe_board, describe_hand, explain
 from app.preflop_ranges import defend_range, open_range
 
 POT_BB = 5.5
@@ -81,13 +84,97 @@ def entropy(row: np.ndarray) -> float:
     return float(-(p * np.log(p)).sum())
 
 
+class EquityFacts:
+    """Per-board equity numbers the explanations quote, from the same exact
+    equity matrix the solver trains on (recomputed here; the trainer keeps it
+    private). eq[p][i] is player p's combo i equity against the other player's
+    whole (weighted) range."""
+
+    def __init__(self, trainer: RangeCfrTrainer, board: tuple[int, ...]) -> None:
+        matrix = compute_equity_matrix(trainer.combos[0], trainer.combos[1], board)
+        possible = (~np.isnan(matrix)).astype(np.float64)
+        win0 = np.where(np.isnan(matrix), 0.0, matrix)
+        w0, w1 = trainer.weights
+        self.weights = (w0, w1)
+        self.eq = (
+            (win0 @ w1) / (possible @ w1),
+            ((possible - win0).T @ w0) / (possible.T @ w0),
+        )
+        range0 = float(w0 @ win0 @ w1) / float(w0 @ possible @ w1)
+        self.range_equity = (range0, 1.0 - range0)
+
+    def percentile(self, player: int, index: int) -> float:
+        """Share of the player's range (by weight) this combo beats on equity,
+        counting ties as half."""
+        eq, w = self.eq[player], self.weights[player]
+        mine = eq[index]
+        below = float(w[eq < mine - 1e-9].sum()) + 0.5 * float(w[np.abs(eq - mine) <= 1e-9].sum())
+        return below / float(w.sum())
+
+
+BET_FRACTION = {label: frac for frac, label in BET_SIZE_MENU}
+
+
+def analyze(
+    trainer: RangeCfrTrainer,
+    facts: EquityFacts,
+    board: tuple[int, ...],
+    player: int,
+    index: int,
+    history: tuple[str, ...],
+    mix: dict[str, float],
+    facing: str | None,
+) -> dict:
+    """The "why" for one dealt hand -- see app/drill_analysis.py for what it is
+    and is not. Returns the bullets plus the compact facts the UI shows."""
+    hero = (OOP if player == 0 else IP).value
+    villain = (IP if player == 0 else OOP).value
+    hole = trainer.combos[player][index]
+    profile = describe_hand((hole[0], hole[1]), board)
+    texture = describe_board(board)
+    actions, strategy = trainer.average_strategy(history)
+    range_mix = {
+        a: float(np.average(strategy[:, k], weights=trainer.weights[player]))
+        for k, a in enumerate(actions)
+    }
+    equity = float(facts.eq[player][index])
+    percentile = facts.percentile(player, index)
+    bullets = explain(
+        AnalysisInput(
+            hero=hero,
+            villain=villain,
+            facing_bet=facing is not None,
+            mix=mix,
+            profile=profile,
+            texture=texture,
+            equity=equity,
+            percentile=percentile,
+            hero_range_equity=facts.range_equity[player],
+            range_mix=range_mix,
+            pot_bb=POT_BB,
+            bet_bb=BET_FRACTION[facing] * POT_BB if facing else 0.0,
+        )
+    )
+    return {
+        "bullets": bullets,
+        "facts": {
+            "hand": profile.label,
+            "draws": list(profile.draws),
+            "board": texture.label,
+            "equityPct": round(equity * 100),
+            "rangePercentile": round(percentile * 100),
+            "rangeEquityPct": round(facts.range_equity[player] * 100),
+        },
+    }
+
+
 def deal(
     trainer: RangeCfrTrainer,
     player: int,
     history: tuple[str, ...],
     rng: random.Random,
-) -> list[tuple[str, np.ndarray, tuple[str, ...]]]:
-    """Hands for one decision: [(hand_key, strategy_row, actions)]."""
+) -> list[tuple[int, str, np.ndarray, tuple[str, ...]]]:
+    """Hands for one decision: [(combo_index, hand_key, strategy_row, actions)]."""
     actions, strategy = trainer.average_strategy(history)
     weights = trainer.weights[player]
     combos = trainer.combos[player]
@@ -104,7 +191,7 @@ def deal(
         i = draw(1)[0]
         if i not in picked:
             picked.append(i)
-    return [(combo_key(combos[i]), strategy[i], actions) for i in picked]
+    return [(i, combo_key(combos[i]), strategy[i], actions) for i in picked]
 
 
 def main() -> None:
@@ -128,6 +215,7 @@ def main() -> None:
             )
         )
         exploitability = trainer.train_until(TARGET_EXPLOITABILITY_PCT, MAX_ITERATIONS)
+        facts = EquityFacts(trainer, tuple(parse_card(c) for c in board))
         worst = max(worst, exploitability)
         print(
             f"{board_text}: {trainer.iterations} iterations, "
@@ -150,7 +238,8 @@ def main() -> None:
                     continue
                 choice = rng.choices(sizes, weights=[bet_freq[a] for a in sizes], k=1)[0]
                 history = (choice,)
-            for hand_key, row, actions in deal(trainer, player, history, rng):
+            for index, hand_key, row, actions in deal(trainer, player, history, rng):
+                mix = {a: round(float(p), 3) for a, p in zip(actions, row)}
                 spot = {
                     "id": f"{board_text.replace(' ', '')}-{situation}-{hand_key}",
                     "board": board,
@@ -161,10 +250,20 @@ def main() -> None:
                     "stackBb": STACK_BB,
                     "hand": [hand_key[:2], hand_key[2:]],
                     "actions": list(actions),
-                    "mix": {a: round(float(p), 3) for a, p in zip(actions, row)},
+                    "mix": mix,
                 }
                 if situation == "facing_bet":
                     spot["facing"] = history[0]
+                spot["analysis"] = analyze(
+                    trainer,
+                    facts,
+                    tuple(parse_card(c) for c in board),
+                    player,
+                    index,
+                    history,
+                    {a: float(p) for a, p in zip(actions, row)},
+                    history[0] if situation == "facing_bet" else None,
+                )
                 spots.append(spot)
 
     rng.shuffle(spots)

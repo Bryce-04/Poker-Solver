@@ -1,31 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ErrorBoundary } from "../components/ErrorBoundary/ErrorBoundary";
 import { PlayingCard } from "../components/PlayingCard/PlayingCard";
 import deckFile from "../data/drill-deck.json";
 import {
-  AGGRESSIVE,
-  actionLabel,
-  directionAction,
+  actionParts,
+  actionText,
+  aggressiveActions,
+  betAmount,
+  formatBb,
   gradeAction,
   isFacingBet,
+  passiveActions,
   shuffled,
+  type BetDisplay,
   type DrillAction,
   type DrillDeckFile,
   type DrillSpot,
   type Grade,
-  type SwipeDirection,
 } from "../lib/drill";
+import {
+  DRILL_THEMES,
+  readTheme,
+  themeById,
+  writeTheme,
+  type DrillThemeId,
+} from "../lib/drillTheme";
+import { readBetDisplay, writeBetDisplay } from "../lib/drillSettings";
 import { haptic } from "../lib/haptics";
 import "./DrillPage.css";
 
 const DECK_FILE = deckFile as unknown as DrillDeckFile;
 const DECK = DECK_FILE.decks[0];
 const SESSION_LENGTH = 15;
-// How far (px) a drag has to travel to count as a swipe.
-const SWIPE_DISTANCE = 80;
-// Matches the .is-thrown transition in DrillPage.css.
-const THROW_MS = 200;
 const BEST_KEY = "drill.bestScore";
 
 interface Answer {
@@ -55,28 +62,23 @@ function pct(p: number): string {
   return p >= 0.995 ? "100%" : p < 0.005 ? "0%" : `${Math.round(p * 100)}%`;
 }
 
-const BET_FRACTION: Record<string, number> = {
-  bet_small: 0.25,
-  bet_medium: 0.75,
-  bet_large: 1.25,
-};
-
 /** The one-glance line on what's happening: who owes what. */
 function situationChip(spot: DrillSpot): { text: string; tone: "facing" | "free" } {
   if (spot.situation === "first_to_act") return { text: "Your action first", tone: "free" };
   if (spot.situation === "facing_check") {
     return { text: `${spot.villainPosition} checked to you`, tone: "free" };
   }
-  const frac = BET_FRACTION[spot.facing ?? ""];
-  const amount = frac ? `${(frac * spot.potBb).toFixed(1)}bb` : "a bet";
-  return { text: `${spot.villainPosition} bets ${amount}`, tone: "facing" };
+  return {
+    text: `${spot.villainPosition} bets ${formatBb(betAmount(spot))}bb`,
+    tone: "facing",
+  };
 }
 
 function seatLine(spot: DrillSpot): string {
   return spot.situation === "first_to_act" ? "Out of position" : "In position";
 }
 
-/** The seat badge: who you are, the thing most worth noticing on the card. */
+/** The seat badge: who you are, the thing most worth noticing on the screen. */
 function SeatBadge({ spot }: { spot: DrillSpot }) {
   return (
     <div className="seat">
@@ -92,30 +94,156 @@ function SeatBadge({ spot }: { spot: DrillSpot }) {
   );
 }
 
-function Chips({ spot }: { spot: DrillSpot }) {
-  const chip = situationChip(spot);
+export function DrillPage() {
+  const [theme, setTheme] = useState<DrillThemeId>(readTheme);
+  const [betDisplay, setBetDisplay] = useState<BetDisplay>(readBetDisplay);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Tint the browser / status bar to match the table while the drill is open.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const previous = meta?.content;
+    if (meta) meta.content = themeById(theme).chrome;
+    return () => {
+      if (meta && previous !== undefined) meta.content = previous;
+    };
+  }, [theme]);
+
   return (
-    <div className="chips">
-      <span className={`chip chip--${chip.tone}`}>{chip.text}</span>
-      <span className="chip">Pot {spot.potBb}bb</span>
-      <span className="chip">{spot.stackBb}bb deep</span>
+    <div className="game" data-theme={theme}>
+      <ErrorBoundary>
+        <Game betDisplay={betDisplay} onSettings={() => setSettingsOpen(true)} />
+        {settingsOpen && (
+          <Settings
+            theme={theme}
+            betDisplay={betDisplay}
+            onTheme={(id) => {
+              setTheme(id);
+              writeTheme(id);
+            }}
+            onBetDisplay={(mode) => {
+              setBetDisplay(mode);
+              writeBetDisplay(mode);
+            }}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+      </ErrorBoundary>
     </div>
   );
 }
 
-export function DrillPage() {
+function Settings({
+  theme,
+  betDisplay,
+  onTheme,
+  onBetDisplay,
+  onClose,
+}: {
+  theme: DrillThemeId;
+  betDisplay: BetDisplay;
+  onTheme: (id: DrillThemeId) => void;
+  onBetDisplay: (mode: BetDisplay) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className="game">
-      <ErrorBoundary>
-        <Game />
-      </ErrorBoundary>
+    <div className="sheet__backdrop" onClick={onClose}>
+      <div
+        className="sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sheet__header">
+          <h2 id="settings-title" className="sheet__title">
+            Settings
+          </h2>
+          <button type="button" className="sheet__done" onClick={onClose} autoFocus>
+            Done
+          </button>
+        </div>
+
+        <fieldset className="themes">
+          <legend>Table color</legend>
+          <div className="themes__row">
+            {DRILL_THEMES.map((t) => (
+              <label key={t.id} className="themes__option">
+                <input
+                  type="radio"
+                  name="drill-theme"
+                  value={t.id}
+                  checked={theme === t.id}
+                  onChange={() => onTheme(t.id)}
+                />
+                <span
+                  className="themes__swatch"
+                  style={{
+                    ["--swatch-felt" as string]: t.felt,
+                    ["--swatch-edge" as string]: t.edge,
+                    ["--swatch-rail" as string]: t.rail,
+                    ["--swatch-rim" as string]: t.rim,
+                  }}
+                />
+                {t.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="segmented">
+          <legend>Show bet sizes as</legend>
+          <div className="segmented__row">
+            <label className="segmented__option">
+              <input
+                type="radio"
+                name="drill-bet-display"
+                value="bb"
+                checked={betDisplay === "bb"}
+                onChange={() => onBetDisplay("bb")}
+              />
+              <span>
+                <strong>4.1bb</strong>
+                <small>75% pot</small>
+              </span>
+            </label>
+            <label className="segmented__option">
+              <input
+                type="radio"
+                name="drill-bet-display"
+                value="pct"
+                checked={betDisplay === "pct"}
+                onChange={() => onBetDisplay("pct")}
+              />
+              <span>
+                <strong>75%</strong>
+                <small>4.1bb</small>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+      </div>
     </div>
   );
 }
 
 type Phase = "start" | "playing" | "done";
 
-function Game() {
+function Game({
+  betDisplay,
+  onSettings,
+}: {
+  betDisplay: BetDisplay;
+  onSettings: () => void;
+}) {
   const [phase, setPhase] = useState<Phase>("start");
   const [round, setRound] = useState(() => Date.now());
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -148,8 +276,16 @@ function Game() {
         {phase === "playing" ? (
           <Progress answers={answers} total={cards.length} />
         ) : (
-          <span className="game__title">Swipe Drill</span>
+          <span className="game__title">Poker Drill</span>
         )}
+        <button
+          type="button"
+          className="game__cog"
+          aria-label="Settings"
+          onClick={onSettings}
+        >
+          <CogIcon />
+        </button>
       </header>
 
       {phase === "start" && <Start best={best} onPlay={play} />}
@@ -157,13 +293,25 @@ function Game() {
         <Playing
           key={round}
           cards={cards}
+          betDisplay={betDisplay}
           onAnswer={(a) => setAnswers((prev) => [...prev, a])}
           onFinish={finish}
           answers={answers}
         />
       )}
-      {phase === "done" && <Summary answers={answers} best={best} onAgain={play} />}
+      {phase === "done" && (
+        <Summary answers={answers} best={best} betDisplay={betDisplay} onAgain={play} />
+      )}
     </>
+  );
+}
+
+function CogIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 14.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01A1.7 1.7 0 0 0 10.2 3.1V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03z" />
+    </svg>
   );
 }
 
@@ -202,22 +350,16 @@ function Progress({ answers, total }: { answers: Answer[]; total: number }) {
 function Start({ best, onPlay }: { best: number | null; onPlay: () => void }) {
   return (
     <main className="start">
-      <h1 className="start__title">Swipe Drill</h1>
+      <h1 className="start__title">Poker Drill</h1>
       <p className="start__deck">{DECK.name}</p>
       <p className="start__desc">{DECK.description}</p>
       <ul className="start__how">
-        <li>
-          <span className="start__key">←</span> Fold or check
-        </li>
-        <li>
-          <span className="start__key">→</span> Call
-        </li>
-        <li>
-          <span className="start__key">↑</span> Bet or raise
-        </li>
+        <li>See the table and your hand.</li>
+        <li>Pick your action.</li>
+        <li>Get scored against the solver's strategy for those exact cards.</li>
       </ul>
       <p className="start__note">
-        {SESSION_LENGTH} hands. Scored against a solved strategy for your exact cards.
+        {SESSION_LENGTH} hands. Change the table color in settings (top right).
       </p>
       {best !== null && <p className="start__best">Best score: {best} / {SESSION_LENGTH}</p>}
       <button type="button" className="game__primary" onClick={onPlay} autoFocus>
@@ -227,29 +369,49 @@ function Start({ best, onPlay }: { best: number | null; onPlay: () => void }) {
   );
 }
 
+/** The table: pot in the middle, the board, then your hand. */
+function Table({ spot }: { spot: DrillSpot }) {
+  const facing = betAmount(spot);
+  return (
+    <div className="table" data-testid="drill-table">
+      <div className="pot">
+        <span className="pot__label">Pot</span>
+        <span className="pot__value">{formatBb(spot.potBb)}bb</span>
+        {facing > 0 && <span className="pot__bet">+ {formatBb(facing)}bb bet</span>}
+      </div>
+      <div className="table__label">Board</div>
+      <div className="card__row">
+        {spot.board.map((c) => (
+          <PlayingCard key={c} card={c} />
+        ))}
+      </div>
+      <div className="table__label">Your hand</div>
+      <div className="card__row card__row--hand">
+        {spot.hand.map((c) => (
+          <PlayingCard key={c} card={c} size="xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Playing({
   cards,
   answers,
+  betDisplay,
   onAnswer,
   onFinish,
 }: {
   cards: DrillSpot[];
   answers: Answer[];
+  betDisplay: BetDisplay;
   onAnswer: (a: Answer) => void;
   onFinish: (all: Answer[]) => void;
 }) {
   const [index, setIndex] = useState(0);
-  const [pickingSize, setPickingSize] = useState(false);
-  const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
-  const [thrown, setThrown] = useState<SwipeDirection | null>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const timer = useRef<number | undefined>(undefined);
 
   const spot = cards[index];
   const answer = answers.length > index ? answers[index] : null;
-  const facingBet = isFacingBet(spot);
-
-  useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const choose = useCallback(
     (action: DrillAction) => {
@@ -257,31 +419,8 @@ function Playing({
       const grade = gradeAction(spot, action);
       haptic(grade.verdict);
       onAnswer({ spot, chosen: action, grade });
-      setPickingSize(false);
-      setThrown(null);
-      setDrag({ x: 0, y: 0, active: false });
     },
     [spot, answer, onAnswer],
-  );
-
-  /** `animate` is for finger swipes: fly the card off first, then grade. */
-  const swipe = useCallback(
-    (direction: SwipeDirection, animate = false) => {
-      if (answer || thrown) return;
-      const result = directionAction(spot, direction);
-      if (result === null) return;
-      if (result === "size") {
-        setPickingSize(true);
-        return;
-      }
-      if (!animate) {
-        choose(result);
-        return;
-      }
-      setThrown(direction);
-      timer.current = window.setTimeout(() => choose(result), THROW_MS);
-    },
-    [spot, answer, thrown, choose],
   );
 
   const next = useCallback(() => {
@@ -289,153 +428,93 @@ function Playing({
       onFinish(answers);
       return;
     }
-    setPickingSize(false);
     setIndex((i) => i + 1);
   }, [index, cards.length, answers, onFinish]);
 
+  // Enter / Space moves on once an answer is showing.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft") swipe("left");
-      else if (e.key === "ArrowRight") swipe("right");
-      else if (e.key === "ArrowUp") swipe("up");
-      else if ((e.key === "Enter" || e.key === " ") && answer) next();
-      else return;
-      e.preventDefault();
+      if ((e.key === "Enter" || e.key === " ") && answer) {
+        e.preventDefault();
+        next();
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [swipe, next, answer]);
-
-  function onPointerDown(e: React.PointerEvent) {
-    if (answer || pickingSize || thrown) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    start.current = { x: e.clientX, y: e.clientY };
-    setDrag({ x: 0, y: 0, active: true });
-  }
-  function onPointerMove(e: React.PointerEvent) {
-    if (!start.current) return;
-    setDrag({ x: e.clientX - start.current.x, y: e.clientY - start.current.y, active: true });
-  }
-  function onPointerEnd() {
-    if (!start.current) return;
-    const { x, y } = drag;
-    start.current = null;
-    setDrag({ x: 0, y: 0, active: false });
-    if (Math.abs(x) >= SWIPE_DISTANCE && Math.abs(x) > Math.abs(y)) {
-      swipe(x < 0 ? "left" : "right", true);
-    } else if (y <= -SWIPE_DISTANCE && Math.abs(y) > Math.abs(x)) {
-      swipe("up", true);
-    }
-  }
-
-  const leftAction = directionAction(spot, "left");
-  const rightAction = directionAction(spot, "right");
-  const upAction = directionAction(spot, "up");
-  const aggressive = spot.actions.filter((a) => AGGRESSIVE.has(a));
-
-  const labelFor = (a: DrillAction | "size" | null, fallback: string) =>
-    a === null ? "" : a === "size" ? fallback : actionLabel(a, facingBet);
-  const leftLabel = labelFor(leftAction, "");
-  const rightLabel = labelFor(rightAction, "");
-  const upLabel = labelFor(upAction, facingBet ? "Raise" : "Bet");
-
-  // 0..1 how far the drag has pulled toward each zone, so its label can
-  // brighten and the card can tint toward it.
-  const pull = (distance: number) => Math.max(0, Math.min(1, distance / SWIPE_DISTANCE));
-  const horizontal = Math.abs(drag.x) > Math.abs(drag.y);
-  const pulls = {
-    left: horizontal && leftAction ? pull(-drag.x) : 0,
-    right: horizontal && rightAction ? pull(drag.x) : 0,
-    up: !horizontal && upAction ? pull(-drag.y) : 0,
-  };
-
-  let transform = `translate(${drag.x}px, ${Math.min(0, drag.y)}px) rotate(${drag.x / 18}deg)`;
-  if (thrown === "left") transform = "translate(-130vw, 0) rotate(-24deg)";
-  if (thrown === "right") transform = "translate(130vw, 0) rotate(24deg)";
-  if (thrown === "up") transform = "translate(0, -130vh)";
+  }, [next, answer]);
 
   if (answer) {
-    return <Feedback key={`fb-${index}`} answer={answer} last={index === cards.length - 1} onNext={next} />;
+    return (
+      <Feedback
+        key={`fb-${index}`}
+        answer={answer}
+        betDisplay={betDisplay}
+        last={index === cards.length - 1}
+        onNext={next}
+      />
+    );
   }
+
+  const facingBet = isFacingBet(spot);
+  const chip = situationChip(spot);
+  const passive = passiveActions(spot);
+  const aggressive = aggressiveActions(spot);
 
   return (
     <>
       <main className="play" key={`card-${index}`}>
         <SeatBadge spot={spot} />
-        <Chips spot={spot} />
-
-        <div className="zones" aria-hidden="true">
-          <span className="zone zone--left" style={{ opacity: 0.35 + 0.65 * pulls.left }}>
-            ← {leftLabel}
-          </span>
-          <span className="zone zone--up" style={{ opacity: 0.35 + 0.65 * pulls.up }}>
-            ↑ {upLabel}
-          </span>
-          <span className="zone zone--right" style={{ opacity: 0.35 + 0.65 * pulls.right }}>
-            {rightLabel && `${rightLabel} →`}
-          </span>
+        <div className="chips">
+          <span className={`chip chip--${chip.tone}`}>{chip.text}</span>
+          <span className="chip">{formatBb(spot.stackBb)}bb deep</span>
         </div>
-
-        <div
-          className={`card${drag.active ? " is-dragging" : ""}${thrown ? " is-thrown" : ""}`}
-          style={{
-            transform,
-            ["--tint" as string]: Math.max(pulls.left, pulls.right, pulls.up),
-          }}
-          data-pull={
-            pulls.up > 0 ? "up" : pulls.left > 0 ? "left" : pulls.right > 0 ? "right" : undefined
-          }
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerEnd}
-          onPointerCancel={onPointerEnd}
-          data-testid="drill-card"
-        >
-          <div className="card__label">Board</div>
-          <div className="card__row">
-            {spot.board.map((c) => (
-              <PlayingCard key={c} card={c} />
-            ))}
-          </div>
-          <div className="card__label">Your hand</div>
-          <div className="card__row card__row--hand">
-            {spot.hand.map((c) => (
-              <PlayingCard key={c} card={c} size="xl" />
-            ))}
-          </div>
-        </div>
+        <Table spot={spot} />
       </main>
 
       <footer className="controls">
-        {pickingSize ? (
+        <div className="controls__row">
+          {passive.map((a) => (
+            <ActionButton key={a} spot={spot} action={a} mode={betDisplay} onChoose={choose} />
+          ))}
+        </div>
+        {aggressive.length > 0 && (
           <>
-            <p className="controls__prompt">{facingBet ? "Raise size" : "Bet size"}</p>
-            <div className="controls__row">
+            <p className="controls__prompt">{facingBet ? "Raise to" : "Bet"}</p>
+            <div className="controls__row controls__row--sizes">
               {aggressive.map((a) => (
-                <button key={a} type="button" className="btn btn--bet" onClick={() => choose(a)}>
-                  {actionLabel(a, facingBet)}
-                </button>
+                <ActionButton key={a} spot={spot} action={a} mode={betDisplay} onChoose={choose} bet />
               ))}
             </div>
-            <button type="button" className="btn btn--ghost" onClick={() => setPickingSize(false)}>
-              Back
-            </button>
           </>
-        ) : (
-          <div className="controls__row">
-            <button type="button" className="btn" disabled={!leftAction} onClick={() => swipe("left")}>
-              ← {leftLabel}
-            </button>
-            <button type="button" className="btn btn--bet" disabled={!upAction} onClick={() => swipe("up")}>
-              ↑ {facingBet ? "Raise" : "Bet"}
-            </button>
-            <button type="button" className="btn" disabled={!rightAction} onClick={() => swipe("right")}>
-              {rightAction ? `${rightLabel} →` : "—"}
-            </button>
-          </div>
         )}
       </footer>
     </>
+  );
+}
+
+function ActionButton({
+  spot,
+  action,
+  mode,
+  onChoose,
+  bet = false,
+}: {
+  spot: DrillSpot;
+  action: DrillAction;
+  mode: BetDisplay;
+  onChoose: (a: DrillAction) => void;
+  bet?: boolean;
+}) {
+  const { main, sub } = actionParts(spot, action, mode);
+  return (
+    <button
+      type="button"
+      className={`btn${bet ? " btn--bet" : ""}`}
+      onClick={() => onChoose(action)}
+    >
+      <span className="btn__main">{main}</span>
+      {sub && <span className="btn__sub">{sub}</span>}
+    </button>
   );
 }
 
@@ -447,15 +526,16 @@ const VERDICT = {
 
 function Feedback({
   answer,
+  betDisplay,
   last,
   onNext,
 }: {
   answer: Answer;
+  betDisplay: BetDisplay;
   last: boolean;
   onNext: () => void;
 }) {
   const { spot, chosen, grade } = answer;
-  const facingBet = isFacingBet(spot);
   const rows = spot.actions
     .map((a) => ({ action: a, p: spot.mix[a] ?? 0 }))
     .filter((r) => r.p >= 0.005 || r.action === chosen)
@@ -470,7 +550,7 @@ function Feedback({
           </span>
         </div>
         <p className="verdict__sub">
-          You chose <strong>{actionLabel(chosen, facingBet)}</strong>, which the solver plays{" "}
+          You chose <strong>{actionText(spot, chosen, betDisplay)}</strong>, which the solver plays{" "}
           {pct(grade.frequency)} of the time with this hand. {VERDICT[grade.verdict].sub}
         </p>
 
@@ -493,7 +573,7 @@ function Feedback({
               key={r.action}
               className={`mix__row${r.action === chosen ? " is-chosen" : ""}${r.action === grade.topAction ? " is-top" : ""}`}
             >
-              <span className="mix__name">{actionLabel(r.action, facingBet)}</span>
+              <span className="mix__name">{actionText(spot, r.action, betDisplay)}</span>
               <span className="mix__bar">
                 <span data-kind={r.action} style={{ width: `${Math.round(r.p * 100)}%` }} />
               </span>
@@ -502,6 +582,48 @@ function Feedback({
           ))}
         </ul>
         <p className="mix__legend">Your pick is bold. The solver's favorite has a ★.</p>
+
+        {spot.analysis && (
+          <details
+            className="why"
+            onToggle={(e) => {
+              // Opening it grows the page downward; keep the new text in view.
+              const el = e.currentTarget;
+              if (el.open && typeof el.scrollIntoView === "function") {
+                el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              }
+            }}
+          >
+            <summary className="why__summary">
+              <span>Why {actionText(spot, grade.topAction, betDisplay)}?</span>
+              <span className="why__chevron" aria-hidden="true">
+                ▾
+              </span>
+            </summary>
+            <div className="why__body">
+              <ul className="why__facts">
+                <li>
+                  <strong>{spot.analysis.facts.equityPct}%</strong>
+                  <span>equity</span>
+                </li>
+                <li>
+                  <strong>{spot.analysis.facts.rangePercentile}%</strong>
+                  <span>of range beaten</span>
+                </li>
+              </ul>
+              <ul className="why__bullets">
+                {spot.analysis.bullets.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+              <p className="why__note">
+                A rule-of-thumb summary of computed numbers (equity against the real range, pot
+                odds, how often the range takes each action). The solver itself only outputs the
+                mix.
+              </p>
+            </div>
+          </details>
+        )}
       </main>
       <footer className="controls">
         <button type="button" className="game__primary" onClick={onNext} autoFocus>
@@ -515,10 +637,12 @@ function Feedback({
 function Summary({
   answers,
   best,
+  betDisplay,
   onAgain,
 }: {
   answers: Answer[];
   best: number | null;
+  betDisplay: BetDisplay;
   onAgain: () => void;
 }) {
   const score = answers.reduce((s, a) => s + a.grade.points, 0);
@@ -549,8 +673,8 @@ function Summary({
                   </span>
                   <span>
                     {a.spot.heroPosition} on {a.spot.board.join(" ")}: you chose{" "}
-                    <strong>{actionLabel(a.chosen, isFacingBet(a.spot))}</strong>; the solver
-                    prefers <strong>{actionLabel(a.grade.topAction, isFacingBet(a.spot))}</strong> (
+                    <strong>{actionText(a.spot, a.chosen, betDisplay)}</strong>; the solver prefers{" "}
+                    <strong>{actionText(a.spot, a.grade.topAction, betDisplay)}</strong> (
                     {pct(a.spot.mix[a.grade.topAction] ?? 0)}).
                   </span>
                 </li>
