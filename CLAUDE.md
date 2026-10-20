@@ -137,8 +137,8 @@ phone home screen (`public/manifest.webmanifest`, apple-touch icons). The
 design plan lives on the `plan-swipe-drill` branch's `docs/plan.md`; the
 decision record is `docs/decisions.md`'s 2026-10-19 entry. Bet sizes are
 deliberately still 25/75/125 (33/66/100 was considered, deferred to the team).
-After each answer the feedback screen also explains **why the solver's
-favorite play is good**: `apps/api/app/drill_analysis.py` (run offline by the
+After each answer the feedback screen also has a tap-to-open (inline `<details>`,
+collapsed by default) explanation of **why the solver's favorite play is good**: `apps/api/app/drill_analysis.py` (run offline by the
 deck script, shipped as each spot's `analysis` in the deck JSON) classifies the
 hand (top pair, flush draw, ace high...) and the board, and computes equity
 against the opponent's real range, where the hand ranks in its range, how often

@@ -96,6 +96,12 @@ above), now fixed and covered. Not done: per-action EVs (needs the trainer to
 expose action values; would make the "why" much stronger), sizing reasoning
 (why 25% vs 75%), blockers, AI-written text.
 
+**Update, same day — the "why" is a tap-to-open row.** Shown in full it pushed
+the mix and the Next button down a screen; it is now a single collapsed row ("Why
+Bet 4.1bb (75%)?") that drops open in place (native `<details>`, so no JS state,
+accessible by default, nothing navigates away) and is closed again on every new
+hand. Opening it scrolls the new text into view.
+
 **Limits.** Flop only, single-raised pot, 100bb, BB vs BTN. Ranges are the
 repo's approximate reference charts, so "correct" means correct against those
 ranges. Not yet done: haptics on iOS (the Vibration API isn't in iOS Safari;

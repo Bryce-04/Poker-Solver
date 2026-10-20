@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DrillPage } from "./DrillPage";
 
 function open() {
-  render(
+  return render(
     <MemoryRouter initialEntries={["/drill"]}>
       <DrillPage />
     </MemoryRouter>,
@@ -49,13 +49,32 @@ describe("DrillPage", () => {
     expect(screen.getByText(/2 \/ 15/)).toBeTruthy();
   });
 
-  it("explains why the solver's play is best, after answering", () => {
-    open();
+  it("tucks the why behind a tap, and opens it in place", () => {
+    const { container } = open();
     play();
     answerFirst();
-    expect(screen.getByRole("heading", { name: /^why /i })).toBeTruthy();
+    const why = container.querySelector("details.why") as HTMLDetailsElement;
+    expect(why).toBeTruthy();
+    expect(why.open).toBe(false);
+    const summary = screen.getByText(/^why /i);
+    fireEvent.click(summary);
+    // jsdom doesn't toggle <details> on a click, so open it the way a browser would.
+    why.open = true;
     expect(screen.getByText("equity")).toBeTruthy();
     expect(screen.getByText(/rule-of-thumb summary/i)).toBeTruthy();
+    // Still on the same screen: the verdict and the next button are right there.
+    expect(screen.getByRole("status")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /next hand|see results/i })).toBeTruthy();
+  });
+
+  it("starts each hand's why collapsed again", () => {
+    const { container } = open();
+    play();
+    answerFirst();
+    (container.querySelector("details.why") as HTMLDetailsElement).open = true;
+    fireEvent.click(screen.getByRole("button", { name: /next hand/i }));
+    answerFirst();
+    expect((container.querySelector("details.why") as HTMLDetailsElement).open).toBe(false);
   });
 
   it("finishes with a score summary and remembers the best score", () => {

@@ -345,7 +345,7 @@ dropped (see `docs/decisions.md`). After each answer: a verdict (best /
 acceptable / miss), then the solver's full action mix for that hand, your pick
 bold and the solver's favorite starred.
 
-**The "why"** (feedback screen, below the mix): `spot.analysis` from the deck —
+**The "why"** (feedback screen, below the mix, **collapsed behind a tap**: a native `<details>` row "Why Bet 4.1bb (75%)?" that drops open in place and starts closed again every hand): `spot.analysis` from the deck —
 two figures (equity against the opponent's range, share of the player's range
 beaten) and a few bullets about the hand, the board/range or pot-odds price, and
 the reason for the solver's favorite play, plus a caveat when the mix is close.

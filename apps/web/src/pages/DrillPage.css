@@ -645,6 +645,8 @@
   .verdict,
   .sheet,
   .sheet__backdrop,
+  .why__body,
+  .why__chevron,
   .progress__bar span {
     animation: none;
     transition: none;
@@ -891,17 +893,47 @@
 /* --- the "why" behind the solver's play ------------------------------------ */
 
 .why {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  padding: 0.9rem 1rem;
   border-radius: 16px;
   background: var(--g-panel);
   border: 1px solid var(--g-line);
 }
-.why__title {
-  margin: 0;
-  font-size: 1.05rem;
+/* A tappable row; the answer drops down in place, nothing navigates away. */
+.why__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.why__summary::-webkit-details-marker {
+  display: none;
+}
+.why__chevron {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background: var(--g-bet-bg);
+  font-size: 0.9rem;
+  transition: transform 0.2s ease;
+}
+.why[open] .why__chevron {
+  transform: rotate(180deg);
+}
+.why__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0 1rem 1rem;
+  animation: fade-in 0.2s ease-out;
 }
 .why__facts {
   list-style: none;
