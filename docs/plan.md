@@ -16,7 +16,9 @@ chart-coverable shapes) — the first of the "pluggable adapters" this
 stage's note called for. The range grid is finally mounted editable, not
 just as a read-only chart display: every entry path (Builder, Type in,
 Import) lets you adjust the matched range before saving it. `apps/web` is
-routed into five screens (Builder / Saved / Type in / Import / Solve).
+routed into four destinations (Solve / Ranges / Library / Drill; Ranges
+merges the builder, text entry and hand-history import), with a dedicated
+desktop layout at 1024px and wider. See `docs/desktop-redesign.md`.
 Saved spots
 is wired end-to-end: `apps/api` persists `Spot`s (Postgres via Supabase)
 behind `POST`/`GET /spots` (see `docs/decisions.md`). Stage 6's frontend

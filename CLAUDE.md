@@ -116,12 +116,10 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
-**Poker Drill (2026-10-19)** — branch status: `main` has only the first version
-(PR #27, the "Swipe Drill", with swiping). Everything below beyond that — tap-only
-actions, settings cog, table colors, the pot on the table, bb amounts, the "why"
-analysis and its tap-to-open row — is on an unmerged stack of branches, each
-built on the last: `drill-themes` → `drill-settings` → `drill-analysis` →
-`drill-why-dropdown` (one PR from the tip carries all of it). See
+**Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
+"Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
+colors, the pot on the table, bb amounts, and the "why" analysis with its
+tap-to-open row (PR #28), plus the iPhone build and haptics (PR #29). See
 `docs/decisions.md`:
 `/drill` (`apps/web/src/pages/DrillPage.tsx`) is a mobile-first practice
 game, rendered full screen *outside* the app shell (`App.tsx`: `/drill` is its
@@ -445,9 +443,10 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   Nav destinations and desktop page titles live in `lib/navigation.ts`.
   Screens live in `apps/web/src/pages/`; `apps/web/src/lib/api.ts` is the
   single fetch chokepoint (never throws — callers switch on a result's
-  `kind` instead of try/catch), currently backing the reference-strategy
-  lookup plus `saveSpot`/`listSpots` (both send the Supabase access
-  token as `Authorization: Bearer`, which `apps/api` requires). Those two
+  `kind` instead of try/catch), backing the reference-strategy lookup,
+  the solver routes, and `saveSpot` / `listSpots` / `renameSpot` /
+  `deleteSpot` (all four send the Supabase access token as
+  `Authorization: Bearer`, which `apps/api` requires). `saveSpot` / `listSpots`
   were built against an assumed `apps/api` contract ahead of the
   endpoints and the token check shipping, since confirmed — see
   `docs/decisions.md`.

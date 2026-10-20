@@ -4,9 +4,12 @@ The React + TypeScript + Vite frontend. Stage 2's manual hand builder lives
 here: the button/dropdown **spot builder** and the **13×13 range grid**. See
 [`../../docs/plan.md`](../../docs/plan.md) for the roadmap and where this fits.
 
-**Status:** routed into five screens — Builder, Saved, Type in, Import,
-Solve (`react-router-dom`, `BrowserRouter` in `App.tsx`; see
-`docs/decisions.md`). The spot builder and range grid are wired end to
+**Status:** routed into four destinations — Solve, Ranges, Library, Drill
+(`react-router-dom`, `BrowserRouter` in `App.tsx`; nav items in
+`lib/navigation.ts`). The old routes redirect: `/` → `/solve`,
+`/saved` → `/library`, `/type-in` and `/import` →
+`/ranges?mode=type|paste`. See `## Desktop layout` below for what changes
+at 1024px and wider. The spot builder and range grid are wired end to
 end to `apps/api`'s reference-chart lookup; the range grid's
 weighted-brush / drag-paint / keyboard selection and weight shading are
 done, and the app has a design-token visual pass (light + dark). Two
@@ -32,6 +35,35 @@ StreetActions.tsx` — the default) or pasting a hand history
 (`lib/parseHandHistory.ts`) — see the `## SolvePage` section below for
 both, and `docs/decisions.md`'s 2026-10-07 entries for the design.
 
+## Desktop layout
+
+At **1024px and wider** the app has its own layout, built from the agreed
+spec and mockup in `docs/desktop-redesign.md`. **Under 1024px nothing
+changes visually**, which covers phones and the Capacitor builds. Phones
+keep the original screens: the Builder / Type in / Import pages under a
+mode switch on Ranges, the stacked Solve steps, and the Saved list.
+
+- **Which layout renders** is `lib/useIsDesktop.ts` (a `min-width: 1024px`
+  media query). jsdom has no `matchMedia`, so tests see the phone layout
+  unless they stub it, as the desktop test files do.
+- **Shell:** `components/Sidebar` on the left with nav, a guide card, and
+  `AuthStatus variant="sidebar"`; `components/PageHeader` across the top
+  of each page.
+- **Ranges:** `pages/RangesWorkspace.tsx`, a rail plus the chart. The chart
+  loads as the spot changes, with no submit button.
+- **Solve:** `pages/solve/SolveWorkspace.tsx`, setup and result views.
+  `pages/solve/useSolveSetup.ts` holds all of Solve's state, shared with
+  the phone layout, so resizing keeps a half-built hand.
+- **Library:** `pages/library/LibraryWorkspace.tsx`, a table plus a
+  preview, with open / rename / duplicate / delete.
+- **Shared fetch-and-save:** `lib/useReferenceChart.ts` is the logic every
+  chart page uses, on both layouts.
+- **Styling:** every desktop-only rule sits inside
+  `@media (min-width: 1024px)`. `src/desktop.css` holds the button roles
+  (`.btn-primary` / `-secondary` / `-ghost` / `-danger`, one primary per
+  screen). Give every new button a role class: on desktop a bare
+  `<button>` in the shell is no longer accent-filled.
+
 ## Commands
 
 Run from the repo root (this is a pnpm workspace):
@@ -41,6 +73,7 @@ pnpm install                 # installs all JS workspace deps
 pnpm dev:web                 # Vite dev server -> http://localhost:5173
 pnpm --filter web build      # production build (tsc -b && vite build)
 pnpm --filter web lint       # oxlint
+pnpm --filter web test       # vitest
 ```
 
 ## Layout
@@ -48,20 +81,34 @@ pnpm --filter web lint       # oxlint
 ```
 src/
   main.tsx                    entry — mounts <App> in StrictMode
-  App.tsx                     router shell: header + nav + <Routes> (BrowserRouter
-                              lives here, not main.tsx — see docs/decisions.md)
+  App.tsx                     router shell: phone header or desktop sidebar + <Routes>,
+                              old-route redirects (BrowserRouter lives here, not
+                              main.tsx — see docs/decisions.md)
   index.css                   design tokens (--*), light/dark via
                               prefers-color-scheme, base element styling
-  App.css                     shell + nav styling
+  desktop.css                 desktop-only (>= 1024px) button roles, section labels
+  App.css                     shell + nav styling (phone header; desktop shell + page header)
   pages/
-    BuilderPage.tsx            "/" — wraps SpotBuilder (Stage 2's button/dropdown builder)
-    TypeInPage.tsx              "/type-in" — Stage 3's plain-language entry
-    ImportPage.tsx               "/import" — Stage 4's hand-history paste entry
-    SolvePage.tsx                "/solve" — Stage 5's live MCCFR solve
-    DrillPage.tsx                "/drill" — the Poker Drill; full screen, rendered
+    SolvePage.tsx              "/solve" — calls useSolveSetup once; phone markup
+                              (SolvePhone) or SolveWorkspace on desktop
+    solve/                    desktop Solve: SolveWorkspace, ActionTimeline, BoardSlots,
+                              StrategyResult, solveText.ts (wording), useSolveSetup.ts
+    RangesPage.tsx             "/ranges" — RangesWorkspace on desktop; on phones the
+                              three pages below under a Pick / Type it / Hand history switch
+    RangesWorkspace.tsx        desktop Ranges: rail + chart, auto-loading
+    BuilderPage.tsx            phone Ranges "Pick" — wraps SpotBuilder
+    TypeInPage.tsx             phone Ranges "Type it" — Stage 3's plain-language entry
+    ImportPage.tsx             phone Ranges "Hand history" — Stage 4's paste entry
+    LibraryPage.tsx            "/library" — LibraryWorkspace on desktop, SavedSpotsPage on phones
+    library/                  desktop Library: table, preview, open/rename/duplicate/delete
+    SavedSpotsPage.tsx         phone Library — the original saved-spots list
+    DrillPage.tsx              "/drill" — the Poker Drill; full screen, rendered
                               outside the shell (see ## Poker Drill)
-    SavedSpotsPage.tsx          "/saved" — lists spots saved via apps/api
   components/
+    Sidebar/                  desktop nav sidebar (nav, guide card, account row)
+    PageHeader/               desktop page title bar with page actions
+    SegmentedControl/         one row of mutually exclusive choices (its own CSS, both widths)
+    MiniRange/                a label-less 13×13 range thumbnail
     SpotBuilder/              the spot builder form, reused by BuilderPage
     RangeGrid/                the 13×13 starting-hand grid
     CardPicker/               click-to-toggle board-card grid (SolvePage)
@@ -73,7 +120,13 @@ src/
                               recoverable message, not a blank screen
   lib/
     api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot,
-                              listSpots, solveSpot
+                              listSpots, renameSpot, deleteSpot, solveSpot, ...
+    useIsDesktop.ts           the 1024px breakpoint, for layout switches CSS can't do
+    navigation.ts             the four nav destinations + desktop page titles
+    useReferenceChart.ts      fetch a chart, edit its range, save it (every chart page)
+    solvePrefill.ts           route state into Solve: Ranges' "solve from here", or a
+                              Library spot (seedFromSpot rebuilds a saved setup)
+    spotText.ts               a saved spot in words (summarize, displayName, board text)
     spot.ts                   buildOpenSpot/buildVsRaiseSpot — the shared Spot-assembly
                               helpers every entry path converges on
     parseSpotText.ts           Stage 3's rule-based parser (two phrasings, plus synonyms)
@@ -120,7 +173,9 @@ switch on `.kind` instead of try/catch.
 | `fetchReferenceStrategy(spot)` | `POST /spots/reference-strategy` | `match` (2xx, `.data` is a `ReferenceStrategyResponse`) / `no-match` (404) / `invalid` (422, `.issues`) / `network-error` / `error` (`.status`) |
 | `saveSpot(spot)` | `POST /spots` | `saved` (2xx, `.spot` echoes the server-assigned `id`/`created_at`/`created_by`) / `invalid` / `network-error` / `error` (401 when not signed in) |
 | `listSpots()` | `GET /spots` | `ok` (`.spots: Spot[]`, the caller's own only) / `network-error` / `error` (401 when not signed in) |
-| `solveSpot(spot)` | `POST /spots/solve` | `solved` (2xx, `.data` is a `LiveSolveResponse`) / `invalid` (422 with an array `detail` — schema-level) / `rejected` (422 with a string `detail` — `apps/api/app/solve.py`'s own `InvalidSolveRequest`) / `network-error` / `error` |
+| `renameSpot(id, name)` | `PATCH /spots/{id}` | `renamed` (`.spot`) / `not-found` (404: gone, or not the caller's) / `invalid` (422, e.g. an empty name) / `network-error` / `error` |
+| `deleteSpot(id)` | `DELETE /spots/{id}` | `deleted` (204) / `not-found` / `network-error` / `error` |
+| `solveSpot(spot)` | `POST /spots/solve` | `solved` (2xx, `.data` is a `LiveSolveResponse`; its newer optional fields — `combo_strategy`, `hand_categories`, `hand_reasons`, `bucketed_actions` — are normalized to empty for an older backend) / `invalid` (422 with an array `detail` — schema-level) / `rejected` (422 with a string `detail` — `apps/api/app/solve.py`'s own `InvalidSolveRequest`) / `network-error` / `error` |
 
 `ReferenceStrategyResponse` mirrors `apps/api/app/routes/spots.py`'s response
 dict and is the one shared seam — coordinate with whoever owns `apps/api`
@@ -146,22 +201,25 @@ from the team's Supabase project, copied into a git-ignored
 mounted in `App.tsx` around `BrowserRouter`; `getAccessToken()` is a
 plain async export `lib/api.ts` calls directly, since that module isn't
 a component and can't use the hook. `components/AuthStatus/AuthStatus.tsx`
-is the header's email/password sign-in (and sign-up, same form, toggled)
-plus "Signed in as X / Sign out" UI — no magic link, to avoid a redirect
-URL in the Supabase dashboard and native deep-link handling this
-Capacitor app doesn't have.
+is the phone header's email/password sign-in (and sign-up, same form,
+toggled) plus "Signed in as X / Sign out" UI. On desktop the same component
+renders in the sidebar (`variant="sidebar"`): an initial avatar, the email
+and a ghost Sign out, or a "Sign in" button that opens the form. There's no
+magic link, to avoid a redirect URL in the Supabase dashboard and native
+deep-link handling this Capacitor app doesn't have.
 
 `saveSpot`/`listSpots` (`lib/api.ts`) attach
 `Authorization: Bearer <token>` when a session exists, omitted (not
 blocked client-side) otherwise. `apps/api` verifies it and returns 401
 without it (`docs/decisions.md`'s 2026-09-30 and 2026-10-06 entries).
 Separately,
-the save button on all three entry screens (Builder, Type in, Import)
-shows "Sign in to save spots" and skips the API call entirely when
-signed out, via each page's own `useAuth()` check. `SavedSpotsPage`
-shows only a signed-out notice when signed out (it doesn't call `GET
-/spots`, which requires sign-in), and fetches the signed-in user's own
-spots — refetching when the account changes.
+every save button (the three phone entry screens, desktop Ranges' "Save to
+Library", desktop Solve's "Save spot") shows a sign-in prompt and skips the
+API call entirely when signed out (`lib/useReferenceChart.ts` and
+`SolveWorkspace` check `useAuth()`). `SavedSpotsPage` and the desktop Library
+show only a signed-out notice when signed out (neither calls `GET /spots`,
+which requires sign-in), and fetch the signed-in user's own spots,
+refetching when the account changes.
 
 ## Android (Capacitor)
 
@@ -238,6 +296,12 @@ screen that needed one — see `## SolvePage` below for the
 
 `pages/SolvePage.tsx` is Stage 5's screen: a real MCCFR solve
 (`apps/api`'s `POST /spots/solve`) instead of a static reference chart.
+This section describes the **phone layout**, whose behavior is unchanged.
+Its state now lives in `pages/solve/useSolveSetup.ts`. The desktop layout
+(`pages/solve/SolveWorkspace.tsx`, see `## Desktop layout`) uses the same
+state with a different presentation: an action timeline, board slots, a
+"Ready to solve" checklist, Ranges / Strategy tabs, auto-loaded ranges,
+Keep exploring, and per-hand categories with a "Why?" on flop solves.
 It's the first screen needing *two* ranges and a board, so it departs
 from the other entry paths in a few ways:
 
@@ -454,4 +518,9 @@ redefined under
 `@media (prefers-color-scheme: dark)`, plus base styling for buttons,
 selects, inputs and focus rings. Lean on the tokens rather than hardcoding
 colours; a few older aliases (`--text-h`, `--code-bg`, `--accent-bg`) are
-kept pointing at their replacements.
+kept pointing at their replacements. The desktop redesign added
+`--sidebar-bg`, `--divider`, `--surface-hover`, `--surface-3`,
+`--success-text`, `--warning` / `--warning-subtle` and `--card-face` /
+`--card-ink` / `--card-red` (light and dark). Desktop-only rules always
+sit inside `@media (min-width: 1024px)`, so phones are untouched; see
+`## Desktop layout`.
