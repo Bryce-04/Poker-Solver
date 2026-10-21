@@ -1,4 +1,7 @@
+import { useState } from "react";
 import type { Position, Spot } from "@poker-solver/schema";
+import { saveSpot } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
 import { STREET_ORDER } from "../lib/handBuilder";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
@@ -41,6 +44,15 @@ export function SolvePage({ prefill, savedSpot }: { prefill?: SolvePrefill; save
   const setup = useSolveSetup(prefill, savedSpot);
   const isDesktop = useIsDesktop();
   return isDesktop ? <SolveWorkspace setup={setup} /> : <SolvePhone setup={setup} />;
+}
+
+type PhoneSaveState = "idle" | "saving" | "saved" | "error" | "not-signed-in";
+
+function PhoneSaveNote({ state }: { state: PhoneSaveState }) {
+  if (state === "saved") return <p className="spot-builder__hint">Saved to your Library.</p>;
+  if (state === "error") return <p className="spot-builder__hint">Couldn&rsquo;t save. Try again.</p>;
+  if (state === "not-signed-in") return <p className="spot-builder__hint">Sign in (top of the page) to save spots.</p>;
+  return null;
 }
 
 /** The phone layout (< 1024px): the original four stacked steps. */
@@ -108,7 +120,33 @@ function SolvePhone({ setup }: { setup: SolveSetup }) {
     setStreetActions,
     goBack,
     goForward,
+    setupAsSpot,
   } = setup;
+
+  // "Save spot" on the phone, same save and sign-in check as the desktop
+  // workspace's: stores the setup (hand, board, both ranges), not the result.
+  const auth = useAuth();
+  const [saveState, setSaveState] = useState<PhoneSaveState>("idle");
+  async function saveSetup() {
+    if (auth.status !== "signed-in") {
+      setSaveState("not-signed-in");
+      return;
+    }
+    setSaveState("saving");
+    const result = await saveSpot(setupAsSpot());
+    setSaveState(result.kind === "saved" ? "saved" : "error");
+  }
+  const saveButton = (
+    <button
+      type="button"
+      className="spot-builder__reset btn-ghost"
+      onClick={saveSetup}
+      disabled={saveState === "saving" || !positionsAreValid}
+    >
+      {saveState === "saving" ? "Saving…" : "Save spot"}
+    </button>
+  );
+  const saveNote = <PhoneSaveNote state={saveState} />;
 
   return (
     <div className="spot-builder">
@@ -563,10 +601,19 @@ function SolvePhone({ setup }: { setup: SolveSetup }) {
             <button type="submit" className="btn-primary" disabled={!canSubmit || outcome.kind === "loading"}>
               Solve
             </button>
-            <button type="button" className="spot-builder__reset btn-ghost" onClick={resetAll}>
+            <button
+              type="button"
+              className="spot-builder__reset btn-ghost"
+              onClick={() => {
+                resetAll();
+                setSaveState("idle");
+              }}
+            >
               Reset
             </button>
+            {saveButton}
           </div>
+          {outcome.kind !== "solved" && saveNote}
         </Step>
       </form>
 
@@ -648,6 +695,8 @@ function SolvePhone({ setup }: { setup: SolveSetup }) {
 
       {outcome.kind === "solved" && (
         <div className="spot-builder__result">
+          <div className="solve-page__actions">{saveButton}</div>
+          {saveNote}
           <p className="spot-builder__source-label">
             Live solve ({outcome.data.iterations.toLocaleString()} iterations)
             &mdash; {outcome.data.position}&rsquo;s strategy:

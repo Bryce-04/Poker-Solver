@@ -139,6 +139,11 @@ A custom menu names actions by percentage (`bet_33`); `/spots/solve` and
 in `docs/decisions.md` (`apps/api/scripts/compare_bet_menus.py`): time grows with
 sizes and roughly doubles per extra raise. No UI sets it yet.
 
+**Solve state and phone save (2026-10-21)**: Solve stays mounted once visited
+(`App.tsx`'s `SolveKeepAlive`), so switching tabs no longer wipes a half-built spot; a
+route-state seed (Ranges' "solve from here", Library "Open") still starts a fresh one. The
+phone layout has a Save spot button like desktop's. See `docs/decisions.md`.
+
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
 colors, the pot on the table, bb amounts, and the "why" analysis with its

@@ -6,6 +6,31 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-21 — Solve keeps its setup across tabs; phone gets Save spot
+
+**Status:** proposed. **Done and verified** (348 web tests, lint and build clean; installed on the Android phone).
+
+Two bugs found on the phone, both fixed:
+
+1. **Switching tabs wiped a half-built spot.** All of Solve's state lives in `SolvePage`
+   (`useSolveSetup`), and the route unmounted it whenever you left `/solve`. Now `App.tsx`'s
+   `SolveKeepAlive` renders Solve once it has been visited and keeps it mounted, hidden with
+   `display: none` off `/solve` (`display: contents` on it, so layout is unchanged). Arriving
+   WITH route state (Ranges' "Solve a flop from here", a spot opened from the Library) starts a
+   fresh instance keyed by that navigation, so those seeds still apply; a plain nav click returns
+   to the one you left. "Start over" / "Reset" still clear it. Cost: the page stays in memory
+   after the first visit; a half-built spot is also lost on a full app restart (not a draft save).
+2. **No Save spot on the phone layout.** It existed only in the desktop workspace. `SolvePhone`
+   now has the same button (step 4, and again above the result once solved) using the same
+   `saveSpot(setupAsSpot())` and sign-in check, with a short note (saved / couldn't save / sign
+   in). It saves the setup, not the result, like desktop. Phone layout is otherwise unchanged.
+
+Tests: `App.test.tsx` (the setup survives Ranges and back, and fails without the fix; a prefill
+still starts a fresh Solve) and `SolvePage.test.tsx` (phone save: saves the setup, asks to sign
+in when signed out, reports a failed save).
+
+---
+
 ## 2026-10-21 — Solver speed: 2.4x to 4.3x faster, answers unchanged
 
 **Status:** proposed.

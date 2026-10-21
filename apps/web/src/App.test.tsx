@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, vi } from 'vitest'
 import App from './App'
@@ -78,6 +78,36 @@ describe('<App />', () => {
 
     await user.click(screen.getByRole('link', { name: /^solve$/i }))
     expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
+  })
+
+  it('keeps a half-built Solve spot when you switch tabs and come back', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    const seat = screen.getByLabelText(/^player 1$/i) as HTMLSelectElement
+    await user.selectOptions(seat, 'CO')
+    expect(seat.value).toBe('CO')
+
+    await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+    await user.click(screen.getByRole('link', { name: /^solve$/i }))
+
+    // The same page instance, not a fresh one reset to the default seat.
+    expect((screen.getByLabelText(/^player 1$/i) as HTMLSelectElement).value).toBe('CO')
+  })
+
+  it('still starts a fresh Solve when another screen hands it a prefill', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.selectOptions(screen.getByLabelText(/^player 1$/i), 'CO')
+    await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+
+    // What navigate('/solve', { state: { prefill } }) leaves in history.
+    const prefill = { hero: 'BTN', villain: 'BB', heroRange: { AA: 1 }, startingStackBb: 100 }
+    act(() => {
+      window.history.pushState({ usr: { prefill }, key: 'prefill-nav', idx: 5 }, '', '/solve')
+      window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+    })
+
+    expect((await screen.findByLabelText(/^player 1$/i) as HTMLSelectElement).value).toBe('BTN')
   })
 
   it.each([

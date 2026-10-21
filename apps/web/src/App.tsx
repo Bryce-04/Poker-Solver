@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AuthStatus } from "./components/AuthStatus/AuthStatus";
 import { ErrorBoundary } from "./components/ErrorBoundary/ErrorBoundary";
@@ -51,11 +52,32 @@ function ShellPageHeader() {
   return <PageHeader title={header.title} description={header.description} />;
 }
 
-/** /solve, optionally seeded from route state (lib/solvePrefill.ts): Ranges'
- * "solve from here", or a spot opened from the Library. */
-function SolveRoute() {
-  const { state } = useLocation();
-  return <SolvePage prefill={readSolvePrefill(state)} savedSpot={readSavedSpot(state)} />;
+/**
+ * /solve (optionally seeded from route state, lib/solvePrefill.ts: Ranges'
+ * "solve from here", or a spot opened from the Library), kept mounted once
+ * visited. The Solve page holds the whole setup (hand, board, ranges, result)
+ * in its own state, so rendering it as an ordinary route threw a half-built
+ * spot away whenever you tapped another tab. Here it stays mounted but hidden
+ * (`display: none`) off /solve, and the state survives. Arriving WITH route
+ * state starts a fresh instance, keyed by that navigation, so the seed still
+ * applies; a plain nav click returns to the one you left. Start over / Reset
+ * still clear it.
+ */
+function SolveKeepAlive() {
+  const location = useLocation();
+  const active = location.pathname === "/solve";
+  const prefill = readSolvePrefill(location.state);
+  const savedSpot = readSavedSpot(location.state);
+  const [instance, setInstance] = useState<{ key: string; prefill: typeof prefill; savedSpot: typeof savedSpot } | null>(null);
+  if (active && (instance === null || ((prefill || savedSpot) && instance.key !== location.key))) {
+    setInstance({ key: location.key, prefill, savedSpot });
+  }
+  if (instance === null) return null;
+  return (
+    <div style={{ display: active ? "contents" : "none" }}>
+      <SolvePage key={instance.key} prefill={instance.prefill} savedSpot={instance.savedSpot} />
+    </div>
+  );
 }
 
 /**
@@ -88,13 +110,14 @@ function Shell() {
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/solve" replace />} />
-              <Route path="/solve" element={<SolveRoute />} />
+              <Route path="/solve" element={null} />
               <Route path="/ranges" element={<RangesPage />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/saved" element={<Navigate to="/library" replace />} />
               <Route path="/type-in" element={<Navigate to="/ranges?mode=type" replace />} />
               <Route path="/import" element={<Navigate to="/ranges?mode=paste" replace />} />
             </Routes>
+            <SolveKeepAlive />
           </ErrorBoundary>
         </main>
       </div>

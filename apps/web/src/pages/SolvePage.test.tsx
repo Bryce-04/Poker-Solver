@@ -1,14 +1,18 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SolvePage } from "./SolvePage";
-import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, solveSpot } from "../lib/api";
+import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, saveSpot, solveSpot } from "../lib/api";
 
 vi.mock("../lib/api", () => ({
   solveSpot: vi.fn(),
   fetchReferenceStrategy: vi.fn(),
   narrowRanges: vi.fn(),
   fetchPreflopRanges: vi.fn(),
+  saveSpot: vi.fn(),
 }));
+let mockAuth: { status: "signed-in" | "signed-out"; email: string | null } = { status: "signed-in", email: "a@b.c" };
+vi.mock("../lib/auth", () => ({ useAuth: () => mockAuth }));
+const mockSave = vi.mocked(saveSpot);
 const mockPreflopRanges = vi.mocked(fetchPreflopRanges);
 const mockNarrow = vi.mocked(narrowRanges);
 const mockSolve = vi.mocked(solveSpot);
@@ -19,6 +23,8 @@ beforeEach(() => {
   mockFetchReference.mockReset();
   mockNarrow.mockReset();
   mockPreflopRanges.mockReset();
+  mockSave.mockReset();
+  mockAuth = { status: "signed-in", email: "a@b.c" };
 });
 
 // Three grids are on the page by default (CardPicker, then OOP's and IP's
@@ -279,6 +285,62 @@ describe("SolvePage -- click-through mode (the default)", () => {
     expect(
       screen.getByRole("gridcell", { name: /^AA: Check 5%, All-in 95%$/i }),
     ).toBeInTheDocument();
+  });
+
+  describe("Save spot (phone layout)", () => {
+    const solved = {
+      kind: "solved" as const,
+      data: {
+        source: "live_solve" as const,
+        iterations: 8000,
+        position: "BTN" as const,
+        strategy: { AA: { check: 0.05, all_in: 0.95 } },
+        bucketed_actions: [],
+      },
+    };
+
+    it("is offered once there is a solve, and saves the setup, not the result", async () => {
+      mockSolve.mockResolvedValue(solved);
+      mockSave.mockResolvedValue({ kind: "saved", spot: {} as never });
+      const user = userEvent.setup();
+      render(<SolvePage />);
+      await fillMinimalForm(user);
+      await user.click(screen.getByRole("button", { name: /^solve$/i }));
+      await screen.findByText(/BTN.s strategy/i);
+
+      // One in step 4 and one with the result.
+      const buttons = screen.getAllByRole("button", { name: /^save spot$/i });
+      expect(buttons).toHaveLength(2);
+      await user.click(buttons[1]);
+
+      expect(mockSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positions_in_hand: ["BB", "BTN"],
+          board: ["Ks", "Qh", "9d"],
+          ranges: { BB: { KJo: 1 }, BTN: { AA: 1 } },
+        }),
+      );
+      expect(await screen.findByText(/saved to your library/i)).toBeInTheDocument();
+    });
+
+    it("asks you to sign in instead of saving when signed out", async () => {
+      mockAuth = { status: "signed-out", email: null };
+      const user = userEvent.setup();
+      render(<SolvePage />);
+      await user.click(screen.getAllByRole("button", { name: /^save spot$/i })[0]);
+
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(screen.getByText(/sign in .* to save spots/i)).toBeInTheDocument();
+    });
+
+    it("says so when the save fails", async () => {
+      mockSave.mockResolvedValue({ kind: "error", status: 500 } as never);
+      const user = userEvent.setup();
+      render(<SolvePage />);
+      await user.click(screen.getAllByRole("button", { name: /^save spot$/i })[0]);
+
+      expect(await screen.findByText(/couldn.t save/i)).toBeInTheDocument();
+    });
   });
 
   it("submits a seeded bet as a real action, not just a check", async () => {
