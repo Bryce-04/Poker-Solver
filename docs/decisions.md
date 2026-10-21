@@ -113,6 +113,11 @@ reach, so one matrix per card is stored, not two). The single-street path is unc
    (0.0263%).
 The tests were mutation-checked: scaling the chance weight by 5%, or letting hands that
 hold the river card back into the sum, makes them fail.
+5. *Against an independent mature solver (b-inary's postflop-solver, Rust).* On the same turn
+   game (same ranges, menus and all 48 river cards) OOP's equilibrium game value agrees to 0.01
+   chip at tight precision (412.66 vs 412.65), and root frequencies to 0.46 points. See the
+   entry "Checked against postflop-solver" for the full comparison, including that our solver is
+   ~20x slower single-thread and ~100x slower than their multithreaded run.
 
 **Two things that went wrong first, and what they changed.**
 - *Sampled-card exploitability plateaued near 1% and went negative.* With a SAMPLE of the
@@ -156,9 +161,11 @@ ranges, turn menu one 50% size with a raise cap of 2; to a Nash gap under 0.5% o
 Memory scales with the number of hands as well as nodes. The default turn menu (3 sizes,
 raise cap 3) has 131 closing lines; with the default river and 12 cards that is 4,548 decision
 nodes and ~460 MB (refused at the 350 MB budget), and with all 48 cards 17,796 nodes and
-~1.8 GB. Hence small turn menus. Render's free tier is ~10x slower than this laptop (not
-measured for joint solves), so a 12-card, no-re-raise joint solve (~7 s here) should land
-near the 100 s time budget there; the others will come back `converged: false`.
+~1.8 GB. Hence small turn menus. Render: the measured single-street ratio is about 4x this
+laptop (a wide flop that takes ~3.3 s here took 13.0 s warm there; see the speed entry), so a
+12-card, no-re-raise joint solve (~7 s here) should take roughly 30 s there. That is an
+ESTIMATE: no joint solve has run on Render. The larger settings may still pass the 100 s time
+budget and come back `converged: false`.
 
 **The API (`POST /spots/solve`).** `river` on a turn spot. `bet_menu` defaults to one 75%
 size and no sized re-raise (`DEFAULT_RIVER_MENU`); `null` means no river betting; `cards`
@@ -180,8 +187,8 @@ about this street's own line.
   inside a chance node (every turn card x every river card x betting on each street); that
   needs card sampling at both streets and is the real next step toward a full-hand solve.
 - *One river menu per solve* (not per line), and no per-node custom trees.
-- *Render hasn't run one.* The cost estimates are laptop numbers and the 10x factor is the
-  single-street one.
+- *Render hasn't run one.* The cost estimates are laptop numbers and the ~4x factor is the
+  single-street one (measured).
 - *Range chaining doesn't use it yet.* `/spots/narrow` still narrows from a single-street
   solve, so the weakness in the 2026-10-18 entry (narrowing by a rarely played line) is not
   fixed by this alone; a joint solve is the tool that could fix it, and wiring that in is a
@@ -353,9 +360,10 @@ on a laptop:
 | default, raise cap 4 | 12.7 | 0.40% |
 
 Time grows roughly linearly with the number of sizes and roughly doubles with
-each extra raise allowed. Render's free tier is about 10x slower than a laptop,
-so four sizes or a raise cap of 4 would reach its 100-second budget there and
-come back `converged: false`; the schema's limits (5 sizes, cap 5) are
+each extra raise allowed. Render's free tier was assumed to be about 10x slower than a laptop
+(later measured at about 4x for a single-street solve, see the speed entry), so four sizes or a
+raise cap of 4 would reach or pass its 100-second budget there and may come back
+`converged: false`; the schema's limits (5 sizes, cap 5) are
 deliberately generous and the time budget is the real guard.
 
 **A note on all-in.** All-in is always in the tree. With a lot behind, a
