@@ -46,13 +46,13 @@ and where it goes next. The long versions are `docs/progress-and-struggles.md`,
 - **Phone testing is fiddly.** The Samsung keeps dropping adb authorization, and there
   is no local Postgres or `gh`, so PRs go through prefilled compare links.
 
-## Known issues to fix later
+## Known issues (both fixed 2026-10-21, branch `fix-solve-state-and-phone-save`)
 
-- **Switching tabs wipes the spot you were building.** The Solve page keeps its setup
+- **FIXED: switching tabs wiped the spot you were building.** The Solve page keeps its setup
   (positions, board, actions, ranges, result) in the page itself (`useSolveSetup`), so
   leaving it for another tab discards it. The setup needs to live above the routes, or be
   kept as a draft.
-- **No Save spot button on the phone layout after a solve.** "Save spot" exists only in the
+- **FIXED: no Save spot button on the phone layout after a solve.** "Save spot" exists only in the
   desktop Solve layout (`pages/solve/SolveWorkspace.tsx`); `SolvePhone` has no save
   control. It needs one on the result, using the same save and sign-in check.
 
