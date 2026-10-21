@@ -6,6 +6,76 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-21 — Checked against postflop-solver (Rust): same answers, ~20-100x slower
+
+**Status:** proposed.
+
+**Context.** After the speed work and the joint turn + river solve, the open question was how
+the solver stands against a mature one, on two things: are the answers right, and is the time
+"normal". `postflop-solver` (b-inary; Rust; AGPL-3.0) is the reference open implementation.
+
+**Method.** The same game on both sides (spot, ranges, menus and the harness are in
+`services/solver/benchmarks/external/`, with how to build it): Q J 7 3 turn, 100bb deep, BB's flat
+range vs BTN's open range, turn = one 50% size + all-in, river = one 75% size + all-in, no sized
+re-raises, all 48 river cards, DCFR on both. Their tree is made to match ours by turning off their
+auto all-in / merging / donk rules; the two players' EVs sum to the pot in both conventions.
+
+**Correctness: they agree.** OOP's equilibrium game value, which is unique, so it cannot hide behind
+tied actions:
+
+| precision (% of pot) | ours | postflop-solver |
+|---|--:|--:|
+| ~0.5 | 411.82 chips | 412.25 |
+| ~0.03 | **412.66** | **412.65** |
+
+The 0.01-chip agreement at tight precision (0.0001% of the pot) is strong independent confirmation
+that the joint solve's tree, chance handling, money accounting and payoffs are right (it is the
+check the exact self-equivalence tests could not give, because both sides of those share our code).
+Root strategy at 0.03%: check 90.6% / bet 9.4% (ours) vs 91.1% / 8.9% (theirs), max frequency
+difference 0.46 points, range-weighted per-hand strategy difference 0.010. At the rough 0.5% target the
+frequencies differ by 3.7 points; that was noise at near-tied actions (both converge to the same answer).
+Iteration counts are the same too (110 vs 130 to 0.5%; 750 vs 700 to ~0.02-0.03%): the algorithm
+converges equally fast, so the whole gap below is cost per iteration.
+
+**Time: much slower than a compiled solver.** (laptop, i5-11400H, 6 cores / 12 threads)
+
+| | postflop-solver, 12 threads | postflop-solver, 1 thread | ours |
+|---|--:|--:|--:|
+| to 0.5% of pot | 0.18 s | 0.92 s | 17.9-19.5 s |
+| to ~0.03% of pot | 1.3 s | | 106.6 s |
+| per iteration | 1.7 ms | 8.3 ms | 134-146 ms |
+| memory | 7.3 MB (3.9 compressed) | | 156 MB peak |
+
+So about **100x slower than their multithreaded run and ~20x slower single-thread**, and ~20x the
+memory. Our run does not speed up with more threads (it is single-thread bound: numpy's per-array
+passes; limiting BLAS to one thread made no difference, 17.4 s vs 19.0 s), theirs does (5x from 1 to
+12 threads). This is a ceiling of numpy, not a tuning gap: a pass over a node's regrets and strategies
+here is ~25 separate array operations over (actions x hands) float64 arrays; theirs is one fused SIMD
+loop over float32 (or 16-bit) data. The earlier 2.4-4.3x speed-up was real, and this shows how much
+room is left beyond what numpy can reach.
+
+**What this means.** Our numbers (seconds to a minute) are fine for a class project and for a local
+tool; they are NOT competitive with a compiled solver, and the single-street/joint sizes that fit
+within Render's budget are set by this gap. It also reframes the roadmap: a full flop + turn + river
+solve takes minutes in a compiled solver (TexasSolver's self-reported benchmark: 172 s for a flop setup), and at this gap would plausibly take far longer here (an extrapolation, not a measurement).
+
+**Options (not decided; each is a real trade).**
+1. *Keep Python, compile the hot loop* (numba, or a small Rust/C extension we write ourselves):
+   realistic 5-20x on the update/traversal passes; the equivalence tests (frozen reference, exact
+   float64) already exist to keep it honest. Adds a build/deploy dependency (numba on Render, or a
+   wheel).
+2. *Use postflop-solver as the engine behind the API.* Fastest by far, but it is AGPL-3.0: a network
+   service built on it must offer its source under the AGPL, and it is unmaintained (development
+   suspended Oct 2023; to build today it needed its serialization feature off and two compiler lints allowed). It would also replace
+   our abstractions (menus, narrowing, joint sampling) with theirs. A licensing decision for the team,
+   not a technical one.
+3. *Accept it* and keep tuning in numpy (float32 state, fewer passes): maybe 1.5-2x more.
+
+**Caveats.** One spot, one machine; their threading means the 12-thread ratio flatters them on a
+laptop and understates the single-core gap on a server; Render was not measured.
+
+---
+
 ## 2026-10-21 — Joint turn + river solve: the first multi-street step
 
 **Status:** proposed.

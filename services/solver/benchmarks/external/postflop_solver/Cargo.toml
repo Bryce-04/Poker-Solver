@@ -1,0 +1,12 @@
+[package]
+name = "compare"
+version = "0.1.0"
+edition = "2021"
+
+# Their solver is NOT vendored here (it is AGPL-3.0). Clone it next to this repo and
+# point `path` at it -- see ../README.md.
+[dependencies]
+postflop-solver = { path = "../../../../../../postflop-solver", default-features = false, features = ["rayon"] }
+
+[profile.release]
+opt-level = 3

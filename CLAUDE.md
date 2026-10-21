@@ -116,6 +116,12 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Checked against postflop-solver (2026-10-21)**: the joint solve's game value matches b-inary's
+Rust solver to 0.01 chip on the same game (strong independent confirmation), but ours is ~20x slower
+single-thread and ~100x slower than their 12-thread run (numpy's ceiling; same iteration counts).
+Harness, how to build their (AGPL, unmaintained) solver, and the options: `services/solver/benchmarks/external/`
+and `docs/decisions.md`. Don't vendor their code without a licensing decision.
+
 **Joint turn + river solve (2026-10-21)**: `Spot.river` (schema `RiverSpec`) asks a
 `POST /spots/solve` on a TURN board to include the river: closing turn lines deal a river
 card and play the river's betting (each card its own strategies), so the turn strategy knows
