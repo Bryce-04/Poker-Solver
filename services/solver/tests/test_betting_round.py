@@ -1,4 +1,12 @@
-from poker_solver.betting_round import MAX_AGGRESSIVE_ACTIONS, BettingRoundState
+import pytest
+
+from poker_solver.betting_round import (
+    BET_SIZE_MENU,
+    DEFAULT_BET_MENU,
+    MAX_AGGRESSIVE_ACTIONS,
+    BetMenu,
+    BettingRoundState,
+)
 
 
 def test_shallow_stack_collapses_menu_to_check_or_all_in() -> None:
@@ -119,3 +127,82 @@ def test_seeded_check_is_unchanged() -> None:
     assert state.contributed == (0.0, 0.0)
     assert state.to_act == 1
     assert state.history == ("check",)
+
+
+# --- custom bet menus ---------------------------------------------------------
+
+
+def test_the_default_menu_is_the_legacy_one_and_names_are_unchanged() -> None:
+    assert DEFAULT_BET_MENU.is_default
+    assert DEFAULT_BET_MENU.labelled_sizes == BET_SIZE_MENU
+    assert BetMenu() == DEFAULT_BET_MENU
+    # Spelling the default sizes out is still the default (legacy names kept).
+    assert BetMenu(sizes=(0.25, 0.75, 1.25)).is_default
+    assert BetMenu(sizes=(0.25, 0.75, 1.25)).labelled_sizes[0][1] == "bet_small"
+
+
+def test_a_custom_menu_names_each_size_by_its_percentage() -> None:
+    menu = BetMenu(sizes=(0.33, 0.5, 2.0))
+    assert not menu.is_default
+    assert [name for _, name in menu.labelled_sizes] == ["bet_33", "bet_50", "bet_200"]
+    assert menu.size_of("bet_50") == 0.5
+    assert menu.aggressive_labels == {"bet_33", "bet_50", "bet_200", "all_in"}
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"sizes": ()},  # nothing to bet
+        {"sizes": (0.1, 0.2, 0.3, 0.4, 0.5, 0.6)},  # more than MAX_BET_SIZES
+        {"sizes": (0.01,)},  # below the minimum fraction
+        {"sizes": (6.0,)},  # above the maximum fraction
+        {"sizes": (0.75, 0.25)},  # not ascending
+        {"sizes": (0.5, 0.504)},  # the same percentage twice
+        {"sizes": (0.5,), "max_aggressive_actions": 0},
+        {"sizes": (0.5,), "max_aggressive_actions": 6},
+    ],
+)
+def test_a_bad_menu_is_refused(kwargs) -> None:
+    with pytest.raises(ValueError):
+        BetMenu(**kwargs)
+
+
+def test_a_custom_menu_sets_the_legal_actions_and_the_chips_in() -> None:
+    menu = BetMenu(sizes=(0.5, 2.0))
+    state = BettingRoundState.initial(pot_bb=100, stack_bb=1000, menu=menu)
+    assert state.legal_actions() == ("check", "bet_50", "bet_200", "all_in")
+    assert state.apply("bet_50").contributed == (50, 0)
+    assert state.apply("bet_200").contributed == (200, 0)
+    # A raise is sized on the pot after calling: pot 150 + to_call 50 -> 50 + 0.5*200 = 150.
+    facing = state.apply("bet_50")
+    assert facing.legal_actions() == ("fold", "call", "bet_50", "bet_200", "all_in")
+    assert facing.apply("bet_50").contributed == (50, 150)
+    # The menu travels with the state through every transition.
+    assert facing.apply("bet_50").menu == menu
+
+
+def test_a_size_that_does_not_fit_collapses_into_all_in_like_the_default() -> None:
+    menu = BetMenu(sizes=(0.5, 2.0))
+    state = BettingRoundState.initial(pot_bb=100, stack_bb=120, menu=menu)
+    assert state.legal_actions() == ("check", "bet_50", "all_in")  # the 200 is more than the stack
+
+
+def test_the_raise_cap_is_the_menus_not_a_global() -> None:
+    one = BetMenu(sizes=(0.5,), max_aggressive_actions=1)
+    state = BettingRoundState.initial(pot_bb=100, stack_bb=10_000, menu=one).apply("bet_50")
+    assert state.legal_actions() == ("fold", "call", "all_in")  # no sized raise after the bet
+
+    two = BetMenu(sizes=(0.5,), max_aggressive_actions=2)
+    state = BettingRoundState.initial(pot_bb=100, stack_bb=10_000, menu=two).apply("bet_50")
+    assert "bet_50" in state.legal_actions()
+    assert state.apply("bet_50").legal_actions() == ("fold", "call", "all_in")
+
+
+def test_the_menu_is_replayed_with_a_seeded_history() -> None:
+    menu = BetMenu(sizes=(0.5,))
+    state = BettingRoundState.initial(
+        pot_bb=100, stack_bb=1000, first_to_act=0, prior_history=("bet_50",), menu=menu
+    )
+    # first_to_act is who acts AFTER the seeded bet, so the bettor was player 1.
+    assert state.to_act == 0 and state.contributed == (0, 50)
+    assert state.legal_actions()[:2] == ("fold", "call")
