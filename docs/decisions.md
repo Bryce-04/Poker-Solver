@@ -74,7 +74,10 @@ merging isomorphic turn/river deals. Of those:
 | river K7294, BB flat vs BTN open | 1.7 | 0.4 |
 
 Per training iteration on the wide flop: 51 ms to 19 ms. Run-to-run noise on this
-laptop is about +/-15%. The bet-menu cost table in the entry below was
+laptop is about +/-15%. **Measured on Render afterwards (2026-10-21, deployed `main`):** the same wide
+K72r flop solves in 13.0 s warm (125 iterations, converged, 0.37%); the first request after idle took
+51.8 s including the cold start. That is about 4x the laptop, not the ~10x assumed elsewhere in these
+notes (the hardening entry recorded 90 s for its worst-case deep wide flop on Render before this work). The bet-menu cost table in the entry below was
 re-measured: default menu 6.3s to 2.2s, four sizes 10.3s to 5.4s, raise cap 4
 12.7s to 5.0s.
 

@@ -116,6 +116,10 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Progress list and open problems (2026-10-21)**: `docs/progress-and-struggles.md` (what's built since the
+narrowing work, what's open, the honest list of difficulties); the next performance step, deferred until
+after the demo, is planned in `docs/compiled-solver-plan.md`.
+
 **Solver speed (2026-10-21)**: `range_cfr.py` was rebuilt for speed with the
 same answers (2.4x to 4.3x faster end to end; wide flop 10.9s to ~3.3s). The tree is
 built once and each pass is planned level by level (`_Schedule`); all of a pass's
