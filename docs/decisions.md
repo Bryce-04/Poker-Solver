@@ -6,7 +6,7 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
-## 2026-10-21 — Solve keeps its setup across tabs; phone gets Save spot
+## 2026-10-21 — Solve keeps its setup across tabs; phone gets Save spot and Open
 
 **Status:** proposed. **Done and verified** (348 web tests, lint and build clean; installed on the Android phone).
 
@@ -24,6 +24,13 @@ Two bugs found on the phone, both fixed:
    now has the same button (step 4, and again above the result once solved) using the same
    `saveSpot(setupAsSpot())` and sign-in check, with a short note (saved / couldn't save / sign
    in). It saves the setup, not the result, like desktop. Phone layout is otherwise unchanged.
+
+3. **A saved spot couldn't be seen or opened on the phone.** The phone Library
+   (`SavedSpotsPage`) showed every spot as `summarize()`'s preflop-style line ("BB/BTN — 100bb,
+   facing a raise from BTN"), ignoring the spot's name and board, and was look-only. It now shows
+   the name (`displayName`), the street and board for postflop spots, and an Open button that
+   hands the spot to Solve (has a board) or Ranges (preflop) through route state, exactly like
+   the desktop Library's Open. Rename / delete / duplicate remain desktop-only.
 
 Tests: `App.test.tsx` (the setup survives Ranges and back, and fails without the fix; a prefill
 still starts a fresh Solve) and `SolvePage.test.tsx` (phone save: saves the setup, asks to sign

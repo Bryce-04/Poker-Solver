@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
 import { listSpots } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { summarize } from "../lib/spotText";
+import { boardText, displayName, spotKind } from "../lib/spotText";
 import "../components/SpotBuilder/SpotBuilder.css";
 
 // Mirrors SpotBuilder's Outcome pattern: the api result kinds plus loading,
@@ -122,15 +123,37 @@ function SavedSpotsList({ state }: { state: ListState }) {
   return (
     <ul className="spot-builder__actions">
       {state.spots.map((spot) => (
-        <li key={spot.id ?? summarize(spot)} className="spot-builder__action-row">
+        <li key={spot.id ?? displayName(spot)} className="spot-builder__action-row">
           <div>
-            <p>{summarize(spot)}</p>
+            <p>{displayName(spot)}</p>
+            {(spot.board ?? []).length > 0 && (
+              <p className="spot-builder__hint">
+                {spot.current_street} &middot; {boardText(spot.board ?? [])}
+              </p>
+            )}
             {formatSavedAt(spot) && (
               <p className="spot-builder__hint">Saved {formatSavedAt(spot)}</p>
             )}
           </div>
+          <OpenSpotButton spot={spot} />
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Opens a saved spot where it can be seen and used: a spot with a board in
+ * Solve, a preflop chart in Ranges (same hand-off the desktop Library does,
+ * via route state). Before this the phone list was look-only. */
+function OpenSpotButton({ spot }: { spot: Spot }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      className="spot-builder__reset btn-ghost"
+      onClick={() => navigate(spotKind(spot) === "preflop" ? "/ranges" : "/solve", { state: { spot } })}
+    >
+      Open
+    </button>
   );
 }
