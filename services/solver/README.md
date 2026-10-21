@@ -1,12 +1,14 @@
 # services/solver
 
 The actual solving engine (Stage 5): range-vs-range Discounted CFR over the
-locked-in scope (single postflop street, heads-up, fixed bet-size menu —
+locked-in scope (single postflop street, heads-up, a bet-size menu (default fixed,
+customizable per solve) —
 see [`../../docs/plan.md`](../../docs/plan.md)).
 
 **Status:** any single postflop street — flop, turn, or river — heads-up,
-two ranges, the locked bet-size menu (check / **bet_small 25% /
-bet_medium 75% / bet_large 125% pot** / all-in), solved by `range_cfr.py`:
+two ranges, the default bet-size menu (check / **bet_small 25% /
+bet_medium 75% / bet_large 125% pot** / all-in; or any `BetMenu` of 1-5
+sizes and a raise cap, see `betting_round.py`), solved by `range_cfr.py`:
 every combo in both ranges trained on every iteration (no hole-card
 sampling), equity from an exact precomputed matrix (`equity.py`, every
 runout enumerated), Discounted CFR updates, trained until exploitability
@@ -29,6 +31,8 @@ exploitability reached.
 pip install -e ".[dev]"
 pytest                                   # everything, including closed-form + regression tests
 pytest tests/test_range_cfr.py           # the live trainer's own tests
+pytest tests/test_range_cfr_matches_reference.py   # the trainer vs. its frozen pre-optimization copy
+python benchmarks/bench_trainer.py       # timings (add --reference for the old trainer)
 python -m poker_solver.kuhn_spike       # the Stage 1 toy spike (see below)
 python -m poker_solver.postflop_mccfr   # the superseded Monte Carlo trainer's demo
 ```
@@ -81,6 +85,13 @@ src/poker_solver/
                       combo_equities() for each combo's equity against the
                       opponent's range, read off the same matrix (apps/api's
                       hand_notes.py quotes it in the "Why?" text).
+  (outside src/)      benchmarks/bench_trainer.py times the trainer on four
+                      realistic spots (setup, ms/iteration, time to the
+                      production target); benchmarks/sweep_dcfr.py compares
+                      DCFR discount settings at fixed iteration counts (how
+                      alpha/beta/gamma were chosen). tests/reference_range_cfr.py
+                      is a FROZEN copy of the trainer before the 2026-10-21
+                      speed work -- the oracle the real one is tested against.
   postflop_mccfr.py   SUPERSEDED (2026-10-07) -- the old chance-sampled
                       Monte Carlo trainer. No longer used by apps/api;
                       kept intact as a known-good reference, a real
@@ -89,8 +100,9 @@ src/poker_solver/
 
 ## How the live trainer (range_cfr.py) is validated
 
-Three independent checks, in `tests/test_range_cfr.py`, `tests/test_equity.py`
-and `tests/test_evaluator.py` — none of them "did it run":
+Four independent checks, in `tests/test_range_cfr.py`, `tests/test_equity.py`,
+`tests/test_evaluator.py` and `tests/test_range_cfr_matches_reference.py` —
+none of them "did it run":
 
 - **Closed-form theory.** The same polarized-range-vs-bluffcatcher river the
   old trainer was checked against: 33 must bluff-shove 20% and KJo call 80%.
@@ -106,6 +118,19 @@ and `tests/test_evaluator.py` — none of them "did it run":
   defend vs BTN open ranges in `tests/fixtures/`, 4bb pot, 96bb deep) and
   asserts nothing jams absurdly and exploitability is under 5% of the pot
   after 100 iterations.
+
+- **Equivalence to the frozen original** (`tests/test_range_cfr_matches_reference.py`).
+  A speed-up must not change an answer. `tests/reference_range_cfr.py` is the
+  straightforward pre-optimization trainer; the real one is held to it in
+  layers: in float64 end to end the two agree to ~1e-9 (strategies, regrets,
+  exploitability) on eight spots; in the shipped float32, every terminal's
+  value matches the reference's, and the reference's own exploitability code,
+  run on the new trainer's strategies, agrees with the new one's. (Strategies
+  from two float32 runs are NOT compared node by node: at near-tied actions
+  rounding picks between equal options, so that would test luck.) The equity
+  matrix and the hand evaluator are each tested against their original
+  algorithms exactly (`test_equity.py`, `test_evaluator.py`). If the update
+  rule is changed on purpose, change the reference copy in the same commit.
 
 `exploitability()` (best-response value against the average strategy, minus
 the dead pot) is the convergence measure — use it, not eyeballed

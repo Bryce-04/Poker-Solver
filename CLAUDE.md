@@ -363,6 +363,10 @@ cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR s
 cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
+pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer vs its frozen pre-speed-up copy
+python services/solver/benchmarks/bench_trainer.py            # timings; --reference for the old trainer
+PYTHONPATH=apps/api python services/solver/benchmarks/sweep_dcfr.py   # DCFR parameter sweep
+python apps/api/scripts/compare_bet_menus.py                  # what a custom bet menu costs
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
@@ -373,6 +377,11 @@ at Supabase) unless `DATABASE_URL` is already set — so set it explicitly:
 ```
 DATABASE_URL=postgresql+psycopg://poker_solver:poker_solver_dev@localhost:5432/poker_solver pytest apps/api
 ```
+Tests that never touch the database can run without Postgres: `DATABASE_URL=
+postgresql+psycopg://x:x@localhost:5432/x pytest --noconftest apps/api/tests/test_solve_route.py
+apps/api/tests/test_preflop_ranges.py ...` (the engine connects lazily and `--noconftest`
+skips the fixture that runs Alembic) — handy when there's no local Postgres; CI still runs
+the whole suite against a real one.
 The test session runs `alembic upgrade head` itself (`tests/conftest.py`)
 and signs its own tokens with a throwaway key, so tests need no Supabase
 access. `db.py` loads `.env` itself via `python-dotenv` for bare
