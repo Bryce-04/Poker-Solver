@@ -14,12 +14,16 @@ opposing range taken from an exact precomputed matrix (equity.py). That's
 the standard approach every serious open-source solver takes.
 
 Update rule is Discounted CFR (Brown & Sandholm, "Solving Imperfect-
-Information Games via Discounted Regret Minimization", with their
-recommended alpha=1.5, beta=0, gamma=2) and alternating player updates.
-CFR+ was implemented first and measured head to head on the wide-range
-regression scenario below: DCFR reached 1.1% of the pot in exploitability
-at 100 iterations (CFR+: 2.4%) and 0.35% at 200 (CFR+: 1.2%) -- roughly
-2-3x fewer iterations for the same precision, for a few extra lines.
+Information Games via Discounted Regret Minimization") and alternating
+player updates. CFR+ was implemented first and measured head to head on
+the wide-range regression scenario below: DCFR reached 1.1% of the pot in
+exploitability at 100 iterations (CFR+: 2.4%) and 0.35% at 200 (CFR+:
+1.2%) -- roughly 2-3x fewer iterations for the same precision, for a few
+extra lines. The discount parameters are alpha=1.5, beta=0.5, gamma=3
+(the paper recommends 1.5 / 0 / 2; postflop-solver uses gamma=3): swept
+on eight spots (benchmarks/sweep_dcfr.py), that setting reached the same
+precision in up to a third of the iterations on wide flops -- the slow
+case -- and was level elsewhere. See docs/decisions.md, 2026-10-21.
 
 Game model is unchanged from postflop_mccfr.py: betting_round.py's state
 machine for one street, then -- if nobody folds -- the rest of the board
@@ -38,13 +42,18 @@ from .betting_round import DEFAULT_BET_MENU, BetMenu, BettingRoundState
 from .combos import Combo, combo_key, expand_range, label_to_combos
 from .equity import compute_equity_matrix
 
-# Brown & Sandholm's recommended DCFR parameters.
+# DCFR discount parameters (see the module docstring for why these differ from
+# Brown & Sandholm's recommended 1.5 / 0 / 2).
 _DCFR_ALPHA = 1.5
-_DCFR_BETA = 0.0
-_DCFR_GAMMA = 2.0
+_DCFR_BETA = 0.5
+_DCFR_GAMMA = 3.0
 
 # posterior_ranges collapses a label's combos back into one label weight when
-# they all agree to within this much; a bigger spread keeps them separate.
+# they all agree to within this FRACTION of the label's heaviest combo. Relative,
+# not absolute: a narrowed range isn't normalized (a rarely taken line scales
+# every weight down, to ~1e-4), and an absolute tolerance would call every
+# combo of such a line "equal" and throw away the suit differences it exists
+# to keep.
 _COLLAPSE_TOLERANCE = 1e-3
 
 
@@ -86,15 +95,30 @@ def _expand(range_weights: dict[str, float], blocked: frozenset[int]) -> tuple[l
 class _PublicNode:
     """One public betting history. Holds a regret and a strategy-sum row
     for EVERY combo of the acting player at once, rather than one
-    _InfoSetNode per (combo, history) the way postflop_mccfr.py does."""
+    _InfoSetNode per (combo, history) the way postflop_mccfr.py does.
 
-    __slots__ = ("actions", "actor", "regret", "strategy_sum")
+    `regret`, `strategy_sum` and `current` (the regret-matched strategy the
+    node plays this iteration) are not arrays of their own: they are
+    (combos x actions) views into the acting player's _PlayerStore, which keeps
+    every node's rows together (one row per action, so a node owns a run of
+    rows), so the whole tree can be updated with a few array operations
+    instead of a few dozen per node."""
 
-    def __init__(self, actions: tuple[str, ...], actor: int, combo_count: int) -> None:
+    __slots__ = (
+        "actions", "actor", "index", "depth", "children", "slot", "col0", "regret", "strategy_sum", "current",
+    )
+
+    def __init__(self, actions: tuple[str, ...], actor: int, index: int, depth: int) -> None:
         self.actions = actions
         self.actor = actor
-        self.regret = np.zeros((combo_count, len(actions)))
-        self.strategy_sum = np.zeros((combo_count, len(actions)))
+        self.index = index
+        self.depth = depth
+        # Child references, one per action: >= 0 is another decision node's
+        # index, < 0 is the terminal ~ref (so -1 is terminal 0).
+        self.children: tuple[int, ...] = ()
+        # Set by RangeCfrTrainer._allocate: this node's position among its
+        # player's nodes, its first column in that player's arrays, and the views.
+        self.slot = self.col0 = -1
 
     @staticmethod
     def _normalize(weights: np.ndarray) -> np.ndarray:
@@ -103,41 +127,178 @@ class _PublicNode:
         return np.where(totals > 0, weights / np.where(totals > 0, totals, 1.0), uniform)
 
     def current_strategy(self) -> np.ndarray:
-        # DCFR keeps (discounted) negative regrets, so take the positive part.
-        return self._normalize(np.maximum(self.regret, 0.0))
+        return self.current
 
     def average_strategy(self) -> np.ndarray:
         return self._normalize(self.strategy_sum)
 
 
-class _OpponentReach:
-    """The opponent's reach vector, plus its product with the payoff
-    matrices -- computed lazily, at most once. Profiling showed terminal
-    matrix-vector products at ~65% of training time; every terminal
-    under the updating player's own decision sees the *same* opponent
-    reach (only the updating player's action differs), so sharing one
-    product across those siblings removes a large share of them."""
+class _PlayerStore:
+    """One player's decision nodes' training state, together: regrets, strategy
+    sums and current strategies as (total actions x combos) arrays -- one row per
+    (node, action), a node owning a contiguous run of rows -- plus the index
+    arrays that let one expression act on every node at once.
 
-    __slots__ = ("vector", "_matrix", "_products")
+    Action-major (rows are actions), not combo-major, because every operation on
+    the tree gathers or sums whole rows: all the actions of a level's nodes, all
+    of a node's children. Each is then a contiguous copy, not a strided one."""
 
-    def __init__(self, vector: np.ndarray, matrix: np.ndarray) -> None:
-        self.vector = vector
-        self._matrix = matrix
-        self._products: tuple[np.ndarray, np.ndarray] | None = None
+    __slots__ = ("nodes", "regret", "strategy_sum", "current", "starts", "column_node", "inv_actions")
 
-    def products(self) -> tuple[np.ndarray, np.ndarray]:
-        """(equity-weighted opponent mass, total opponent mass), per own combo."""
-        if self._products is None:
-            stacked = self._matrix @ self.vector.astype(np.float32)
-            half = stacked.shape[0] // 2
-            self._products = (stacked[:half].astype(np.float64), stacked[half:].astype(np.float64))
-        return self._products
+    def __init__(self, nodes: list[_PublicNode], combos: int) -> None:
+        sizes = np.array([len(n.actions) for n in nodes], dtype=np.intp)
+        total = int(sizes.sum())
+        self.nodes = nodes
+        # Where each node's rows start, and which node each row belongs to.
+        self.starts = np.concatenate([[0], np.cumsum(sizes)[:-1]]).astype(np.intp) if nodes else sizes
+        self.column_node = np.repeat(np.arange(len(nodes), dtype=np.intp), sizes)
+        self.inv_actions = (1.0 / np.repeat(sizes, sizes))[:, None] if nodes else np.zeros((0, 1))
+        self.regret = np.zeros((total, combos))
+        self.strategy_sum = np.zeros((total, combos))
+        self.current = np.tile(self.inv_actions, (1, combos))  # zero regret = uniform
+        for slot, (node, start, size) in enumerate(zip(nodes, self.starts, sizes)):
+            node.slot, node.col0 = slot, int(start)
+            rows = slice(int(start), int(start + size))
+            node.regret = self.regret[rows].T
+            node.strategy_sum = self.strategy_sum[rows].T
+            node.current = self.current[rows].T
 
-    def scaled(self, factor: np.ndarray) -> _OpponentReach:
-        return _OpponentReach(self.vector * factor, self._matrix)
+    def normalize(self, weights: np.ndarray) -> np.ndarray:
+        """Each node's rows normalized to sum to 1 per combo (combos with no
+        weight fall back to uniform) -- _PublicNode._normalize, for every node at once."""
+        if weights.shape[0] == 0:
+            return weights.copy()
+        totals = np.add.reduceat(weights, self.starts, axis=0)[self.column_node]
+        positive = totals > 0
+        return np.where(positive, weights / np.where(positive, totals, 1.0), self.inv_actions)
+
+
+class _Schedule:
+    """The tree walked for one updating player, planned once. The tree never
+    changes, so which row of which array every node's reach vector lives in, and
+    which nodes sit at each depth, is decided here, in __init__, rather than
+    rediscovered by a Python loop over ~150 nodes on every pass.
+
+    Reach vectors are shared, not copied, wherever the player's own action
+    doesn't change them: the opponent's reach is the same for every child of the
+    updating player's own decision (only its action differs), and the updating
+    player's own reach is the same for every child of an opponent's decision. So
+    a row is only created where a strategy is multiplied in -- and the terminals
+    under one of the player's own decisions all share its row, one column of the
+    matrix product instead of several.
+
+    Node ids: decisions are 0..D-1 (preorder), terminal t is D + t."""
+
+    def __init__(self, trainer: RangeCfrTrainer, player: int) -> None:
+        decisions = trainer._decisions
+        D, T = len(decisions), len(trainer._terminal_pot)
+        unified = lambda ref: ref if ref >= 0 else D + ~ref  # noqa: E731
+        opp_row = np.full(D + T, -1, dtype=np.intp)
+        own_row = np.full(D, -1, dtype=np.intp)
+        opp_row[0] = own_row[0] = 0
+        opp_rows = own_rows = 1
+        by_depth_own: dict[int, list] = {}  # parent row, child row, store row of the action
+        by_depth_opp: dict[int, list] = {}
+
+        for node in decisions:  # preorder: a node's own rows are set before its children's
+            for k, ref in enumerate(node.children):
+                child = unified(ref)
+                action_row = node.col0 + k  # row in the ACTING player's store
+                if node.actor == player:
+                    opp_row[child] = opp_row[node.index]  # shared
+                    if ref >= 0:
+                        own_row[child] = own_rows
+                        by_depth_own.setdefault(node.depth, []).append(
+                            (own_row[node.index], own_rows, action_row)
+                        )
+                        own_rows += 1
+                else:
+                    opp_row[child] = opp_rows
+                    by_depth_opp.setdefault(node.depth, []).append(
+                        (opp_row[node.index], opp_rows, action_row)
+                    )
+                    opp_rows += 1
+                    if ref >= 0:
+                        own_row[child] = own_row[node.index]  # shared
+
+        def arrays(entries):
+            parent, child, action = (np.array(column, dtype=np.intp) for column in zip(*entries))
+            return parent, child, action
+
+        # Top-down steps, shallowest first.
+        self.own_steps = [(d, *arrays(by_depth_own[d])) for d in sorted(by_depth_own)]
+        self.opp_steps = [(d, *arrays(by_depth_opp[d])) for d in sorted(by_depth_opp)]
+        self.opp_rows, self.own_rows = opp_rows, own_rows
+
+        # Terminals: each distinct opponent-reach row is one row of the matrix
+        # product; every terminal points at its row.
+        unique_rows, self.terminal_to_row = np.unique(opp_row[D:], return_inverse=True)
+        self.matrix_rows = unique_rows
+
+        # Bottom-up groups, deepest first: the player's own nodes (their action
+        # values feed regret updates) and the opponent's (plain sums of children).
+        self.levels = []
+        for depth in sorted({n.depth for n in decisions}, reverse=True):
+            groups = []
+            for mine in (True, False):
+                nodes = [n for n in decisions if n.depth == depth and (n.actor == player) == mine]
+                if not nodes:
+                    groups.append(None)
+                    continue
+                sizes = [len(n.children) for n in nodes]
+                groups.append(
+                    (
+                        np.array([n.index for n in nodes], dtype=np.intp),
+                        np.array([unified(r) for n in nodes for r in n.children], dtype=np.intp),
+                        np.concatenate([[0], np.cumsum(sizes)[:-1]]).astype(np.intp),
+                        np.array([n.col0 + k for n in nodes for k in range(len(n.children))], dtype=np.intp),
+                        np.array([n.slot for n in nodes], dtype=np.intp),
+                    )
+                )
+            self.levels.append(tuple(groups))
+
+        # For the regret update: each of the player's rows' own-reach row.
+        store = trainer._stores[player]
+        own_node_rows = np.array([own_row[n.index] for n in store.nodes], dtype=np.intp)
+        self.own_row_of_action = own_node_rows[store.column_node] if store.nodes else own_node_rows
+
+        # Scratch, reused every pass: reach vectors and values, one row each.
+        combos, opponent_combos = len(trainer.combos[player]), len(trainer.combos[1 - player])
+        self.opp = np.empty((opp_rows, opponent_combos))
+        self.own = np.empty((own_rows, combos))
+        self.value = np.empty((D + T, combos))
+        self.action_values = np.empty((len(store.column_node), combos))
+        self.node_value = np.empty((len(store.nodes), combos))
 
 
 class RangeCfrTrainer:
+    """Trains (and measures) one street's range-vs-range game.
+
+    Speed notes, in the order they were found by profiling (docs/decisions.md,
+    2026-10-21; tests/reference_range_cfr.py is the unoptimized original and
+    test_range_cfr_matches_reference.py holds this class to its answers):
+
+      * The game tree is built ONCE, in __init__, as plain arrays of node and
+        terminal records. The original rebuilt a BettingRoundState (a frozen
+        dataclass) for every visit of every node, every iteration.
+      * A pass over the tree is three phases, not one recursion: top-down, each
+        node's reach vectors; then ALL of the pass's terminals evaluated in one
+        matrix multiply (the equity matrix against every terminal's opponent-
+        reach vector at once -- one pass over the matrix instead of ~150); then
+        bottom-up, values and regret updates.
+      * "How much opponent weight can I be facing" (the matrix's second half
+        in the original) is counted with per-card sums and inclusion-exclusion,
+        O(combos) instead of a second matrix product -- the same blocker trick
+        postflop-solver (b-inary) uses for its fold and showdown evaluation.
+      * Regret-matched strategies are cached and refreshed only when regrets
+        change, and every node's regrets, strategy sums and strategies live in
+        three contiguous arrays per player (a node owns a column slice), so the
+        DCFR update and the regret matching for the WHOLE tree are a handful of
+        array operations rather than ~25 numpy calls per node.
+      * Terminals that share an opponent-reach vector (the fold and the call under
+        one decision) share one column of the matrix multiply.
+    """
+
     def __init__(self, config: RangeSpotConfig) -> None:
         self._config = config
         blocked = frozenset(config.board)
@@ -152,19 +313,24 @@ class RangeCfrTrainer:
         # together, so they carry no weight at all (never "hero loses").
         possible = (~np.isnan(equity)).astype(np.float64)
         win0 = np.where(np.isnan(equity), 0.0, equity)
-        # Per player p, one stacked matrix taking the opponent's reach
-        # vector to [equity-weighted share p wins at showdown; total
-        # opponent weight p could be facing] for each of p's combos -- one
-        # matrix-vector product per terminal instead of two. float32 halves
-        # memory traffic (the product is the hot loop); regrets and
-        # strategy sums stay float64.
+        # Per player p, a stacked matrix taking the opponent's reach vector to
+        # [equity-weighted share p wins at showdown; total opponent weight p
+        # could be facing] for each of p's combos. Training uses only the top
+        # half (`_win`, a view; the bottom half is computed by card counting,
+        # `_mass_vs`); combo_equities uses both. float32 halves memory traffic
+        # (the product is the hot loop); regrets and strategy sums stay float64.
         self._payoff = (
             np.vstack([win0, possible]).astype(np.float32),
             np.vstack([(possible - win0).T, possible.T]).astype(np.float32),
         )
+        self._win = (
+            self._payoff[0][: len(combos0)],
+            self._payoff[1][: len(combos1)],
+        )
         self._chance_mass = float(weights0 @ possible @ weights1)
         if self._chance_mass <= 0:
             raise ValueError("no possible deal: every combo pair shares a card")
+        self._blockers = tuple(self._build_blockers(p) for p in (0, 1))
 
         self._root = BettingRoundState.initial(
             config.pot_bb,
@@ -174,76 +340,174 @@ class RangeCfrTrainer:
             config.bet_menu,
         )
         self._nodes: dict[tuple[str, ...], _PublicNode] = {}
+        self._decisions: list[_PublicNode] = []  # preorder: a parent precedes its children
+        self._terminal_pot: list[float] = []
+        self._terminal_contrib: list[tuple[float, float]] = []
+        self._terminal_fold_winner: list[int] = []  # the non-folder's seat, or -1 for a showdown
+        self._build_tree(self._root)
+        self._terminal_arrays = self._terminal_tables()
+        self._stores = tuple(
+            _PlayerStore([n for n in self._decisions if n.actor == player], len(self.combos[player]))
+            for player in (0, 1)
+        )
+        self._schedules = tuple(_Schedule(self, player) for player in (0, 1))
         self.iterations = 0
+
+    # --- setup ----------------------------------------------------------
+
+    def _build_tree(self, state: BettingRoundState, depth: int = 0) -> int:
+        """Builds the node and terminal records under `state`; returns its
+        child reference (see _PublicNode.children)."""
+        if state.is_terminal():
+            self._terminal_pot.append(state.pot_bb + state.contributed[0] + state.contributed[1])
+            self._terminal_contrib.append(state.contributed)
+            # apply() has already flipped to_act to the non-folder on a fold.
+            self._terminal_fold_winner.append(state.to_act if state.history[-1] == "fold" else -1)
+            return ~(len(self._terminal_pot) - 1)
+        node = _PublicNode(state.legal_actions(), state.to_act, len(self._decisions), depth)
+        self._decisions.append(node)
+        self._nodes[state.history] = node
+        node.children = tuple(self._build_tree(state.apply(action), depth + 1) for action in node.actions)
+        return node.index
+
+    def _terminal_tables(self) -> tuple:
+        """Per player and terminal, the two coefficients that turn the opponent
+        masses into a value: value = alpha * (equity-weighted mass won) + beta *
+        (mass faced). A showdown is pot * win - own * facing; a fold is
+        (share - own) * facing, where the share is the WHOLE pot for the
+        non-folder (dead money from earlier streets included -- see
+        betting_round.terminal_utility) and nothing for the folder. Shapes (T,)."""
+        pot = np.array(self._terminal_pot)
+        winner = np.array(self._terminal_fold_winner)
+        contrib = np.array(self._terminal_contrib)  # (T, 2)
+        is_fold = winner >= 0
+        per_player = []
+        for player in (0, 1):
+            own = contrib[:, player]
+            fold_share = np.where(winner == player, pot, 0.0)
+            alpha = np.where(is_fold, 0.0, pot)
+            beta = np.where(is_fold, fold_share - own, -own)
+            per_player.append((alpha[:, None], beta[:, None]))
+        return tuple(per_player)
+
+    def _build_blockers(self, player: int) -> tuple:
+        """What `_mass_vs` needs to count, for each of `player`'s combos, the
+        opponent weight it is NOT blocked from: its two cards, an opponent-
+        combo-by-card incidence matrix, and each combo's identical twin in
+        the opponent range (if there is one)."""
+        mine, theirs = self.combos[player], self.combos[1 - player]
+        own_cards = np.array(mine, dtype=np.intp)  # (n, 2)
+        incidence = np.zeros((len(theirs), 52))
+        for j, (a, b) in enumerate(theirs):
+            incidence[j, a] = incidence[j, b] = 1.0
+        # Keyed by the sorted pair: the same two cards can be listed in either
+        # order (a pair built from a label vs. from a specific-combo key).
+        index_of = {tuple(sorted(combo)): j for j, combo in enumerate(theirs)}
+        same = np.array(
+            [index_of.get(tuple(sorted(combo)), len(theirs)) for combo in mine], dtype=np.intp
+        )
+        return own_cards[:, 0], own_cards[:, 1], incidence, same
 
     @property
     def root(self) -> BettingRoundState:
         return self._root
 
-    def _node(self, state: BettingRoundState) -> _PublicNode:
-        node = self._nodes.get(state.history)
-        if node is None:
-            node = _PublicNode(state.legal_actions(), state.to_act, len(self.combos[state.to_act]))
-            self._nodes[state.history] = node
-        return node
+    # --- evaluating terminals -------------------------------------------
 
-    def _opponent_reach(self, player: int, vector: np.ndarray) -> _OpponentReach:
-        return _OpponentReach(vector, self._payoff[player])
+    def _mass_rows(self, player: int, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """For each of `player`'s combos and each ROW of `rows` (a (T, opponent
+        combos) array of reach weights): the equity-weighted opponent mass it wins
+        at showdown, and the total opponent mass it could be facing (combos
+        sharing a card excluded). Shapes (T, own combos).
 
-    def _terminal_value(self, state: BettingRoundState, player: int, opp: _OpponentReach) -> np.ndarray:
-        """Counterfactual value of each of `player`'s combos at a terminal:
-        sum over every opponent combo it could be facing (weighted by that
-        combo's reach) of player's payoff. Same payoff formula as
-        BettingRoundState.terminal_utility -- including its fold pitfall:
-        the winner's share is the WHOLE pot, dead money from earlier
-        streets included, not just what the folder put in this street."""
-        total_pot = state.pot_bb + state.contributed[0] + state.contributed[1]
-        own = state.contributed[player]
-        winning, facing = opp.products()
-        if state.history[-1] == "fold":
-            # apply() already flipped to_act to the non-folder.
-            share = total_pot if state.to_act == player else 0.0
-            return (share - own) * facing
-        return total_pot * winning - own * facing
+        The win mass is one matrix multiply. The facing mass needs no matrix:
+        total reach, minus the reach of opponent combos holding either of my
+        two cards, plus back the combo identical to mine (it was subtracted
+        for both cards). Inclusion-exclusion over a 52-card table. One row per
+        terminal (rather than one column) keeps each terminal's values
+        contiguous, which is what the gathers and the bottom-up pass want."""
+        matrix = self._win[player]
+        win = (rows.astype(matrix.dtype, copy=False) @ matrix.T).astype(np.float64)
+        first, second, incidence, same = self._blockers[player]
+        per_card = rows @ incidence  # (T, 52): reach of opponent combos holding each card
+        padded = np.concatenate([rows, np.zeros((rows.shape[0], 1))], axis=1)  # column m = "no identical twin"
+        facing = rows.sum(axis=1)[:, None] - per_card[:, first] - per_card[:, second] + padded[:, same]
+        return win, facing
 
-    def _traverse(
-        self, state: BettingRoundState, player: int, reach_own: np.ndarray, opp: _OpponentReach
-    ) -> np.ndarray:
-        if state.is_terminal():
-            return self._terminal_value(state, player, opp)
-        node = self._node(state)
-        strategy = node.current_strategy()
+    def _mass_vs(self, player: int, vectors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """_mass_rows for callers holding the vectors as columns: `vectors` is
+        (opponent combos, T) and the masses come back (own combos, T)."""
+        win, facing = self._mass_rows(player, np.ascontiguousarray(vectors.T))
+        return win.T, facing.T
 
-        if node.actor == player:
-            action_values = np.empty((len(reach_own), len(node.actions)))
-            for k, action in enumerate(node.actions):
-                # Same `opp` object for every child -- its cached product is
-                # shared by all of this decision's terminal outcomes.
-                action_values[:, k] = self._traverse(
-                    state.apply(action), player, reach_own * strategy[:, k], opp
-                )
-            value = (strategy * action_values).sum(axis=1)
-            # DCFR: discount what's accumulated so far before adding this
-            # iteration -- positive regrets by t^a/(t^a+1), negative by
-            # t^b/(t^b+1), the average strategy by (t/(t+1))^g -- so early,
-            # badly-informed iterations fade instead of anchoring the result.
+    # --- one pass over the tree ------------------------------------------
+
+    def _pass(self, player: int, *, train: bool) -> np.ndarray:
+        """One traversal for `player`. With train=True: both players play their
+        current strategies, `player`'s regrets and strategy sums are updated
+        (DCFR), and its strategies refreshed. With train=False: the opponent
+        plays its AVERAGE strategy and `player` best-responds -- the
+        exploitability measure. Returns `player`'s per-combo value at the root.
+
+        Three phases, each a handful of array operations per tree level (the
+        plan is in _Schedule) rather than a Python loop over every node."""
+        plan = self._schedules[player]
+        mine, theirs = self._stores[player], self._stores[1 - player]
+        decisions = len(self._decisions)
+        opp, own, value = plan.opp, plan.own, plan.value
+        opp[0] = self.weights[1 - player]
+        own[0] = self.weights[player]
+        opponent_strategy = theirs.current if train else theirs.normalize(theirs.strategy_sum)
+
+        # Top-down: reach vectors. Both players' reach is multiplied by a strategy
+        # only where that player acts; everything else is a shared row.
+        for (_, parent, child, action) in plan.opp_steps:
+            opp[child] = opp[parent] * opponent_strategy[action]
+        if train:
+            for (_, parent, child, action) in plan.own_steps:
+                own[child] = own[parent] * mine.current[action]
+
+        # Every terminal at once. Row t of `value[decisions:]` is terminal t's value
+        # for each of the player's combos.
+        alpha, beta = self._terminal_arrays[player]
+        win, facing = self._mass_rows(player, opp[plan.matrix_rows])
+        value[decisions:] = alpha * win[plan.terminal_to_row] + beta * facing[plan.terminal_to_row]
+
+        # Bottom-up, deepest level first.
+        for own_group, opp_group in plan.levels:
+            if opp_group is not None:
+                nodes, children, starts, _, _ = opp_group
+                value[nodes] = np.add.reduceat(value[children], starts, axis=0)
+            if own_group is not None:
+                nodes, children, starts, action_rows, slots = own_group
+                action_values = value[children]
+                if train:
+                    plan.action_values[action_rows] = action_values
+                    node_value = np.add.reduceat(action_values * mine.current[action_rows], starts, axis=0)
+                    plan.node_value[slots] = node_value
+                else:
+                    node_value = np.maximum.reduceat(action_values, starts, axis=0)
+                value[nodes] = node_value
+
+        if train and mine.nodes:
+            # DCFR, for every one of the player's nodes at once: discount what's
+            # accumulated so far before adding this iteration -- positive regrets
+            # by t^a/(t^a+1), negative by t^b/(t^b+1), the average strategy by
+            # (t/(t+1))^g -- so early, badly-informed iterations fade instead of
+            # anchoring the result. Then regret-match the new current strategies.
             t = self.iterations - 1
             positive = t**_DCFR_ALPHA / (t**_DCFR_ALPHA + 1)
             negative = t**_DCFR_BETA / (t**_DCFR_BETA + 1)
-            node.regret = (
-                np.where(node.regret > 0, node.regret * positive, node.regret * negative)
-                + action_values
-                - value[:, None]
-            )
-            node.strategy_sum = (
-                node.strategy_sum * (t / (t + 1)) ** _DCFR_GAMMA + reach_own[:, None] * strategy
-            )
-            return value
-
-        value = np.zeros(len(reach_own))
-        for k, action in enumerate(node.actions):
-            value += self._traverse(state.apply(action), player, reach_own, opp.scaled(strategy[:, k]))
-        return value
+            gamma = (t / (t + 1)) ** _DCFR_GAMMA
+            regret, strategy_sum, current = mine.regret, mine.strategy_sum, mine.current
+            np.multiply(regret, np.where(regret > 0, positive, negative), out=regret)
+            regret += plan.action_values
+            regret -= plan.node_value[mine.column_node]
+            strategy_sum *= gamma
+            strategy_sum += own[plan.own_row_of_action] * current  # the strategy played THIS iteration
+            # DCFR keeps (discounted) negative regrets, so take the positive part.
+            current[...] = mine.normalize(np.maximum(regret, 0.0))
+        return value[0].copy()
 
     def train(self, iterations: int) -> None:
         for _ in range(iterations):
@@ -251,8 +515,7 @@ class RangeCfrTrainer:
             # Alternating updates: player 1's pass already sees player 0's
             # freshly updated strategy.
             for player in (0, 1):
-                opp = self._opponent_reach(player, self.weights[1 - player])
-                self._traverse(self._root, player, self.weights[player], opp)
+                self._pass(player, train=True)
 
     def train_until(
         self,
@@ -374,8 +637,8 @@ class RangeCfrTrainer:
         keeps its prior weight.
 
         Keys are combo-aware: a 169-type label ('AKs') where every one of
-        its live combos ended up within _COLLAPSE_TOLERANCE of the same
-        weight, otherwise one specific-combo key ('AhKh') per combo --
+        its live combos ended up within _COLLAPSE_TOLERANCE (relative) of
+        the same weight, otherwise one specific-combo key ('AhKh') per combo --
         because the suits are the point (the nut flush draw is the hand
         that bluffed, its blocker-free sibling isn't), and averaging them
         back into a label would throw that away. A label whose every
@@ -401,7 +664,7 @@ class RangeCfrTrainer:
                 whole_label = len(members) == sum(
                     1 for c in label_to_combos(label) if c[0] not in board and c[1] not in board
                 )
-                if whole_label and max(values) - min(values) <= _COLLAPSE_TOLERANCE:
+                if whole_label and max(values) - min(values) <= _COLLAPSE_TOLERANCE * max(values):
                     weights[label] = sum(values) / len(values)
                 else:
                     for combo, weight in members:
@@ -439,26 +702,10 @@ class RangeCfrTrainer:
 
     # --- convergence measurement ---------------------------------------
 
-    def _best_response(self, state: BettingRoundState, player: int, opp: _OpponentReach) -> np.ndarray:
-        if state.is_terminal():
-            return self._terminal_value(state, player, opp)
-        node = self._node(state)
-        if node.actor == player:
-            return np.max(
-                np.stack([self._best_response(state.apply(a), player, opp) for a in node.actions], axis=1),
-                axis=1,
-            )
-        average = node.average_strategy()
-        value = np.zeros(len(self.combos[player]))
-        for k, action in enumerate(node.actions):
-            value += self._best_response(state.apply(action), player, opp.scaled(average[:, k]))
-        return value
-
     def best_response_value(self, player: int) -> float:
         """Expected payoff (bb per deal) of `player`'s best response against
         the opponent's current average strategy."""
-        opp = self._opponent_reach(player, self.weights[1 - player])
-        per_combo = self._best_response(self._root, player, opp)
+        per_combo = self._pass(player, train=False)
         return float(self.weights[player] @ per_combo) / self._chance_mass
 
     def exploitability(self) -> float:

@@ -213,3 +213,39 @@ def test_pack_strength_preserves_order() -> None:
     for a, b in zip(strengths, strengths[1:]):
         assert (a < b) == (pack_strength(a) < pack_strength(b))
         assert (a == b) == (pack_strength(a) == pack_strength(b))
+
+
+# --- scoring many boards in one call ------------------------------------------------
+
+
+def test_evaluate_seven_boards_equals_one_board_at_a_time():
+    import numpy as np
+
+    from poker_solver.evaluator import evaluate_seven_batch, evaluate_seven_boards
+
+    rng = np.random.default_rng(3)
+    boards = np.array([rng.choice(52, size=5, replace=False) for _ in range(60)])
+    holes = np.array([rng.choice(52, size=2, replace=False) for _ in range(150)])
+    together = evaluate_seven_boards(holes, boards)
+    assert together.shape == (60, 150)
+    for b, board in enumerate(boards):
+        alive = ~np.isin(holes, board).any(axis=1)  # a hand sharing a board card has no meaningful score
+        np.testing.assert_array_equal(together[b][alive], evaluate_seven_batch(holes, board)[alive])
+
+
+def test_evaluate_seven_boards_spans_block_boundaries():
+    # More (hand, board) pairs than one internal block, so the blocking logic is exercised.
+    import numpy as np
+
+    from poker_solver import evaluator
+
+    rng = np.random.default_rng(5)
+    boards = np.array([rng.choice(52, size=5, replace=False) for _ in range(40)])
+    holes = np.array([rng.choice(52, size=2, replace=False) for _ in range(900)])
+    assert boards.shape[0] * holes.shape[0] > evaluator._BLOCK_HANDS
+    together = evaluator.evaluate_seven_boards(holes, boards)
+    for b in (0, 17, 39):
+        alive = ~np.isin(holes, boards[b]).any(axis=1)
+        np.testing.assert_array_equal(
+            together[b][alive], evaluator.evaluate_seven_batch(holes, boards[b])[alive]
+        )

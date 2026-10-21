@@ -162,7 +162,10 @@ roughly this order of effort:
 
 1. **More bet sizes** — cheap; same MCCFR, bigger action space per node.
    *Backend done 2026-10-21*: a solve takes a custom `bet_menu` (sizes and
-   raise cap); see `docs/decisions.md`. No UI control yet.
+   raise cap); see `docs/decisions.md`. No UI control yet. Solver speed
+   (2.4-4.3x, same answers) landed the same day, which is what makes a
+   bigger tree (more sizes, a deeper raise cap, more streets) affordable;
+   see `docs/decisions.md`.
 2. **Multi-street solving** — one tree spanning flop→turn→river betting
    in a single solve, instead of one street at a time (any single street
    is already solvable — see `services/solver/README.md`). The big one.

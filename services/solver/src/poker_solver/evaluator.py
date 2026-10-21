@@ -222,23 +222,70 @@ def evaluate_seven_batch(holes: np.ndarray, board: Sequence[int]) -> np.ndarray:
     that exactly, on random hands and every category's edge cases."""
     if len(board) != 5:
         raise ValueError(f"evaluate_seven_batch needs a 5-card board, got {len(board)}")
+    return evaluate_seven_boards(holes, np.asarray(board, dtype=np.int64)[None, :])[0]
+
+
+# How many (hand, board) pairs one call to the scorer handles. Big enough that
+# numpy's fixed per-call cost (~10 microseconds an operation, ~50 operations)
+# is spread over thousands of hands; small enough that the temporaries stay
+# in cache.
+_BLOCK_HANDS = 24_000
+
+
+def evaluate_seven_boards(holes: np.ndarray, boards: np.ndarray) -> np.ndarray:
+    """holes: (n, 2) hole cards; boards: (B, 5) five-card boards. Returns
+    (B, n) int64 scores: row b equals evaluate_seven_batch(holes, boards[b]).
+
+    Scoring many boards in one call is what makes the equity matrix cheap: a
+    flop has 990 runouts, and one call per runout spent most of its time on
+    fixed numpy overhead (the hands per call were only ~480). As with
+    evaluate_seven_batch, a hand sharing a card with its board gets a
+    meaningless score -- callers mask those out."""
     n = holes.shape[0]
+    boards = np.asarray(boards, dtype=np.int64)
+    count = boards.shape[0]
 
-    # One 13-bit rank mask per suit, per hand.
-    board_suits = np.zeros(4, dtype=np.int64)
-    for card in board:
-        board_suits[card % 4] |= 1 << (card // 4)
-    suit_mask = np.tile(board_suits, (n, 1))
-    rows = np.arange(n)
-    for col in (0, 1):
-        cards = holes[:, col].astype(np.int64)
-        suit_mask[rows, cards % 4] |= np.left_shift(1, cards // 4)
+    # One 13-bit rank mask per suit, for each board.
+    board_suits = np.zeros((count, 4), dtype=np.int64)
+    rows = np.arange(count)
+    for col in range(5):
+        cards = boards[:, col]
+        board_suits[rows, cards % 4] |= np.left_shift(1, cards // 4)
 
-    presence = np.bitwise_or.reduce(suit_mask, axis=1)
-    rank_counts = ((suit_mask[:, :, None] >> np.arange(13)) & 1).sum(axis=1)
-    quad_mask = ((rank_counts == 4) * _RANK_BITS).sum(axis=1)
-    trip_mask = ((rank_counts == 3) * _RANK_BITS).sum(axis=1)
-    pair_mask = ((rank_counts == 2) * _RANK_BITS).sum(axis=1)
+    hole_cards = holes.astype(np.int64)
+    hole_suit = hole_cards % 4
+    hole_bit = np.left_shift(1, hole_cards // 4)
+    hand_rows = np.arange(n)
+
+    out = np.empty((count, n), dtype=np.int64)
+    per_block = max(1, _BLOCK_HANDS // max(n, 1))
+    for start in range(0, count, per_block):
+        stop = min(count, start + per_block)
+        block = stop - start
+        suit_mask = np.broadcast_to(board_suits[start:stop, None, :], (block, n, 4)).copy()
+        for col in (0, 1):
+            suit_mask[:, hand_rows, hole_suit[:, col]] |= hole_bit[:, col]
+        out[start:stop] = _score_suit_masks(suit_mask.reshape(block * n, 4)).reshape(block, n)
+    return out
+
+
+def _score_suit_masks(suit_mask: np.ndarray) -> np.ndarray:
+    """suit_mask: (N, 4) int64, each entry the 13-bit mask of ranks a hand holds
+    in that suit (hole cards and board together). Returns (N,) packed scores."""
+    a, b, c, d = suit_mask[:, 0], suit_mask[:, 1], suit_mask[:, 2], suit_mask[:, 3]
+    presence = a | b | c | d
+
+    # How many suits hold each rank, as a 3-bit counter per rank done with a
+    # carry-save adder on the four masks -- instead of expanding to an
+    # (N, 4, 13) tensor and summing it. bit0/bit1/bit2 are the counter's bits.
+    t1, carry1 = a ^ b, a & b
+    t2, carry2 = t1 ^ c, t1 & c
+    bit0, carry3 = t2 ^ d, t2 & d
+    bit1 = carry1 ^ carry2 ^ carry3
+    bit2 = (carry1 & carry2) | (carry1 & carry3) | (carry2 & carry3)
+    quad_mask = bit2  # held in all four suits
+    trip_mask = bit0 & bit1  # in exactly three
+    pair_mask = bit1 & ~bit0 & ~bit2  # in exactly two
 
     suit_counts = _POPCOUNT[suit_mask]
     flush_mask = np.where(suit_counts >= 5, suit_mask, 0).max(axis=1)  # at most one suit qualifies

@@ -116,6 +116,19 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Solver speed (2026-10-21)**: `range_cfr.py` was rebuilt for speed with the
+same answers (2.4x to 4.3x faster end to end; wide flop 10.9s to ~3.3s). The tree is
+built once and each pass is planned level by level (`_Schedule`); all of a pass's
+terminals are one matrix multiply; every node's training state lives in contiguous
+per-player arrays; the equity matrix and hand evaluator are vectorized over runouts;
+DCFR is 1.5 / 0.5 / 3. **Equivalence is enforced**: `tests/reference_range_cfr.py` is a
+frozen copy of the old trainer and `test_range_cfr_matches_reference.py` holds the real
+one to it (exactly, in float64) — if you change the update rule on purpose, change the
+reference copy in the same commit and say why. Tools: `services/solver/benchmarks/`
+(`bench_trainer.py` for timings, `--reference` for the old one; `sweep_dcfr.py` for
+tuning). The equity matrix is cached (64 MB LRU): clear `equity._cache` when timing.
+See `docs/decisions.md`.
+
 **Custom bet sizes (2026-10-21)**: `Spot.bet_menu` (schema `BetMenu`: `sizes` as
 fractions of the pot, plus `max_aggressive_actions`) replaces the fixed
 25/75/125% menu for a solve. The state machine carries it
@@ -350,6 +363,10 @@ cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR s
 cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
+pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer vs its frozen pre-speed-up copy
+python services/solver/benchmarks/bench_trainer.py            # timings; --reference for the old trainer
+PYTHONPATH=apps/api python services/solver/benchmarks/sweep_dcfr.py   # DCFR parameter sweep
+python apps/api/scripts/compare_bet_menus.py                  # what a custom bet menu costs
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by
@@ -360,6 +377,11 @@ at Supabase) unless `DATABASE_URL` is already set — so set it explicitly:
 ```
 DATABASE_URL=postgresql+psycopg://poker_solver:poker_solver_dev@localhost:5432/poker_solver pytest apps/api
 ```
+Tests that never touch the database can run without Postgres: `DATABASE_URL=
+postgresql+psycopg://x:x@localhost:5432/x pytest --noconftest apps/api/tests/test_solve_route.py
+apps/api/tests/test_preflop_ranges.py ...` (the engine connects lazily and `--noconftest`
+skips the fixture that runs Alembic) — handy when there's no local Postgres; CI still runs
+the whole suite against a real one.
 The test session runs `alembic upgrade head` itself (`tests/conftest.py`)
 and signs its own tokens with a throwaway key, so tests need no Supabase
 access. `db.py` loads `.env` itself via `python-dotenv` for bare

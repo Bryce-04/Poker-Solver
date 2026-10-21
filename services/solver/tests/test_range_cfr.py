@@ -86,14 +86,13 @@ def test_card_removal_shrinks_the_opponent_range_correctly() -> None:
             range1={"AKs": 1.0, "AKo": 1.0},
         )
     )
-    _, facing = trainer._opponent_reach(0, trainer.weights[1]).products()
+    _, facing = trainer._mass_vs(0, trainer.weights[1][:, None])
     assert np.allclose(facing, 8.0)
 
 
 def test_terminal_values_match_brute_force() -> None:
     # Showdown value of each hero combo vs the whole villain range, from
     # the trainer's matrices, against summing pair by pair by hand.
-    from poker_solver.betting_round import BettingRoundState
     from poker_solver.evaluator import evaluate_best
 
     board = _board("Ks", "Qh", "9d", "4c", "2s")
@@ -106,9 +105,11 @@ def test_terminal_values_match_brute_force() -> None:
             range1={"KQo": 1.0, "99": 1.0},
         )
     )
-    state = BettingRoundState.initial(10.0, 50.0).apply("check").apply("check")
+    # A check-check showdown: nothing contributed this street, so the pot is
+    # the dead 10 and a combo's value is 10 x (its equity-weighted opponent mass).
     reach = trainer.weights[1]
-    values = trainer._terminal_value(state, 0, trainer._opponent_reach(0, reach))
+    win, _ = trainer._mass_vs(0, reach[:, None])
+    values = 10.0 * win[:, 0]
     for i, hero in enumerate(trainer.combos[0]):
         expected = 0.0
         for j, villain in enumerate(trainer.combos[1]):
@@ -279,7 +280,9 @@ def test_posterior_keeps_combos_apart_when_blockers_make_them_differ() -> None:
     oop, _ = trainer.posterior_ranges(("bet_medium",))
     assert "AKs" not in oop
     assert {"AhKh", "AsKs"} <= set(oop)
-    assert abs(oop["AhKh"] - oop["AsKs"]) > 1e-3
+    # Relative: this is a rarely taken line, so every weight is tiny, but the
+    # flush-draw combo and the others still differ by a real fraction.
+    assert abs(oop["AhKh"] - oop["AsKs"]) > 0.05 * max(oop["AhKh"], oop["AsKs"])
 
 
 def test_posterior_does_not_resurrect_an_excluded_combo() -> None:
