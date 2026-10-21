@@ -21,6 +21,13 @@ board with no further betting and goes to showdown — multi-street
 solving (betting across flop *and* turn *and* river in one tree) is a
 bigger, separate future direction (`docs/plan.md`).
 
+**Joint turn + river.** With `RangeSpotConfig.river` (a `RiverSpec`) on a turn board, the
+same trainer solves the turn and the river as one game: a closing turn line deals a river card
+(a chance node) and each card plays its own river betting, so the turn strategy knows what the
+river will be like. The river cards can be a sample; `estimate_joint_size` counts the game before
+it's built. See `docs/decisions.md` (2026-10-21) for how it's validated, what a sample costs in
+accuracy, and the timings.
+
 `apps/api/app/solve.py` calls into this (`RangeCfrTrainer.train_until`),
 can seed a solve from any non-terminal action prefix on the current
 street (replayed through `BettingRoundState`, with any bet/raise bucketed
@@ -32,6 +39,8 @@ pip install -e ".[dev]"
 pytest                                   # everything, including closed-form + regression tests
 pytest tests/test_range_cfr.py           # the live trainer's own tests
 pytest tests/test_range_cfr_matches_reference.py   # the trainer vs. its frozen pre-optimization copy
+pytest tests/test_joint_solve.py         # the joint turn+river solve (exact equivalences to the single-street trainer)
+python benchmarks/bench_joint.py         # joint solve sizes and timings (--accuracy: sampled river cards vs exact)
 python benchmarks/bench_trainer.py       # timings (add --reference for the old trainer)
 python -m poker_solver.kuhn_spike       # the Stage 1 toy spike (see below)
 python -m poker_solver.postflop_mccfr   # the superseded Monte Carlo trainer's demo
@@ -119,6 +128,10 @@ none of them "did it run":
   asserts nothing jams absurdly and exploitability is under 5% of the pot
   after 100 iterations.
 
+- **The joint solve** (`tests/test_joint_solve.py`): with no river betting and every card
+  enumerated it equals the plain turn solve, and with the turn already closed each river card's
+  strategies equal a standalone river solve of that card -- both exactly, in float64. (These
+  were mutation-checked: a wrong chance weight or letting card-holding hands back in fails them.)
 - **Equivalence to the frozen original** (`tests/test_range_cfr_matches_reference.py`).
   A speed-up must not change an answer. `tests/reference_range_cfr.py` is the
   straightforward pre-optimization trainer; the real one is held to it in

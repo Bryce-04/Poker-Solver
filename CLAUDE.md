@@ -116,6 +116,20 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Joint turn + river solve (2026-10-21)**: `Spot.river` (schema `RiverSpec`) asks a
+`POST /spots/solve` on a TURN board to include the river: closing turn lines deal a river
+card and play the river's betting (each card its own strategies), so the turn strategy knows
+what the river will be like. `range_cfr.py`'s tree has chance nodes (`RangeSpotConfig.river`,
+`_ChanceNode`, `RiverSpec`); money is counted across streets; river cards can be a SAMPLE
+(`select_river_cards`) — an approximation whose accuracy is measured in `docs/decisions.md`
+(the response's `joint` block says exactly what was used). A sampled game isn't constant-sum,
+so convergence is the Nash gap (`exploitability()` switches to it automatically; it equals
+the classic formula when every card is dealt). The size is estimated and refused if over
+350 MB (`estimate_joint_size`, `app/solve.py`'s `JOINT_MEMORY_BUDGET_BYTES`). Validated by
+exact float64 equivalence to the single-street trainer (`tests/test_joint_solve.py`).
+`benchmarks/bench_joint.py` times it and (`--accuracy`) measures the sampling error. No UI yet;
+"Why?" notes aren't built for it; `/spots/narrow` ignores `river`.
+
 **Solver speed (2026-10-21)**: `range_cfr.py` was rebuilt for speed with the
 same answers (2.4x to 4.3x faster end to end; wide flop 10.9s to ~3.3s). The tree is
 built once and each pass is planned level by level (`_Schedule`); all of a pass's
@@ -367,6 +381,7 @@ pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer 
 python services/solver/benchmarks/bench_trainer.py            # timings; --reference for the old trainer
 PYTHONPATH=apps/api python services/solver/benchmarks/sweep_dcfr.py   # DCFR parameter sweep
 python apps/api/scripts/compare_bet_menus.py                  # what a custom bet menu costs
+python services/solver/benchmarks/bench_joint.py              # joint turn+river sizes/timings; --accuracy for the sampling error
 ```
 `apps/api` requires a reachable `DATABASE_URL` even to run `pytest
 apps/api` — `/health` does a real `SELECT 1`, and `app.main` (imported by

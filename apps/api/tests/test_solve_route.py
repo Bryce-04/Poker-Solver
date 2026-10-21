@@ -325,3 +325,100 @@ def test_narrowing_uses_the_same_custom_menu():
     res = client.post("/spots/narrow", json=spot)
     assert res.status_code == 200
     assert res.json()["bucketed_actions"] == ["BTN's 50.0bb bet -> bucketed to 50% pot (bet_50)"]
+
+
+# --- joint turn + river solves ----------------------------------------------------------
+
+JOINT_TURN = {
+    "positions_in_hand": ["BB", "BTN"],
+    "effective_stack_bb": 95,
+    "pot_bb": 10.5,
+    "board": ["Qs", "Jh", "7h", "3h"],
+    "current_street": "turn",
+    "actions": [],
+    "ranges": {
+        "BB": {"AA": 1.0, "KQs": 1.0, "T9s": 1.0, "55": 1.0},
+        "BTN": {"KK": 1.0, "AQs": 1.0, "98s": 1.0, "66": 1.0},
+    },
+    # Small menus: the joint game is the turn's closing lines x river cards x river betting.
+    "bet_menu": {"sizes": [0.5], "max_aggressive_actions": 2},
+}
+
+
+def test_a_joint_solve_reports_exactly_what_the_river_was_solved_with():
+    spot = {
+        **JOINT_TURN,
+        "river": {"bet_menu": {"sizes": [0.75], "max_aggressive_actions": 1}, "cards": 4},
+    }
+    res = client.post("/spots/solve", json=spot)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["converged"]
+    joint = body["joint"]
+    assert len(joint["river_cards"]) == 4
+    assert joint["river_cards_total"] == 48 and joint["exact"] is False
+    assert joint["river_bet_menu"] == {"sizes": {"bet_75": 0.75}, "max_aggressive_actions": 1}
+    assert joint["closing_turn_lines"] > 0
+    # The answer is the TURN decision, on the turn menu; the "Why?" notes aren't built for a joint solve.
+    assert {a for mix in body["strategy"].values() for a in mix} <= {"check", "bet_50", "all_in"}
+    assert body["hand_categories"] == {} and body["hand_reasons"] == {}
+
+
+def test_a_joint_solve_without_a_card_count_uses_twelve_and_null_means_no_river_betting():
+    res = client.post("/spots/solve", json={**JOINT_TURN, "river": {"bet_menu": None}})
+    assert res.status_code == 200
+    joint = res.json()["joint"]
+    assert len(joint["river_cards"]) == 12  # the server's default sample
+    assert joint["river_bet_menu"] is None
+
+
+def test_a_normal_solve_has_no_joint_block():
+    assert client.post("/spots/solve", json=RIVER_SPOT).json()["joint"] is None
+
+
+def test_a_joint_solve_needs_a_turn_board():
+    flop = {**JOINT_TURN, "board": ["Qs", "Jh", "7h"], "current_street": "flop", "river": {}}
+    res = client.post("/spots/solve", json=flop)
+    assert res.status_code == 422
+    assert "turn board" in res.json()["detail"]
+
+
+def test_a_joint_solve_too_big_for_the_server_is_refused_with_what_to_shrink():
+    # Realistic ranges (memory scales with how many hands there are), the default turn menu
+    # (over a hundred closing lines), times every river card, times river betting.
+    from app.preflop_ranges import flat_range, open_range
+    from poker_solver_schema import Position
+
+    huge = {k: v for k, v in JOINT_TURN.items() if k != "bet_menu"}
+    huge["ranges"] = {
+        "BB": flat_range(Position.BTN, Position.BB),
+        "BTN": open_range(Position.BTN),
+    }
+    huge["river"] = {"bet_menu": {"sizes": [0.5, 1.0], "max_aggressive_actions": 2}, "cards": 48}
+    res = client.post("/spots/solve", json=huge)
+    assert res.status_code == 422
+    detail = res.json()["detail"]
+    assert "too big for the server" in detail and "river cards" in detail and "MB" in detail
+
+
+def test_a_bad_river_menu_is_a_422_that_says_why():
+    spot = {**JOINT_TURN, "river": {"bet_menu": {"sizes": [1.0, 0.5]}}}
+    res = client.post("/spots/solve", json=spot)
+    assert res.status_code == 422
+    assert "river.bet_menu" in res.json()["detail"] and "ascending" in res.json()["detail"]
+
+
+def test_narrowing_ignores_a_river_request():
+    # Narrowing is about this street's own line; a joint request (here one that would be
+    # refused as too big) must not be built or sized.
+    spot = {
+        **JOINT_TURN,
+        "river": {"bet_menu": {"sizes": [0.5, 1.0], "max_aggressive_actions": 2}, "cards": 48},
+        "actions": [
+            {"position": "BB", "street": "turn", "action": "check"},
+            {"position": "BTN", "street": "turn", "action": "check"},
+        ],
+    }
+    res = client.post("/spots/narrow", json=spot)
+    assert res.status_code == 200
+    assert set(res.json()["ranges"]) == {"BB", "BTN"}

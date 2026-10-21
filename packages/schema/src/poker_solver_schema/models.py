@@ -115,6 +115,42 @@ class BetMenu(BaseModel):
     )
 
 
+class RiverSpec(BaseModel):
+    """Ask a TURN solve to include the river: a joint turn + river solve.
+
+    A normal turn solve ends where the turn's betting ends (the river card then
+    comes, nobody bets, showdown), so it can't know what the river will be like.
+    With a RiverSpec, a turn line that closes without a fold deals a river card
+    and plays the river's betting, every river card with its own strategies, and
+    the turn strategy is worked out knowing that. The board must have 4 cards.
+
+    The game this builds is large (every closing turn line, times every river
+    card, times the river's betting), so it is solved on small menus and, by
+    default, with a sample of the river cards instead of all of them; the
+    response says exactly what was used.
+    """
+
+    bet_menu: BetMenu | None = Field(
+        default_factory=lambda: BetMenu(sizes=[0.75], max_aggressive_actions=1),
+        description=(
+            "The river's bet sizes. Omit for one 75% size and no sized re-raise; null for NO "
+            "river betting (the river card is dealt and the hand goes to showdown, "
+            "which is the cheapest way to get exact river equity into the turn "
+            "strategy)."
+        ),
+    )
+    cards: int | None = Field(
+        default=None,
+        ge=1,
+        le=48,
+        description=(
+            "How many river cards to enumerate. null means 12, spread across ranks and "
+            "suits; 48 is every card that can come (exact, and expensive). Fewer "
+            "cards is an approximation."
+        ),
+    )
+
+
 class Spot(BaseModel):
     """A single poker situation: who's in it, what's happened, and what's
     being asked about it. Produced identically by the button builder
@@ -145,6 +181,14 @@ class Spot(BaseModel):
         description=(
             "Custom bet sizes for a postflop solve of this spot. Null means the "
             "default menu (25% / 75% / 125% of the pot, or all-in)."
+        ),
+    )
+
+    river: RiverSpec | None = Field(
+        default=None,
+        description=(
+            "Solve the river as well as the turn (turn boards only). Null: a plain "
+            "single-street solve."
         ),
     )
 

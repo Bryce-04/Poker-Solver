@@ -273,6 +273,17 @@ export interface LiveSolveResponse {
     sizes: Record<string, number>;
     max_aggressive_actions: number;
   };
+  // Present for a joint turn + river solve (Spot.river), null/absent otherwise:
+  // exactly what the river was solved with. `exact` is false when `river_cards`
+  // (a sample, spread over ranks and suits) stand in for all `river_cards_total`.
+  // Nothing in the UI requests a joint solve yet.
+  joint?: {
+    river_cards: string[];
+    river_cards_total: number;
+    exact: boolean;
+    river_bet_menu: { sizes: Record<string, number>; max_aggressive_actions: number } | null;
+    closing_turn_lines: number;
+  } | null;
 }
 
 // /spots/solve's 422s aren't one shape: a schema-invalid Spot (missing

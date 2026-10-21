@@ -166,7 +166,9 @@ roughly this order of effort:
    (2.4-4.3x, same answers) landed the same day, which is what makes a
    bigger tree (more sizes, a deeper raise cap, more streets) affordable;
    see `docs/decisions.md`.
-2. **Multi-street solving** — one tree spanning flop→turn→river betting
+2. **Multi-street solving** — *first step done 2026-10-21: a joint turn + river
+   solve (`Spot.river`), see `docs/decisions.md`; flop + turn + river is still open
+   and needs card sampling at both streets.* One tree spanning flop→turn→river betting
    in a single solve, instead of one street at a time (any single street
    is already solvable — see `services/solver/README.md`). The big one.
    Tree size grows combinatorially; needs card abstraction (bucketing
