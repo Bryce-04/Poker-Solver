@@ -59,7 +59,8 @@ src/poker_solver/
                       board: every runout enumerated (990 flop, 44 turn),
                       shared-card pairs NaN (never 0). ~2s for two ~500-combo
                       ranges on a flop, 0.1s turn, 0.01s river.
-  betting_round.py    The action abstraction for one street as a pure
+  betting_round.py    The action abstraction for one street (with a replaceable
+                      BetMenu of bet sizes and a raise cap) as a pure
                       state machine: legal actions, transitions, terminal
                       detection, payoff arithmetic. No cards, no CFR, no
                       evaluator -- genuinely card-agnostic. initial()

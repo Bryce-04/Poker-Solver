@@ -6,6 +6,80 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-21 — Custom bet sizes: the first piece of custom noding
+
+**Status:** proposed.
+
+**Context.** The bet menu (25% / 75% / 125% pot / all-in) and the raise cap (a
+bet plus 2 raises) were module constants in `betting_round.py`, so every
+solve, saved spot and the Drill shared one fixed tree. Custom noding, a
+full-hand solve, and saved/practice spots that remember how they were solved
+all need a solve to take a description of its tree. This is the smallest real
+step: the sizes and the raise cap.
+
+**Decision.**
+- `betting_round.BetMenu` (frozen dataclass): `sizes` (fractions of the pot,
+  ascending, at least 1% apart, 0.05 to 5.0, 1 to 5 of them) and
+  `max_aggressive_actions` (1 to 5). All-in is always available on top. A
+  `BettingRoundState` carries its menu through every transition, so nothing
+  else in the solver needs to know which menu is in use; `RangeSpotConfig`
+  gets `bet_menu`. `BET_SIZE_MENU`, `MAX_AGGRESSIVE_ACTIONS` and the other
+  constants stay, as the default, because the Drill deck script and
+  `hand_notes` read them.
+- **Action names.** The default menu keeps `bet_small` / `bet_medium` /
+  `bet_large`, so every saved result, the Drill and the UI are unchanged
+  (a menu spelled out as 0.25/0.75/1.25 is still the default, tested).
+  Any other menu names a size by its percentage: `bet_33`, `bet_200`. A name
+  always says how big it is, and two menus can't give the same name different
+  meanings.
+- **Where it lives.** `Spot.bet_menu` (new, optional, schema `BetMenu`), so a
+  saved spot can carry it. `null` means the default, so every existing spot and
+  request is unchanged. `/spots/solve` and `/spots/narrow` both honor it; a
+  recorded bet on the street is bucketed onto the *custom* sizes (disclosed in
+  `bucketed_actions` as before); the response reports `bet_menu`
+  (`is_default`, `sizes` by action name, `max_aggressive_actions`) so a client
+  can label and order the actions. An invalid menu is a 422 that says why.
+- **Not for custom menus:** the "Why?" notes and hand categories (their rules
+  and bet-size arithmetic are written against the default names) are left out
+  of a custom-menu solve rather than describing the wrong sizes.
+
+**What it costs (measured, not guessed):** `apps/api/scripts/compare_bet_menus.py`,
+K♠7♥2♦ flop, 100bb, BB flat range vs BTN open range, to under 0.5% of the pot,
+on a laptop:
+
+| menu | seconds | precision |
+|------|--------:|----------:|
+| one size, 33% | 1.8 | 0.47% |
+| two sizes, 33 / 75% | 3.3 | 0.47% |
+| default, 25 / 75 / 125% | 6.3 | 0.43% |
+| three sizes, 33 / 66 / 100% | 7.2 | 0.39% |
+| four sizes, 25 / 50 / 100 / 200% | 10.3 | 0.46% |
+| default, raise cap 2 | 3.0 | 0.47% |
+| default, raise cap 4 | 12.7 | 0.40% |
+
+Time grows roughly linearly with the number of sizes and roughly doubles with
+each extra raise allowed. Render's free tier is about 10x slower than a laptop,
+so four sizes or a raise cap of 4 would reach its 100-second budget there and
+come back `converged: false`; the schema's limits (5 sizes, cap 5) are
+deliberately generous and the time budget is the real guard.
+
+**A note on all-in.** All-in is always in the tree. With a lot behind, a
+polarized range will simply jam rather than use a mid-size bet, so a custom
+size only matters when stacks make it a real choice (a closed-form check of a
+custom size against theory isn't possible deep, which is why the tests check
+the mechanics, sizing, the cap, naming, equivalence with the default, and
+convergence instead).
+
+**Not done yet.** No UI control: nothing in the app sets `bet_menu`, and the
+chart's colours and labels (`lib/strategySummary.ts`) only know the default
+action names, so a custom-menu response would render with blank cells until a
+bet-size control brings that work with it. Saved spots carry the field but the
+Solve page's save/open doesn't round-trip it yet. Raise sizes are the same set
+as bet sizes (no separate raise menu), and sizes are per solve, not per street
+or per node: per-node trees are the next step toward a full-hand solve.
+
+---
+
 ## 2026-10-20 — Hand categories and "Why?" on live solves
 
 **Status:** proposed.

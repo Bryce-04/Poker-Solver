@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -237,3 +238,90 @@ def test_solve_adds_hand_categories_and_reasons_on_a_flop_only():
     river = client.post("/spots/solve", json=RIVER_SPOT).json()
     assert river["hand_categories"] == {}
     assert river["hand_reasons"] == {}
+
+
+# --- custom bet menus -----------------------------------------------------------
+
+DEEP_RIVER = {
+    **RIVER_SPOT,
+    "effective_stack_bb": 300,
+    "ranges": {"BB": {"KJo": 1.0, "QTo": 1.0}, "BTN": {"AA": 1.0, "33": 1.0, "76s": 1.0}},
+}
+
+
+def test_a_default_solve_reports_the_default_menu():
+    body = client.post("/spots/solve", json=RIVER_SPOT).json()
+    assert body["bet_menu"] == {
+        "is_default": True,
+        "sizes": {"bet_small": 0.25, "bet_medium": 0.75, "bet_large": 1.25},
+        "max_aggressive_actions": 3,
+    }
+
+
+def test_a_custom_menu_solves_with_its_own_action_names():
+    spot = {**DEEP_RIVER, "bet_menu": {"sizes": [0.5, 1.0], "max_aggressive_actions": 2}}
+    res = client.post("/spots/solve", json=spot)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["converged"]
+    assert body["bet_menu"] == {
+        "is_default": False,
+        "sizes": {"bet_50": 0.5, "bet_100": 1.0},
+        "max_aggressive_actions": 2,
+    }
+    actions = {a for mix in body["strategy"].values() for a in mix}
+    assert actions <= {"check", "bet_50", "bet_100", "all_in"}
+    assert not actions & {"bet_small", "bet_medium", "bet_large"}
+    # The "Why?" notes are written for the default menu, so they're left out.
+    assert body["hand_categories"] == {} and body["hand_reasons"] == {}
+
+
+def test_a_recorded_bet_is_bucketed_onto_the_custom_menu():
+    # BB bets 40 into a 100 pot: 0.4 of the pot. On the default menu that's
+    # nearest 25% (bet_small); on a 0.5/1.0 menu it's nearest 50% (bet_50).
+    spot = {
+        **DEEP_RIVER,
+        "bet_menu": {"sizes": [0.5, 1.0]},
+        "actions": [{"position": "BB", "street": "river", "action": "bet", "size_bb": 40}],
+    }
+    body = client.post("/spots/solve", json=spot).json()
+    assert body["bucketed_actions"] == ["BB's 40.0bb bet -> bucketed to 50% pot (bet_50)"]
+    assert body["position"] == "BTN"
+
+
+@pytest.mark.parametrize(
+    "menu, message",
+    [
+        ({"sizes": [1.0, 0.5]}, "ascending"),
+        ({"sizes": [0.5, 0.504]}, "at least 1%"),
+        ({"sizes": [0.01]}, "between 0.05 and 5.0"),
+        ({"sizes": [9.0]}, "between 0.05 and 5.0"),
+    ],
+)
+def test_a_bad_menu_is_a_422_that_says_why(menu, message):
+    res = client.post("/spots/solve", json={**DEEP_RIVER, "bet_menu": menu})
+    assert res.status_code == 422
+    assert message in res.json()["detail"]
+
+
+def test_a_menu_beyond_the_schemas_own_limits_is_rejected_at_the_edge():
+    too_many = {"sizes": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]}
+    assert client.post("/spots/solve", json={**DEEP_RIVER, "bet_menu": too_many}).status_code == 422
+    assert (
+        client.post("/spots/solve", json={**DEEP_RIVER, "bet_menu": {"sizes": []}}).status_code == 422
+    )
+
+
+def test_narrowing_uses_the_same_custom_menu():
+    spot = {
+        **DEEP_RIVER,
+        "bet_menu": {"sizes": [0.5, 1.0]},
+        "actions": [
+            {"position": "BB", "street": "river", "action": "check"},
+            {"position": "BTN", "street": "river", "action": "bet", "size_bb": 50},
+            {"position": "BB", "street": "river", "action": "call"},
+        ],
+    }
+    res = client.post("/spots/narrow", json=spot)
+    assert res.status_code == 200
+    assert res.json()["bucketed_actions"] == ["BTN's 50.0bb bet -> bucketed to 50% pot (bet_50)"]

@@ -85,6 +85,36 @@ class HandRange(RootModel[dict[str, float]]):
     root: dict[str, float]
 
 
+class BetMenu(BaseModel):
+    """The bet and raise sizes a solve may use on a street, replacing the
+    fixed 25% / 75% / 125% menu. All-in is always available on top of
+    `sizes`. Omit it from a Spot for the default menu.
+
+    The limits here are the solver's own (poker_solver.betting_round.BetMenu,
+    which is what actually validates and enforces them); they're repeated so
+    a bad menu is rejected at the edge with a field-level message.
+    """
+
+    sizes: list[float] = Field(
+        min_length=1,
+        max_length=5,
+        description=(
+            "Bet/raise sizes as fractions of the pot, ascending and at least 1% of "
+            "the pot apart (0.33 = a third of the pot, 1.0 = pot-sized). Each between "
+            "0.05 and 5.0."
+        ),
+    )
+    max_aggressive_actions: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description=(
+            "How many bets/raises are allowed on the street before only fold, call "
+            "and all-in remain. The tree, and the solve time, grow with it."
+        ),
+    )
+
+
 class Spot(BaseModel):
     """A single poker situation: who's in it, what's happened, and what's
     being asked about it. Produced identically by the button builder
@@ -110,6 +140,13 @@ class Spot(BaseModel):
     current_street: Street = Street.PREFLOP
     actions: list[BettingAction] = Field(default_factory=list)
     ranges: dict[Position, HandRange] = Field(default_factory=dict)
+    bet_menu: BetMenu | None = Field(
+        default=None,
+        description=(
+            "Custom bet sizes for a postflop solve of this spot. Null means the "
+            "default menu (25% / 75% / 125% of the pot, or all-in)."
+        ),
+    )
 
     opponent_tags: dict[Position, list[str]] = Field(
         default_factory=dict,

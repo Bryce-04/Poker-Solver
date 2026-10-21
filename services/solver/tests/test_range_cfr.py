@@ -360,3 +360,51 @@ def test_combo_equities_match_the_showdown_by_hand() -> None:
     assert np.allclose(by_label["AA"], 1.0)
     assert np.allclose(by_label["33"], 0.0)
     assert villain_overall == pytest.approx(0.5)
+
+
+# --- custom bet menus through the trainer -------------------------------------
+
+
+def _flop_trainer(menu=None) -> RangeCfrTrainer:
+    from poker_solver.betting_round import DEFAULT_BET_MENU
+
+    return RangeCfrTrainer(
+        RangeSpotConfig(
+            board=_board("Ks", "7h", "2d"),
+            pot_bb=10.0,
+            effective_stack_bb=60.0,
+            range0={"AA": 1.0, "KQs": 1.0, "T9s": 1.0, "55": 1.0},
+            range1={"KK": 1.0, "AQs": 1.0, "98s": 1.0, "66": 1.0},
+            bet_menu=menu or DEFAULT_BET_MENU,
+        )
+    )
+
+
+def test_spelling_out_the_default_menu_changes_nothing() -> None:
+    from poker_solver.betting_round import BetMenu
+
+    implicit, explicit = _flop_trainer(), _flop_trainer(BetMenu(sizes=(0.25, 0.75, 1.25)))
+    implicit.train(30)
+    explicit.train(30)
+    assert implicit.label_strategies() == explicit.label_strategies()
+
+
+def test_a_custom_menu_solves_and_uses_only_its_own_actions() -> None:
+    from poker_solver.betting_round import BetMenu
+
+    trainer = _flop_trainer(BetMenu(sizes=(0.33, 0.66)))
+    reached = trainer.train_until(0.5, max_iterations=400)
+    assert reached < 0.5  # converged: the tree is a real, solvable game
+    actions = {a for mix in trainer.label_strategies().values() for a in mix}
+    assert actions <= {"check", "bet_33", "bet_66", "all_in"}
+    assert {"bet_33", "bet_66"} & actions  # it does use the new sizes
+    assert "bet_small" not in actions and "bet_medium" not in actions
+
+
+def test_every_strategy_row_is_a_distribution_under_a_custom_menu() -> None:
+    from poker_solver.betting_round import BetMenu
+
+    trainer = _flop_trainer(BetMenu(sizes=(0.5, 1.0, 2.0), max_aggressive_actions=2))
+    trainer.train(40)
+    for mix in trainer.label_strategies().values():
+        assert abs(sum(mix.values()) - 1.0) < 1e-6

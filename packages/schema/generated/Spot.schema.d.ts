@@ -53,6 +53,22 @@ export type SizeBb = number | null;
  */
 export type SizePctPot = number | null;
 export type Actions = BettingAction[];
+/**
+ * Bet/raise sizes as fractions of the pot, ascending and at least 1% of the pot apart (0.33 = a third of the pot, 1.0 = pot-sized). Each between 0.05 and 5.0.
+ *
+ * @minItems 1
+ * @maxItems 5
+ */
+export type Sizes =
+  | [number]
+  | [number, number]
+  | [number, number, number]
+  | [number, number, number, number]
+  | [number, number, number, number, number];
+/**
+ * How many bets/raises are allowed on the street before only fold, call and all-in remain. The tree, and the solve time, grow with it.
+ */
+export type MaxAggressiveActions = number;
 
 /**
  * A single poker situation: who's in it, what's happened, and what's
@@ -71,6 +87,10 @@ export interface Spot {
   current_street?: Street;
   actions?: Actions;
   ranges?: Ranges;
+  /**
+   * Custom bet sizes for a postflop solve of this spot. Null means the default menu (25% / 75% / 125% of the pot, or all-in).
+   */
+  bet_menu?: BetMenu | null;
   opponent_tags?: OpponentTags;
   [k: string]: unknown;
 }
@@ -105,6 +125,23 @@ export interface Ranges {
  */
 export interface HandRange {
   [k: string]: number;
+}
+/**
+ * The bet and raise sizes a solve may use on a street, replacing the
+ * fixed 25% / 75% / 125% menu. All-in is always available on top of
+ * `sizes`. Omit it from a Spot for the default menu.
+ *
+ * The limits here are the solver's own (poker_solver.betting_round.BetMenu,
+ * which is what actually validates and enforces them); they're repeated so
+ * a bad menu is rejected at the edge with a field-level message.
+ *
+ * This interface was referenced by `Spot`'s JSON-Schema
+ * via the `definition` "BetMenu".
+ */
+export interface BetMenu {
+  sizes: Sizes;
+  max_aggressive_actions?: MaxAggressiveActions;
+  [k: string]: unknown;
 }
 /**
  * Stage 6: preset or free-text tendency tags per opponent seat.

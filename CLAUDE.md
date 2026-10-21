@@ -116,6 +116,16 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Custom bet sizes (2026-10-21)**: `Spot.bet_menu` (schema `BetMenu`: `sizes` as
+fractions of the pot, plus `max_aggressive_actions`) replaces the fixed
+25/75/125% menu for a solve. The state machine carries it
+(`betting_round.BetMenu`, `RangeSpotConfig.bet_menu`); `null` is the default and
+changes nothing (the Drill and `hand_notes` still read the default constants).
+A custom menu names actions by percentage (`bet_33`); `/spots/solve` and
+`/spots/narrow` honor it and `/spots/solve` reports `bet_menu`. Cost is measured
+in `docs/decisions.md` (`apps/api/scripts/compare_bet_menus.py`): time grows with
+sizes and roughly doubles per extra raise. No UI sets it yet.
+
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
 colors, the pot on the table, bb amounts, and the "why" analysis with its

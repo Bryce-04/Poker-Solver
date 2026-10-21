@@ -261,6 +261,18 @@ export interface LiveSolveResponse {
   // the Drill uses. Normalized to {} for an older backend -- see solveSpot.
   hand_categories?: Record<string, string>;
   hand_reasons?: Record<string, string[]>;
+  // The bet menu this solve used (the Spot's own `bet_menu`, else the default
+  // 25/75/125%): each bet action's size as a fraction of the pot, keyed by the
+  // action name used in `strategy` ("bet_small", or "bet_33" for a custom
+  // menu). Absent from an older backend. Nothing in the UI sets a custom menu
+  // yet -- a custom menu's action names ("bet_33") aren't known to the chart's
+  // colours and labels (lib/strategySummary.ts), which is the work a bet-size
+  // control would bring with it.
+  bet_menu?: {
+    is_default: boolean;
+    sizes: Record<string, number>;
+    max_aggressive_actions: number;
+  };
 }
 
 // /spots/solve's 422s aren't one shape: a schema-invalid Spot (missing

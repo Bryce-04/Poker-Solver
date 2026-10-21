@@ -7,17 +7,24 @@ river -- postflop_mccfr.py decides that by how many board cards it hands
 the caller and whether it samples a runout before showdown. Nothing here
 changed when flop/turn support was added; it was already card-agnostic.
 
-Locked scope (docs/plan.md): fixed bet-size menu (check / bet_small 25% /
-bet_medium 75% / bet_large 125% pot / all-in), heads-up, symmetric
-effective stacks.
+Scope (docs/plan.md): heads-up, symmetric effective stacks. The bet-size
+menu defaults to check / bet_small 25% / bet_medium 75% / bet_large 125% pot
+/ all-in, and can be replaced per solve with a BetMenu (custom sizes, and how
+many bets/raises before only fold/call/all-in remain). Every BettingRoundState
+carries its menu, so nothing else in the solver needs to know which one is in
+use.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 
 _EPS = 1e-9
 
+# The default menu. Kept as plain constants because other code (the Drill
+# deck script, hand_notes) reads them -- a default solve must keep exactly
+# these sizes and these action names.
 BET_SIZE_MENU: tuple[tuple[float, str], ...] = (
     (0.25, "bet_small"),
     (0.75, "bet_medium"),
@@ -31,6 +38,80 @@ MAX_AGGRESSIVE_ACTIONS = 3
 
 AGGRESSIVE_LABELS = frozenset({label for _, label in BET_SIZE_MENU} | {"all_in"})
 
+# Limits on a custom menu. Each size is a fraction of the pot; the tree (and
+# solve time) grows with the number of sizes and the raise cap, so both are
+# bounded rather than left to blow up a request.
+MIN_BET_FRACTION = 0.05
+MAX_BET_FRACTION = 5.0
+MAX_BET_SIZES = 5
+MAX_RAISE_CAP = 5
+
+
+@dataclass(frozen=True)
+class BetMenu:
+    """The sizes a bet or raise can take on one street, and how many
+    aggressive actions (a bet, then raises) are allowed before only
+    fold / call / all-in remain. All-in is always available on top of
+    `sizes`.
+
+    `sizes` are fractions of the pot (0.33 = a third of the pot), ascending
+    and distinct. A raise is sized the same way as a bet: the fraction of the
+    pot *after* calling (see BettingRoundState.legal_actions).
+
+    Action names: the default menu keeps its legacy names (bet_small /
+    bet_medium / bet_large) so saved results, the Drill and the UI are
+    unaffected. Any other menu names each size by its percentage ("bet_33"),
+    so a name always says how big it is.
+    """
+
+    sizes: tuple[float, ...] = tuple(frac for frac, _ in BET_SIZE_MENU)
+    max_aggressive_actions: int = MAX_AGGRESSIVE_ACTIONS
+
+    def __post_init__(self) -> None:
+        if not 1 <= len(self.sizes) <= MAX_BET_SIZES:
+            raise ValueError(f"a bet menu needs 1-{MAX_BET_SIZES} sizes, got {len(self.sizes)}")
+        for size in self.sizes:
+            if not MIN_BET_FRACTION <= size <= MAX_BET_FRACTION:
+                raise ValueError(
+                    f"a bet size is a fraction of the pot between {MIN_BET_FRACTION} and "
+                    f"{MAX_BET_FRACTION} (got {size})"
+                )
+        if list(self.sizes) != sorted(self.sizes):
+            raise ValueError("bet sizes must be in ascending order")
+        percentages = [round(size * 100) for size in self.sizes]
+        if len(set(percentages)) != len(percentages):
+            raise ValueError("bet sizes must differ by at least 1% of the pot")
+        if not 1 <= self.max_aggressive_actions <= MAX_RAISE_CAP:
+            raise ValueError(f"the raise cap must be 1-{MAX_RAISE_CAP}")
+
+    @property
+    def is_default(self) -> bool:
+        return self == DEFAULT_BET_MENU
+
+    # cached_property: these are read on every node of every CFR iteration, so
+    # they're built once per menu (it writes straight to the instance dict,
+    # which a frozen dataclass allows).
+    @cached_property
+    def labelled_sizes(self) -> tuple[tuple[float, str], ...]:
+        """(fraction, action name) for each size, smallest first."""
+        if self.sizes == tuple(frac for frac, _ in BET_SIZE_MENU):
+            return BET_SIZE_MENU
+        return tuple((size, f"bet_{round(size * 100)}") for size in self.sizes)
+
+    @cached_property
+    def _size_by_label(self) -> dict[str, float]:
+        return {name: size for size, name in self.labelled_sizes}
+
+    def size_of(self, label: str) -> float:
+        return self._size_by_label[label]
+
+    @cached_property
+    def aggressive_labels(self) -> frozenset[str]:
+        return frozenset(self._size_by_label) | {"all_in"}
+
+
+DEFAULT_BET_MENU = BetMenu()
+
 
 @dataclass(frozen=True)
 class BettingRoundState:
@@ -40,6 +121,7 @@ class BettingRoundState:
     to_act: int
     history: tuple[str, ...]
     num_aggressive_actions: int
+    menu: BetMenu = DEFAULT_BET_MENU
 
     @classmethod
     def initial(
@@ -48,6 +130,7 @@ class BettingRoundState:
         stack_bb: float,
         first_to_act: int = 0,
         prior_history: tuple[str, ...] = (),
+        menu: BetMenu = DEFAULT_BET_MENU,
     ) -> BettingRoundState:
         """first_to_act is whoever acts NEXT, once prior_history has played
         out. prior_history (e.g. apps/api/app/solve.py seeding a recorded
@@ -69,13 +152,14 @@ class BettingRoundState:
             to_act=opener,
             history=(),
             num_aggressive_actions=0,
+            menu=menu,
         )
         for action in prior_history:
             state = state.apply(action)
         return state
 
     def _facing_bet(self) -> bool:
-        return bool(self.history) and self.history[-1] in AGGRESSIVE_LABELS
+        return bool(self.history) and self.history[-1] in self.menu.aggressive_labels
 
     def legal_actions(self) -> tuple[str, ...]:
         if self.is_terminal():
@@ -95,12 +179,12 @@ class BettingRoundState:
         if raise_room <= _EPS:
             return base  # no chips left to bet/raise with
 
-        if self.num_aggressive_actions >= MAX_AGGRESSIVE_ACTIONS:
+        if self.num_aggressive_actions >= self.menu.max_aggressive_actions:
             # Cap reached: no more sized raises, but shoving is always legal.
             return base + ("all_in",)
 
         sized: list[str] = []
-        for frac, label in BET_SIZE_MENU:
+        for frac, label in self.menu.labelled_sizes:
             amount = to_call + frac * (current_pot + to_call) if facing_bet else frac * current_pot
             sized.append("all_in" if amount >= remaining - _EPS else label)
         sized.append("all_in")
@@ -123,7 +207,7 @@ class BettingRoundState:
             if action == "all_in":
                 contributed[to_act] += remaining
             else:
-                frac = _SIZE_BY_LABEL[action]
+                frac = self.menu.size_of(action)
                 current_pot = self.pot_bb + contributed[0] + contributed[1]
                 if self._facing_bet():
                     to_call = contributed[other] - contributed[to_act]
@@ -140,6 +224,7 @@ class BettingRoundState:
             to_act=other,
             history=(*self.history, action),
             num_aggressive_actions=num_aggressive,
+            menu=self.menu,
         )
 
     def is_terminal(self) -> bool:

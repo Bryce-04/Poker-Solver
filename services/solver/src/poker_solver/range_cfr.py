@@ -34,7 +34,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .betting_round import BettingRoundState
+from .betting_round import DEFAULT_BET_MENU, BetMenu, BettingRoundState
 from .combos import Combo, combo_key, expand_range, label_to_combos
 from .equity import compute_equity_matrix
 
@@ -61,6 +61,9 @@ class RangeSpotConfig:
     range1: dict[str, float]
     first_to_act: int = 0
     prior_history: tuple[str, ...] = ()
+    # What a bet or raise can be on this street (betting_round.BetMenu); the
+    # default is the fixed 25 / 75 / 125 / all-in menu.
+    bet_menu: BetMenu = DEFAULT_BET_MENU
 
     def __post_init__(self) -> None:
         if len(self.board) not in (3, 4, 5):
@@ -164,7 +167,11 @@ class RangeCfrTrainer:
             raise ValueError("no possible deal: every combo pair shares a card")
 
         self._root = BettingRoundState.initial(
-            config.pot_bb, config.effective_stack_bb, config.first_to_act, config.prior_history
+            config.pot_bb,
+            config.effective_stack_bb,
+            config.first_to_act,
+            config.prior_history,
+            config.bet_menu,
         )
         self._nodes: dict[tuple[str, ...], _PublicNode] = {}
         self.iterations = 0
