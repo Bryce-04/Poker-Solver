@@ -6,6 +6,116 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-10-21 — Solver speed: 2.4x to 4.3x faster, answers unchanged
+
+**Status:** proposed.
+
+**Context.** Asked to make the solver as fast as possible, learning from the
+open-source solvers. Profiled first (cProfile, then per-phase timers), because
+the obvious guess (terminal matrix products) was only part of it, and wrong
+about what came next.
+
+**What the open-source solvers do, and what applies here.** Read directly from
+b-inary's `postflop-solver` (Rust; `src/game/evaluation.rs` and its README),
+the reference open implementation: DCFR with gamma = 3 (not the paper's 2);
+showdown and fold values in O(hands) with sorted hand strengths and per-card
+running sums plus inclusion-exclusion for blockers; f32 storage; multithreading;
+merging isomorphic turn/river deals. Of those:
+- *Applied:* gamma = 3 (and beta = 0.5, found by sweeping, below); the
+  inclusion-exclusion blocker counting (for the "how much opponent weight am I
+  facing" half of terminal values).
+- *Not applicable as-is:* the sorted-strength showdown. Our model values a
+  street as "the rest of the board runs out, no more betting", which needs the
+  pairwise equity matrix (a hand's showdown value depends on the runout, not one
+  strength); the matrix product is the cheaper form of that. It would apply to a
+  river street, which is already the fastest.
+- *Not done:* f32 regret storage (it breaks the exact-equivalence test below;
+  untried bandwidth gain), isomorphism (ranges break suit symmetry), threading
+  (the dependency chain is sequential; BLAS is already threaded locally and
+  deliberately single-threaded on Render).
+
+**What was changed** (`services/solver`):
+1. The game tree is built once, as flat records. The original rebuilt a frozen
+   `BettingRoundState` for every visit of every node on every iteration.
+2. One matrix multiply per pass for ALL terminals (it was ~150 matrix-vector
+   products), sharing a column between terminals that share an opponent-reach
+   vector (the fold and call under one decision).
+3. "Mass I'm facing" by per-card sums and inclusion-exclusion: O(combos), not the
+   second half of the matrix product.
+4. Every node's regrets, strategy sums and strategies live in contiguous
+   per-player arrays (one row per action; a node owns a run of rows), and each
+   pass is planned once (`_Schedule`) and run level by level: reach vectors,
+   values and the whole DCFR update are a few array operations per level, not
+   ~25 numpy calls per node. Python function calls per 60 iterations on the wide flop
+   (measured with cProfile): about 740,000 to 2,600.
+5. The equity matrix (`equity.py`): all runouts scored in blocks
+   (`evaluator.evaluate_seven_boards`, with quad/trip/pair detection by a
+   carry-save counter instead of an (N,4,13) tensor), dead hands handled by
+   sentinel scores instead of per-comparison masks, per-pair denominators by one
+   matrix product. 1.7s to 0.9s on a wide flop. A small LRU cache keyed by
+   (board, both combo lists), bounded to 64 MB, so re-solving the same spot
+   (another bet size, one more action, reopening a saved spot) skips it.
+6. DCFR discount parameters 1.5 / 0 / 2 to 1.5 / 0.5 / 3, from a sweep
+   (`benchmarks/sweep_dcfr.py`) over eight realistic spots at fixed iteration
+   counts. On the wide flops (the slow case) it reaches a given precision in up
+   to a third of the iterations (K72r: 0.65% by 80 iterations vs 2.0%; A83r 0.83%
+   vs 1.38%; monotone 0.46% vs 0.68%; T98 0.54% vs 0.92%), level on the turn and
+   the 3-bet pot, marginally behind on a river at under 80 iterations and equal
+   by 120.
+
+**Measured** (`benchmarks/bench_trainer.py`, a laptop, cold start, to under
+0.5% of the pot as `/spots/solve` does; setup + training, seconds):
+
+| spot | original | now |
+|------|---------:|----:|
+| flop K72r, BB defend vs BTN open (494x469 combos) | 10.9 | 3.3 |
+| flop QJ7 two-tone, BB flat vs BTN open | 3.8 | 1.6 |
+| turn QJ73 (flush), BB flat vs BTN open | 2.0 | 0.7 |
+| river K7294, BB flat vs BTN open | 1.7 | 0.4 |
+
+Per training iteration on the wide flop: 51 ms to 19 ms. Run-to-run noise on this
+laptop is about +/-15%. The bet-menu cost table in the entry below was
+re-measured: default menu 6.3s to 2.2s, four sizes 10.3s to 5.4s, raise cap 4
+12.7s to 5.0s.
+
+**Why the answers are unchanged (how this was made safe).**
+`services/solver/tests/reference_range_cfr.py` is a frozen copy of the
+pre-optimization trainer, and `test_range_cfr_matches_reference.py` holds the real
+one to it in layers:
+- *float64 end to end in both*, the algorithm must agree to ~1e-9 on eight spots
+  (flop, two-tone, turn, river, closed-form river, seeded bet, custom menu, and a
+  pair given as a label in one range and as specific combos in the other). Measured:
+  strategies 1e-10, regrets 1e-8, exploitability 1e-14.
+- *as shipped (float32)*: every terminal's value against the reference's own
+  per-terminal products; and the new trainer's strategies measured by the
+  REFERENCE's exploitability code (same strategies, two independent evaluators:
+  they agree to 1e-5 or better).
+- the equity matrix and the evaluator each against the original algorithm,
+  exactly (`test_equity.py`, `test_evaluator.py`).
+This also explains why strategies in the shipped float32 runs are not bit-for-bit
+the original's: at near-tied actions a 1e-7 rounding difference steers which of two
+equal options a hand mostly takes (a measured 0.14 difference at one deep raise
+node, 0.002 averaged over the whole tree; exploitability agrees to 0.015%).
+The first version of this test compared strategies directly in float32 and had to
+be replaced: it was testing luck, not the algorithm.
+
+**One behaviour change found along the way.** `posterior_ranges` collapses a hand
+type's combos back to one weight when they agree. Its tolerance was absolute (1e-3);
+narrowed weights aren't normalized (a rarely taken line scales everything to ~1e-4),
+so an absolute tolerance erased real suit differences on exactly those lines. It is
+now relative to the hand's own heaviest combo.
+
+**Not done, and where the time goes now** (wide flop: ~0.9s setup, ~19 ms per
+iteration of which about 5 ms is the matrix multiply and facing counts, the rest
+array arithmetic over the level-batched tree): f32 regrets (bandwidth), an
+adaptive schedule for the exploitability checks (they run every 25 iterations and
+overshoot the target by ~12 on average), and a faster pairwise-comparison loop in
+the equity matrix (~0.5s of the 0.9s, a numpy floor at ~3 ns per pair).
+`/spots/solve` and the Drill deck script need no change; the deck, solved with the
+old trainer, was not regenerated.
+
+---
+
 ## 2026-10-21 — Custom bet sizes: the first piece of custom noding
 
 **Status:** proposed.
@@ -43,7 +153,7 @@ step: the sizes and the raise cap.
   and bet-size arithmetic are written against the default names) are left out
   of a custom-menu solve rather than describing the wrong sizes.
 
-**What it costs (measured, not guessed):** `apps/api/scripts/compare_bet_menus.py`,
+**What it costs (measured, not guessed; these are the pre-speed-up numbers, see the entry above for the current ones):** `apps/api/scripts/compare_bet_menus.py`,
 K♠7♥2♦ flop, 100bb, BB flat range vs BTN open range, to under 0.5% of the pot,
 on a laptop:
 

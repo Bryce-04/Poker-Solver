@@ -24,6 +24,7 @@ never "hero loses."
 from __future__ import annotations
 
 import itertools
+from collections import OrderedDict
 
 import numpy as np
 
@@ -55,7 +56,33 @@ _DEAD_HERO = -1
 _DEAD_VILLAIN = 1 << 40
 
 
+# The matrix depends only on the board and the two combo lists, and a user
+# re-solving a spot (another bet size, one more action, reopening a saved
+# spot) changes neither -- so the last few are kept. Bounded by BYTES, not
+# entries: a wide river matrix is ~14 MB, and this runs on a small free-tier host.
+_CACHE_MAX_BYTES = 64 * 1024 * 1024
+_cache: OrderedDict[tuple, np.ndarray] = OrderedDict()
+
+
 def compute_equity_matrix(
+    combos0: list[Combo], combos1: list[Combo], board: tuple[int, ...]
+) -> np.ndarray:
+    """The equity matrix (see _compute_equity_matrix), from a small cache of
+    recent ones. The array returned is read-only: it may be shared."""
+    key = (tuple(board), tuple(combos0), tuple(combos1))
+    cached = _cache.get(key)
+    if cached is not None:
+        _cache.move_to_end(key)
+        return cached
+    matrix = _compute_equity_matrix(combos0, combos1, board)
+    matrix.flags.writeable = False
+    _cache[key] = matrix
+    while len(_cache) > 1 and sum(m.nbytes for m in _cache.values()) > _CACHE_MAX_BYTES:
+        _cache.popitem(last=False)
+    return matrix
+
+
+def _compute_equity_matrix(
     combos0: list[Combo], combos1: list[Combo], board: tuple[int, ...]
 ) -> np.ndarray:
     """board may be 3 (flop), 4 (turn), or 5 (river) cards. Both combo

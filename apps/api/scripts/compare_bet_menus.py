@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import time
 
+from poker_solver import equity
 from poker_solver.betting_round import DEFAULT_BET_MENU, BetMenu
 from poker_solver.cards import parse_card
 from poker_solver.range_cfr import RangeCfrTrainer, RangeSpotConfig
@@ -49,6 +50,7 @@ def main() -> None:
     print(f"target: exploitability under {TARGET_PCT}% of the pot, at most {MAX_ITERATIONS} iterations\n")
     print(f"{'menu':<34}{'actions at root':>16}{'iters':>7}{'seconds':>9}{'expl %':>8}  BB bets")
     for name, menu in MENUS:
+        equity._cache.clear()  # cold start every row: the matrix is cached across solves
         start = time.perf_counter()
         trainer = RangeCfrTrainer(
             RangeSpotConfig(

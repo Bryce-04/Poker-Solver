@@ -57,8 +57,9 @@ src/poker_solver/
                       starting on the flop or turn).
   equity.py           Exact hero-combo x villain-combo equity matrix for a
                       board: every runout enumerated (990 flop, 44 turn),
-                      shared-card pairs NaN (never 0). ~2s for two ~500-combo
-                      ranges on a flop, 0.1s turn, 0.01s river.
+                      shared-card pairs NaN (never 0). ~0.9s for two ~500-combo
+                      ranges on a flop, 0.04s turn, 0.01s river, vectorized
+                      over runouts and cached (64 MB LRU) across solves.
   betting_round.py    The action abstraction for one street (with a replaceable
                       BetMenu of bet sizes and a raise cap) as a pure
                       state machine: legal actions, transitions, terminal
@@ -70,7 +71,10 @@ src/poker_solver/
                       betting node, a regret/strategy row for every combo
                       of the acting player; reach-probability vectors
                       instead of sampled hands; terminal values as
-                      matrix-vector products against equity.py's matrix;
+                      ONE matrix multiply per pass against equity.py's matrix
+                      (blocker mass by inclusion-exclusion), the tree built
+                      once and walked level by level from a precomputed
+                      schedule, all nodes' state in contiguous arrays;
                       Discounted CFR updates; exploitability() and
                       train_until() for convergence; label_strategies() to
                       roll combos back up to 169-type labels;

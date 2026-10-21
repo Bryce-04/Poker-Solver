@@ -25,6 +25,7 @@ sys.path.insert(0, str(HERE.parent.parent.parent / "apps" / "api"))  # app.prefl
 
 from app.preflop_ranges import defend_range, flat_range, open_range  # noqa: E402
 
+from poker_solver import equity  # noqa: E402
 from poker_solver.cards import parse_card  # noqa: E402
 from poker_solver_schema import Position  # noqa: E402
 
@@ -66,6 +67,9 @@ def main() -> None:
             board=tuple(parse_card(c) for c in board_text.split()),
             pot_bb=pot, effective_stack_bb=stack, range0=oop, range1=ip,
         )
+        # Cold setup every time: the equity matrix is cached across solves, which
+        # would make the second construction below look free.
+        equity._cache.clear()
         t0 = time.perf_counter()
         trainer = module.RangeCfrTrainer(config)
         setup = time.perf_counter() - t0
@@ -75,6 +79,7 @@ def main() -> None:
         ms_per_iteration = 1000 * (time.perf_counter() - t0) / TIMING_ITERATIONS
 
         # The production path, from scratch: setup + train until the target.
+        equity._cache.clear()
         t0 = time.perf_counter()
         fresh = module.RangeCfrTrainer(config)
         expl = fresh.train_until(TARGET_PCT, MAX_ITERATIONS)

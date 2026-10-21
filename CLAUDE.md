@@ -116,6 +116,19 @@ come back combo-level where suits matter (flush draws, blockers), plus a
 principle); the Solve page's "Load both ranges from the preflop action"
 button uses it. See `docs/reference-chart-coverage.md` and `docs/decisions.md`.
 
+**Solver speed (2026-10-21)**: `range_cfr.py` was rebuilt for speed with the
+same answers (2.4x to 4.3x faster end to end; wide flop 10.9s to ~3.3s). The tree is
+built once and each pass is planned level by level (`_Schedule`); all of a pass's
+terminals are one matrix multiply; every node's training state lives in contiguous
+per-player arrays; the equity matrix and hand evaluator are vectorized over runouts;
+DCFR is 1.5 / 0.5 / 3. **Equivalence is enforced**: `tests/reference_range_cfr.py` is a
+frozen copy of the old trainer and `test_range_cfr_matches_reference.py` holds the real
+one to it (exactly, in float64) — if you change the update rule on purpose, change the
+reference copy in the same commit and say why. Tools: `services/solver/benchmarks/`
+(`bench_trainer.py` for timings, `--reference` for the old one; `sweep_dcfr.py` for
+tuning). The equity matrix is cached (64 MB LRU): clear `equity._cache` when timing.
+See `docs/decisions.md`.
+
 **Custom bet sizes (2026-10-21)**: `Spot.bet_menu` (schema `BetMenu`: `sizes` as
 fractions of the pot, plus `max_aggressive_actions`) replaces the fixed
 25/75/125% menu for a solve. The state machine carries it

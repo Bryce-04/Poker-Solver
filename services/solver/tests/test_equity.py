@@ -172,3 +172,34 @@ def test_the_vectorized_matrix_equals_the_original_algorithm_exactly(board_text)
     # Exactly equal, NaNs (shared-card pairs) in the same places.
     np.testing.assert_array_equal(np.isnan(fast), np.isnan(slow))
     np.testing.assert_array_equal(fast[~np.isnan(fast)], slow[~np.isnan(slow)])
+
+
+# --- the cache ----------------------------------------------------------------------
+
+
+def test_the_same_inputs_return_the_cached_matrix_and_it_cannot_be_modified():
+    from poker_solver import equity
+
+    board = tuple(parse_card(c) for c in "Ks 7h 2d".split())
+    combos0 = [(parse_card("As"), parse_card("Ah")), (parse_card("Qc"), parse_card("Qd"))]
+    combos1 = [(parse_card("Jc"), parse_card("Jd")), (parse_card("9h"), parse_card("8h"))]
+    first = equity.compute_equity_matrix(combos0, combos1, board)
+    again = equity.compute_equity_matrix(list(combos0), list(combos1), board)
+    assert again is first  # same inputs, even as different list objects
+    with pytest.raises(ValueError):
+        first[0, 0] = 0.5
+    # A different board is a different matrix.
+    other = equity.compute_equity_matrix(combos0, combos1, tuple(parse_card(c) for c in "Ks 7h 3d".split()))
+    assert other is not first
+
+
+def test_the_cache_is_bounded_by_bytes(monkeypatch):
+    from poker_solver import equity
+
+    monkeypatch.setattr(equity, "_CACHE_MAX_BYTES", 4000)  # ~ a few tiny matrices
+    monkeypatch.setattr(equity, "_cache", equity.OrderedDict())
+    combos0 = [(parse_card("As"), parse_card("Ah"))]
+    combos1 = [(parse_card("Jc"), parse_card("Jd"))]
+    for third in ("2d", "3d", "4d", "5d", "6d", "8d"):
+        equity.compute_equity_matrix(combos0, combos1, tuple(parse_card(c) for c in ("Ks", "7h", third)))
+    assert sum(m.nbytes for m in equity._cache.values()) <= 4000 or len(equity._cache) == 1
