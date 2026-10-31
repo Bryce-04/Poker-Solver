@@ -1,0 +1,54 @@
+/* docs/mobile-redesign.md §3.5; values from docs/mobile-redesign/mockup. */
+.step-progress__list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-progress__link {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 12px/1.2 var(--sans);
+  text-align: left;
+}
+
+.step-progress__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--range-empty);
+}
+
+.step-progress__item[data-state="done"] .step-progress__link,
+.step-progress__item[data-state="current"] .step-progress__link {
+  color: var(--text-strong);
+}
+
+.step-progress__item[data-state="done"] .step-progress__bar,
+.step-progress__item[data-state="current"] .step-progress__bar {
+  background: var(--accent);
+}
+
+button.step-progress__link {
+  cursor: pointer;
+}
+
+/* :not(:disabled) to out-rank index.css's button:hover:not(:disabled). */
+button.step-progress__link:hover:not(:disabled) {
+  background: transparent;
+}
+
+button.step-progress__link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

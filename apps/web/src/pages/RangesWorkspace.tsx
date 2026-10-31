@@ -1,20 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { HandRange, Position, Spot } from "@poker-solver/schema";
+import type { Position, Spot } from "@poker-solver/schema";
 import { SegmentedControl } from "../components/SegmentedControl/SegmentedControl";
 import { RangeGrid } from "../components/RangeGrid/RangeGrid";
 import { SIX_MAX_POSITIONS } from "../lib/positions";
-import { buildOpenSpot, buildVsRaiseSpot } from "../lib/spot";
 import { parseSpotText } from "../lib/parseSpotText";
 import { EXAMPLE_HAND_HISTORY, parseHandHistory } from "../lib/parseHandHistory";
 import { useReferenceChart, type ChartMatch } from "../lib/useReferenceChart";
 import { indexRange, totalCombos } from "../lib/rangeCombos";
 import { prefillFromChartSpot } from "../lib/solvePrefill";
+import {
+  TOTAL_COMBOS,
+  TYPE_EXAMPLES,
+  describeSpot,
+  pickSpot,
+  useChartAutoLoad,
+  useOpenedChart,
+  type Situation,
+} from "../lib/rangesSpot";
+import { ChartProblem } from "./ranges/ChartProblem";
 import type { RangesMode } from "./RangesPage";
 import "../components/SpotBuilder/SpotBuilder.css";
 import "./RangesWorkspace.css";
-
-type Situation = "open" | "defend";
 
 const MODES = [
   { value: "pick", label: "Pick" },
@@ -28,48 +35,6 @@ const STACK_OPTIONS = [
   { value: "40", label: "40bb" },
   { value: "100", label: "100bb" },
 ] as const;
-
-const TYPE_EXAMPLES = ["BTN opens 100bb", "BB defends CO open, 100bb", "CO opens 40bb"];
-
-const TOTAL_COMBOS = 1326;
-
-// How long Pick / Type it wait after the last change before fetching, so
-// clicking through seats or typing doesn't fire a request per keystroke.
-const AUTO_LOAD_MS = 250;
-
-/** The seats that act before `seat` preflop, so could have raised first. */
-function earlierSeats(seat: Position): Position[] {
-  return SIX_MAX_POSITIONS.slice(0, SIX_MAX_POSITIONS.indexOf(seat));
-}
-
-/** The raiser in a chart spot (open, or facing one raise). */
-function raiserOf(spot: Spot): Position | undefined {
-  return (spot.actions ?? []).find((a) => a.action === "raise")?.position;
-}
-
-/** The Pick controls' spot, with the impossible combinations derived away:
- * BB is never first in, UTG never faces an earlier raise, and the raiser
- * must act before the seat. */
-function pickSpot(seat: Position, situationChoice: Situation, raiserChoice: Position, stackBb: number) {
-  const situation: Situation = seat === "BB" ? "defend" : seat === "UTG" ? "open" : situationChoice;
-  const raisers = earlierSeats(seat);
-  const raiser = raisers.includes(raiserChoice) ? raiserChoice : raisers[raisers.length - 1];
-  const spot = situation === "defend" ? buildVsRaiseSpot(seat, raiser, stackBb) : buildOpenSpot(seat, stackBb);
-  return { situation, raisers, raiser, spot };
-}
-
-/** A chart spot in words: the canvas title and the line under it. */
-function describeSpot(spot: Spot): { title: string; subline: string } {
-  const hero = spot.positions_in_hand[0];
-  const raiser = raiserOf(spot);
-  const stack = `about ${spot.effective_stack_bb}bb`;
-  return raiser
-    ? {
-        title: `${hero} vs a ${raiser} raise`,
-        subline: `${raiser} raised and it's on you · ${stack} · 6-max. Green hands continue (call or 3-bet); the rest fold.`,
-      }
-    : { title: `${hero} opening range`, subline: `Nobody has raised yet · ${stack} · 6-max` };
-}
 
 /**
  * Desktop Ranges (docs/desktop-redesign.md §6.3): describe the spot in the
@@ -95,22 +60,14 @@ export function RangesWorkspace({
 }) {
   const navigate = useNavigate();
   const chart = useReferenceChart();
-  const { load, clear } = chart;
 
-  // Pick
-  const openedRaiser = initialSpot ? raiserOf(initialSpot) : undefined;
-  const [seat, setSeat] = useState<Position>(initialSpot?.positions_in_hand[0] ?? "BTN");
-  const [situationChoice, setSituationChoice] = useState<Situation>(openedRaiser ? "defend" : "open");
-  const [raiserChoice, setRaiserChoice] = useState<Position>(openedRaiser ?? "CO");
-  const [stackBb, setStackBb] = useState(initialSpot?.effective_stack_bb ?? 100);
-  // The opened spot, recognized by the spot Pick builds from it: whenever
-  // Pick is back on it, its saved range and name come back too.
-  const [opened] = useState<{ key: string; range: HandRange; name: string | null } | null>(() => {
-    if (!initialSpot) return null;
-    const hero = initialSpot.positions_in_hand[0];
-    const { spot: built } = pickSpot(hero, openedRaiser ? "defend" : "open", openedRaiser ?? "CO", initialSpot.effective_stack_bb);
-    return { key: JSON.stringify(built), range: initialSpot.ranges?.[hero] ?? {}, name: initialSpot.name ?? null };
-  });
+  // Pick. An opened chart (from the Library) sets where it starts, and its
+  // saved range and name come back whenever Pick is back on its spot.
+  const { opened, defaults } = useOpenedChart(initialSpot);
+  const [seat, setSeat] = useState<Position>(defaults.seat);
+  const [situationChoice, setSituationChoice] = useState<Situation>(defaults.situation);
+  const [raiserChoice, setRaiserChoice] = useState<Position>(defaults.raiser);
+  const [stackBb, setStackBb] = useState(defaults.stackBb);
   // Type it
   const [typed, setTyped] = useState("");
   // Hand history
@@ -133,18 +90,8 @@ export function RangesWorkspace({
           : null
         : pastedSpot;
 
-  // Fetch whenever the described spot changes. Keyed on the spot's content,
-  // since a fresh object is built every render.
-  const spotKey = spot ? JSON.stringify(spot) : null;
-  useEffect(() => {
-    if (spotKey === null) {
-      clear();
-      return;
-    }
-    const startRange = opened && spotKey === opened.key ? opened.range : undefined;
-    const timer = setTimeout(() => load(JSON.parse(spotKey) as Spot, startRange), AUTO_LOAD_MS);
-    return () => clearTimeout(timer);
-  }, [spotKey, load, clear, opened]);
+  // Fetch whenever the described spot changes.
+  useChartAutoLoad(spot, chart, opened);
 
   function readHand() {
     const parsed = parseHandHistory(pasted);
@@ -489,53 +436,10 @@ function CanvasMessage({ mode, outcome }: { mode: RangesMode; outcome: ReturnTyp
         </p>
       );
     case "no-match":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--info" role="status">
-          <p className="spot-builder__status-title">No standard chart for this spot yet.</p>
-          <p>The built-in charts (6-max) currently cover:</p>
-          <ul>
-            <li>Opening ranges (nobody has raised): UTG, HJ, CO, BTN, SB.</li>
-            <li>
-              Facing one raise: BB vs any of UTG/HJ/CO/BTN/SB; BTN vs HJ or CO; SB vs CO or BTN.
-            </li>
-            <li>Stacks of about 40bb (30&ndash;50) or 100bb (80&ndash;120).</li>
-            <li>Preflop only: one raise, no re-raised (3-bet) pots yet.</li>
-          </ul>
-        </div>
-      );
     case "invalid":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">The server couldn&rsquo;t use that spot.</p>
-          <ul className="spot-builder__issues">
-            {outcome.issues.map((issue, idx) => (
-              <li key={idx}>
-                <code className="spot-builder__issue-loc">{issue.loc.join(" > ")}</code> &mdash; {issue.msg}
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
     case "network-error":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">Couldn&rsquo;t reach the server.</p>
-          <p>Check your connection and try again. The server may also be waking up &mdash; give it a minute.</p>
-          {import.meta.env.DEV && (
-            <p>
-              Dev: is <code>apps/api</code> running? Start it with{" "}
-              <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
-            </p>
-          )}
-        </div>
-      );
     case "error":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">Something went wrong.</p>
-          <p>The request failed with HTTP {outcome.status}.</p>
-        </div>
-      );
+      return <ChartProblem outcome={outcome} />;
     default:
       return (
         <div className="ranges-workspace__empty">

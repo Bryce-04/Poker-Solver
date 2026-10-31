@@ -3,6 +3,8 @@ import "./SegmentedControl.css";
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
+  /** A smaller second line under the label ("39.4% of hands"). */
+  detail?: string;
   disabled?: boolean;
 }
 
@@ -22,7 +24,7 @@ export interface SegmentedControlProps<T extends string> {
  * aria-pressed rather than radios, matching the mockup and RangeGrid's
  * brush buttons.
  *
- * Under 1024px it looks like SolvePage's existing segmented toggle; at
+ * Under 1024px it is the mobile mockup's touch-sized pill; at
  * >= 1024px, the mockup's inset pill (SegmentedControl.css).
  */
 export function SegmentedControl<T extends string>({
@@ -38,12 +40,18 @@ export function SegmentedControl<T extends string>({
         <button
           key={option.value}
           type="button"
-          className="seg-item"
+          className={option.detail ? "seg-item seg-item--two-line" : "seg-item"}
           aria-pressed={option.value === value}
           disabled={option.disabled}
           onClick={() => onChange(option.value)}
         >
-          {option.label}
+          {option.detail ? (
+            <>
+              <span>{option.label}</span> <span className="seg-item__detail">{option.detail}</span>
+            </>
+          ) : (
+            option.label
+          )}
         </button>
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useState } from "react";
 import type { HandRange, Position } from "@poker-solver/schema";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { SegmentedControl } from "../../components/SegmentedControl/SegmentedControl";
@@ -11,10 +11,12 @@ import { saveSpot } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { sameRange } from "../../lib/useReferenceChart";
 import { indexRange, totalCombos } from "../../lib/rangeCombos";
-import type { Outcome, SolveSetup } from "./useSolveSetup";
+import type { SolveSetup } from "./useSolveSetup";
 import { ActionTimeline } from "./ActionTimeline";
 import { BoardSlots } from "./BoardSlots";
 import { StrategyResult } from "./StrategyResult";
+import { SolveProblem } from "./SolveProblem";
+import { useAutoLoadRanges } from "./useAutoLoadRanges";
 import {
   accuracyOf,
   bb,
@@ -75,28 +77,7 @@ export function SolveWorkspace({ setup: s }: { setup: SolveSetup }) {
     }
   }
 
-  // Ranges load themselves once preflop has closed (§6.1): both from the
-  // preflop line when both are empty, or a typical range for a lone empty
-  // one (e.g. arriving from Ranges with one player's chart). Once per setup.
-  const oopEmpty = Object.keys(s.oopRange).length === 0;
-  const ipEmpty = Object.keys(s.ipRange).length === 0;
-  const autoKey =
-    s.preflopClosed && (oopEmpty || ipEmpty)
-      ? JSON.stringify([s.oopPosition, s.ipPosition, s.startingStackBb, s.streets.preflop, s.setupMode, oopEmpty, ipEmpty])
-      : null;
-  const autoTried = useRef<string | null>(null);
-  const autoLoad = useEffectEvent(() => {
-    if (oopEmpty && ipEmpty) void s.autoLoadRanges();
-    else {
-      const [seat, other] = oopEmpty ? [s.oopPosition, s.ipPosition] : [s.ipPosition, s.oopPosition];
-      void s.loadReferenceRange(seat, other, (r) => s.setRangeFor(seat, r), (st) => s.setChartStateFor(seat, st));
-    }
-  });
-  useEffect(() => {
-    if (autoKey === null || autoTried.current === autoKey) return;
-    autoTried.current = autoKey;
-    autoLoad();
-  }, [autoKey]);
+  const autoLoad = useAutoLoadRanges(s);
 
   function startOver() {
     s.resetAll();
@@ -104,7 +85,7 @@ export function SolveWorkspace({ setup: s }: { setup: SolveSetup }) {
     setTab("ranges");
     setOpenSlot(null);
     setSaveState("idle");
-    autoTried.current = null;
+    autoLoad.reset();
   }
 
   async function saveSetup() {
@@ -474,61 +455,6 @@ function ReadyCard({ s, onSolve }: { s: SolveSetup; onSolve: () => void }) {
       <SolveProblem outcome={s.outcome} />
     </section>
   );
-}
-
-/** Why a solve didn't come back with a result, if it didn't. */
-function SolveProblem({ outcome }: { outcome: Outcome }) {
-  switch (outcome.kind) {
-    case "invalid":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">The server couldn&rsquo;t use this spot.</p>
-          <ul className="spot-builder__issues">
-            {outcome.issues.map((issue, i) => (
-              <li key={i}>
-                <code className="spot-builder__issue-loc">{issue.loc.join(" > ")}</code> &mdash; {issue.msg}
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
-    case "rejected":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">Can&rsquo;t solve this spot yet.</p>
-          <p>{outcome.reason}</p>
-        </div>
-      );
-    case "busy":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">The solver is busy.</p>
-          <p>Another solve is already running on the server. Try again in a minute.</p>
-        </div>
-      );
-    case "network-error":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">Couldn&rsquo;t reach the server.</p>
-          <p>Check your connection and try again. The server may also be waking up &mdash; give it a minute.</p>
-          {import.meta.env.DEV && (
-            <p>
-              Dev: is <code>apps/api</code> running? Start it with{" "}
-              <code>cd apps/api &amp;&amp; uvicorn app.main:app --reload</code>.
-            </p>
-          )}
-        </div>
-      );
-    case "error":
-      return (
-        <div className="spot-builder__status-block spot-builder__status-block--error" role="alert">
-          <p className="spot-builder__status-title">Something went wrong.</p>
-          <p>The request failed with HTTP {outcome.status}.</p>
-        </div>
-      );
-    default:
-      return null;
-  }
 }
 
 function ResultRail({

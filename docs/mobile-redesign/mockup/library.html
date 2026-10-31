@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Library tab</title>
+<!-- Design mockup for docs/mobile-redesign.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#0d0d11}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.topbar{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:#17171e;border-bottom:1px solid #2a2a34}
+.ttl{flex:1;font-size:18px;font-weight:700;color:#f4f3f8;letter-spacing:-.01em}
+.iconbtn{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#b7b5c3;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;font:inherit;flex:none}
+.iconbtn:hover{background:#24242e;color:#f4f3f8}
+.avatar{width:30px;height:30px;border-radius:50%;background:#2c2c38;color:#f4f3f8;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.tabbar{height:64px;flex:none;display:flex;background:#17171e;border-top:1px solid #2a2a34}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:#8a8899;text-decoration:none}
+.tab:hover{color:#f4f3f8}
+.tab[aria-current=page]{color:#c4b5fd}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:8px 18px;border-radius:12px;font:650 15px/1.25 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;border:1px solid transparent;box-sizing:border-box}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.btn-primary:hover{background:#c4b5fd;color:#1a1030}
+.btn-ghost{background:#24242e;color:#f4f3f8}
+.btn-danger{background:rgba(240,133,122,.12);color:#f0857a}
+.seg{display:flex;padding:3px;gap:3px;background:#0f0f14;border:1px solid #2f2f3a;border-radius:12px}
+.seg-item{flex:1 1 0;min-height:40px;padding:0 6px;border:0;border-radius:9px;background:transparent;color:#b7b5c3;font:600 14px/1.2 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.seg-item[aria-pressed=true]{background:#2c2c38;color:#f4f3f8;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.card{width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:14px;border-radius:14px;border:1px solid #2a2a34;background:#1b1b23;color:#b7b5c3;font:inherit;cursor:pointer}
+.card:hover{border-color:#43424f}
+.mini{aspect-ratio:1/1;min-width:0;border-radius:1px}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;justify-content:flex-end;z-index:5}
+.sheet{background:#1b1b23;border-radius:20px 20px 0 0;padding:8px 16px 20px;border-top:1px solid #34343f;display:flex;flex-direction:column;gap:14px}
+.handle{width:40px;height:4px;border-radius:2px;background:#55546a;margin:4px auto 0}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+input{width:100%;font:inherit;color:#f4f3f8;background:#1b1b23;border:1px solid #34343f;border-radius:12px;padding:0 14px;min-height:48px;box-sizing:border-box}
+</style>
+</head>
+<body>
+<div id="app" style="width:390px;margin:0 auto"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #131318; color: #b7b5c3; font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif">
+
+  <header class="topbar">
+    <span class="ttl">Library</span>
+    <a href="account.html" class="iconbtn" aria-label="Account"><span class="avatar">P</span></a>
+  </header>
+
+  <main style="flex: 1; overflow-y: auto; padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 12px">
+    <label><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search saved spots</span><input type="text" placeholder="Search by name, seat or board"></label>
+    <div class="seg" role="group" aria-label="Filter">
+      <sc-for list="{{filters}}" as="f" hint-placeholder-count="3"><button type="button" class="seg-item" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for>
+    </div>
+    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <sc-for list="{{rows}}" as="row" hint-placeholder-count="5">
+        <li>
+          <button type="button" class="card" onClick="{{row.pick}}">
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="color: #f4f3f8; font-weight: 650; font-size: 15px">{{row.name}}</span>
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 13px">
+                <span style="padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: {{row.typeBg}}; color: {{row.typeFg}}">{{row.type}}</span>
+                {{row.meta}}
+              </span>
+            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+          </button>
+        </li>
+      </sc-for>
+    </ul>
+    <p style="margin: 4px 0 0; font-size: 12px; color: #8a8899; text-align: center">Only you can see your saved spots.</p>
+  </main>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="solve-1-hand.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Solve</a>
+    <a class="tab" href="ranges.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Ranges</a>
+    <a class="tab" href="library.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>Library</a>
+    <a class="tab" href="#drill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>Drill</a>
+  </nav>
+
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="scrim">
+      <section class="sheet" role="dialog" aria-label="Saved spot">
+        <span class="handle" aria-hidden="true"></span>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px">
+          <div>
+            <span style="padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: {{sel.typeBg}}; color: {{sel.typeFg}}">{{sel.type}}</span>
+            <h2 style="margin: 6px 0 0; font-size: 20px; color: #f4f3f8">{{sel.name}}</h2>
+            <p style="margin: 2px 0 0; font-size: 13px">{{sel.desc}}</p>
+          </div>
+          <button type="button" class="iconbtn" aria-label="Close" onClick="{{close}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <sc-if value="{{sel.isPre}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; gap: 14px; align-items: center">
+            <span aria-hidden="true" style="width: 150px; flex: none; display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 1px">
+              <sc-for list="{{sel.mini}}" as="m" hint-placeholder-count="169"><span class="mini" style="background: {{m.bg}}"></span></sc-for>
+            </span>
+            <span style="font-size: 14px; color: #f4f3f8">{{sel.pct}}% of hands<br><span style="color: #8a8899; font-size: 13px">{{sel.combos}} combos</span></span>
+          </div>
+        </sc-if>
+        <sc-if value="{{sel.isPost}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <span style="display: flex; gap: 6px">
+              <span role="img" aria-label="Queen of spades" style="width: 40px; height: 56px; border-radius: 6px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 16px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>Q</span><span>♠</span></span>
+              <span role="img" aria-label="Five of clubs" style="width: 40px; height: 56px; border-radius: 6px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 16px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>5</span><span>♣</span></span>
+              <span role="img" aria-label="Two of clubs" style="width: 40px; height: 56px; border-radius: 6px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 16px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>2</span><span>♣</span></span>
+            </span>
+            <p style="margin: 0; font-size: 13px">Saved setup only. Open it and tap Solve to see the strategy again.</p>
+          </div>
+        </sc-if>
+        <a href="{{sel.href}}" class="btn btn-primary">{{sel.openLabel}}</a>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <button type="button" class="btn btn-ghost" style="padding: 0 6px; font-size: 14px">Duplicate</button>
+          <button type="button" class="btn btn-ghost" style="padding: 0 6px; font-size: 14px">Rename</button>
+          <button type="button" class="btn btn-danger" style="padding: 0 6px; font-size: 14px">Delete</button>
+        </div>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+var R = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+function ix(c) { return R.indexOf(c); }
+function handAt(r, c) { if (r === c) return R[r] + R[c]; return r < c ? R[r] + R[c] + 's' : R[c] + R[r] + 'o'; }
+function buildRange(pairMin, suited, off, over) {
+  var m = {};
+  for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+    var h = handAt(r, c), w = 0;
+    if (r === c) w = r <= ix(pairMin) ? 1 : 0;
+    else if (r < c) w = suited[R[r]] && c <= ix(suited[R[r]]) ? 1 : 0;
+    else w = off[R[c]] && r <= ix(off[R[c]]) ? 1 : 0;
+    if (over && over[h] !== undefined) w = over[h];
+    if (w > 0) m[h] = w;
+  }
+  return m;
+}
+function combosOf(h) { return h.length === 2 ? 6 : (h[2] === 's' ? 4 : 12); }
+function bgFor(w) { if (!w) return '#2b2b34'; if (w >= 1) return '#46b06a'; var p = Math.round(w * 100); return 'linear-gradient(to top, #46b06a ' + p + '%, #3a3a46 ' + p + '%)'; }
+var SPOTS = [
+  { name: 'BTN open · standard', type: 'Preflop', meta: 'BTN · 100bb · Oct 7', desc: 'BTN opening range, unedited standard chart.',
+    range: buildRange('2', { A: '2', K: '2', Q: '5', J: '7', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' }, { A: '2', K: '7', Q: '9', J: 'T' }) },
+  { name: 'BTN open · my version', type: 'Preflop', meta: 'BTN · 100bb · Oct 7', desc: 'BTN opening range, tightened.',
+    range: buildRange('2', { A: '2', K: '5', Q: '7', J: '8', T: '7', '9': '7', '8': '7', '7': '6', '6': '5', '5': '4' }, { A: '5', K: '9', Q: 'T', J: 'T' }) },
+  { name: 'BB vs CO raise', type: 'Preflop', meta: 'BB · 100bb · Oct 12', desc: 'BB continuing range after a CO open.',
+    range: buildRange('2', { A: '2', K: '4', Q: '6', J: '7', T: '7', '9': '7', '8': '6', '7': '5', '6': '5', '5': '4' }, { A: '7', K: '9', Q: 'T', J: 'T' }, { AA: 0.25, KK: 0.25, AKs: 0.25 }) },
+  { name: 'CO open · short stack', type: 'Preflop', meta: 'CO · 40bb · Oct 14', desc: 'CO opening range at about 40bb.',
+    range: buildRange('2', { A: '2', K: '6', Q: '8', J: '8', T: '8', '9': '8', '8': '7', '7': '6' }, { A: '8', K: 'T', Q: 'J' }) },
+  { name: 'BB vs BTN on Q♠ 5♣ 2♣', type: 'Postflop', meta: 'BB vs BTN · 97.5bb · Oct 19', desc: 'Single-raised pot, BB to act on the flop.', range: null }
+];
+
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { filter: 'all', sel: null }; }
+  renderVals() {
+    var self = this, st = this.state, rows = [];
+    SPOTS.forEach(function (s, i) {
+      if (st.filter !== 'all' && s.type.toLowerCase() !== st.filter) return;
+      var pre = s.type === 'Preflop';
+      rows.push({ name: s.name, type: s.type, meta: s.meta,
+        typeBg: pre ? 'rgba(70,176,106,.15)' : 'rgba(240,185,61,.15)', typeFg: pre ? '#7fd39b' : '#f0c766',
+        pick: function () { self.setState({ sel: i }); } });
+    });
+    var sel = { name: '', type: '', desc: '', isPre: false, isPost: false, mini: [], pct: '', combos: 0, href: '#', openLabel: '', typeBg: '', typeFg: '' };
+    if (st.sel !== null) {
+      var s = SPOTS[st.sel], pre = s.type === 'Preflop', mini = [], n = 0;
+      if (pre) {
+        for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) mini.push({ bg: bgFor(s.range[handAt(r, c)] || 0) });
+        for (var h in s.range) n += combosOf(h) * s.range[h];
+      }
+      sel = { name: s.name, type: s.type, desc: s.desc + ' ' + s.meta + '.', isPre: pre, isPost: !pre, mini: mini,
+        pct: (n / 1326 * 100).toFixed(1), combos: Math.round(n), href: pre ? 'Ranges.dc.html' : 'Ready.dc.html',
+        openLabel: pre ? 'Open in Ranges' : 'Open in Solve',
+        typeBg: pre ? 'rgba(70,176,106,.15)' : 'rgba(240,185,61,.15)', typeFg: pre ? '#7fd39b' : '#f0c766' };
+    }
+    return {
+      filters: [['all', 'All'], ['preflop', 'Preflop'], ['postflop', 'Postflop']].map(function (f) {
+        return { label: f[1], pressed: String(st.filter === f[0]), pick: function () { self.setState({ filter: f[0] }); } };
+      }),
+      rows: rows, sheetOpen: st.sel !== null, sel: sel,
+      close: function () { self.setState({ sel: null }); }
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>

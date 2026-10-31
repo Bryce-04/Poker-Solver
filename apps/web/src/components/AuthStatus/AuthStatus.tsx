@@ -1,18 +1,11 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import { useAuth } from "../../lib/auth";
-import { supabase } from "../../lib/supabase";
+import { signOut, useSignInForm } from "../../lib/useSignInForm";
 import "./AuthStatus.css";
 
-type Mode = "sign-in" | "sign-up";
-
-type SubmitState =
-  | { kind: "idle" }
-  | { kind: "submitting" }
-  | { kind: "error"; message: string };
-
 /**
- * Minimal email/password sign-in, rendered in App.tsx's header. Email +
+ * Minimal email/password sign-in for the desktop sidebar (phones use
+ * components/mobile/AccountSheet; both share lib/useSignInForm). Email +
  * password only (no magic link) -- see docs/plan.md's Stage 6 note: magic
  * link needs a redirect URL configured in the team's Supabase dashboard
  * plus native deep-link handling this Capacitor app doesn't have yet.
@@ -28,29 +21,7 @@ type SubmitState =
 export function AuthStatus({ variant = "header" }: { variant?: "header" | "sidebar" }) {
   const auth = useAuth();
   const [formOpen, setFormOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("sign-in");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setSubmitState({ kind: "submitting" });
-    const { error } =
-      mode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
-    if (error) {
-      setSubmitState({ kind: "error", message: error.message });
-      return;
-    }
-    setSubmitState({ kind: "idle" });
-    setPassword("");
-  }
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-  }
+  const { mode, setMode, email, setEmail, password, setPassword, submitState, submit } = useSignInForm();
 
   // Avoid a signed-out-form flash while the initial getSession() call is
   // still in flight.
@@ -66,7 +37,7 @@ export function AuthStatus({ variant = "header" }: { variant?: "header" | "sideb
         <span className="sidebar-account__email" title={accountEmail}>
           {accountEmail}
         </span>
-        <button type="button" className="sidebar-account__signout btn-ghost" onClick={handleSignOut}>
+        <button type="button" className="sidebar-account__signout btn-ghost" onClick={signOut}>
           Sign out
         </button>
       </div>
@@ -77,7 +48,7 @@ export function AuthStatus({ variant = "header" }: { variant?: "header" | "sideb
     return (
       <div className="auth-status">
         <span className="auth-status__email">Signed in as {auth.email ?? "unknown"}</span>
-        <button type="button" className="auth-status__signout btn-ghost" onClick={handleSignOut}>
+        <button type="button" className="auth-status__signout btn-ghost" onClick={signOut}>
           Sign out
         </button>
       </div>
@@ -95,7 +66,7 @@ export function AuthStatus({ variant = "header" }: { variant?: "header" | "sideb
   return (
     <form
       className={`auth-status auth-status--form${variant === "sidebar" ? " auth-status--stacked" : ""}`}
-      onSubmit={handleSubmit}
+      onSubmit={submit}
     >
       <input
         type="email"
@@ -122,10 +93,7 @@ export function AuthStatus({ variant = "header" }: { variant?: "header" | "sideb
       <button
         type="button"
         className="auth-status__toggle"
-        onClick={() => {
-          setMode(mode === "sign-in" ? "sign-up" : "sign-in");
-          setSubmitState({ kind: "idle" });
-        }}
+        onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}
       >
         {mode === "sign-in" ? "Sign up instead" : "Sign in instead"}
       </button>

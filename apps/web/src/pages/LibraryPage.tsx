@@ -1,12 +1,13 @@
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { SavedSpotsPage } from "./SavedSpotsPage";
+import { LibraryPhone } from "./library/LibraryPhone";
 import { LibraryWorkspace } from "./library/LibraryWorkspace";
 
 /**
- * /library: the desktop Library (table, preview, open / rename / duplicate /
- * delete) at >= 1024px. Phones keep the original Saved list, unchanged --
- * the redesign changes nothing visually under 1024px.
+ * /library: the desktop Library (table, preview) at >= 1024px, and the phone
+ * Library (cards and a detail sheet, docs/mobile-redesign.md §6) below. Both
+ * run on library/useLibrary: the saved spots and open / rename / duplicate /
+ * delete.
  */
 export function LibraryPage() {
-  return useIsDesktop() ? <LibraryWorkspace /> : <SavedSpotsPage />;
+  return useIsDesktop() ? <LibraryWorkspace /> : <LibraryPhone />;
 }

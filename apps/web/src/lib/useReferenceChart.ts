@@ -7,6 +7,7 @@ import {
   type SpotValidationIssue,
 } from "./api";
 import { useAuth } from "./auth";
+import { useOpenAccountSheet } from "./mobileShell";
 
 // The api result tags plus idle/loading. `match` carries the exact Spot that
 // produced it (not the current form state) so saving saves what was actually
@@ -54,6 +55,9 @@ export function sameRange(a: HandRange, b: HandRange): boolean {
  */
 export function useReferenceChart() {
   const auth = useAuth();
+  // On phones a signed-out Save opens the account sheet (docs/mobile-redesign.md
+  // §3.3); null on desktop, where the sidebar has the sign-in.
+  const openAccountSheet = useOpenAccountSheet();
   const [outcome, setOutcome] = useState<ChartOutcome>({ kind: "idle" });
   const [saveState, setSaveState] = useState<ChartSaveState>({ kind: "idle" });
   // The chart's range, editable before saving. Re-seeded from the chart every
@@ -98,6 +102,7 @@ export function useReferenceChart() {
     if (outcome.kind !== "match") return;
     if (auth.status !== "signed-in") {
       setSaveState({ kind: "not-signed-in" });
+      openAccountSheet?.();
       return;
     }
     setSaveState({ kind: "saving" });
