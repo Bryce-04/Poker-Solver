@@ -15,6 +15,7 @@ import "./SolvePage.css";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useSolveSetup, type SolveSetup } from "./solve/useSolveSetup";
 import { SolveWorkspace } from "./solve/SolveWorkspace";
+import { TopBarActions } from "../components/mobile/TopBarActions";
 
 /**
  * Stage 5's live-solve screen: a real MCCFR solve (apps/api's
@@ -112,6 +113,22 @@ function SolvePhone({ setup }: { setup: SolveSetup }) {
 
   return (
     <div className="spot-builder">
+      <TopBarActions>
+        <button type="button" className="icon-button" aria-label="Start over" onClick={resetAll}>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" />
+          </svg>
+        </button>
+      </TopBarActions>
       <form className="spot-builder__form" onSubmit={handleSubmit}>
         <Step
           number={1}

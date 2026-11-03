@@ -1,0 +1,92 @@
+/* Buttons and labels shared by the phone shell and its components
+   (docs/mobile-redesign.md; values from docs/mobile-redesign/mockup). Only
+   phone components use these classes; desktop has its own role classes in
+   desktop.css. */
+
+.m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 18px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font: 650 15px/1.25 var(--sans);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.m-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.m-btn--primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.m-btn--secondary {
+  background: var(--surface-2);
+  color: var(--text-strong);
+  border-color: var(--border-strong);
+}
+
+.m-btn--ghost {
+  background: transparent;
+  color: var(--text);
+}
+
+@media (hover: hover) {
+  .m-btn--primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+
+  .m-btn--secondary:hover:not(:disabled) {
+    background: var(--surface-3);
+  }
+
+  .m-btn--ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text-strong);
+  }
+}
+
+/* A 44px round icon button: the top bar's actions, a sheet's close. */
+.icon-button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* :not(:disabled) to out-rank index.css's button:hover:not(:disabled). */
+@media (hover: hover) {
+  .icon-button:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text-strong);
+  }
+}
+
+/* The small uppercase label over a group ("PLAYER 1", "STARTING STACK"). */
+.m-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+:where(.m-btn, .icon-button):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}

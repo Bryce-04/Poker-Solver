@@ -6,6 +6,75 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Mobile redesign Phase 1: the phone shell
+
+**Status:** proposed.
+
+**Context.** `docs/mobile-redesign.md` §3 and §9's Phase 1: replace the phone
+header (logo, tagline, link row, inline sign-in form) with a top bar, a bottom
+tab bar and an account sheet, add the shared phone components, and make each
+tab remember its state.
+
+**Decisions.**
+- **Shell** (`App.tsx`, `components/mobile/`): `TopBar` (sticky, covers the
+  status bar; the Phase 0 sticky header is gone with the header itself),
+  `TabBar` (fixed, covers the gesture bar), `AccountSheet`, plus `BottomSheet`,
+  `ChipGroup` and `ActionBar`. `body` now pads by no top or bottom inset; read
+  insets as `--safe-top` / `--safe-bottom` (`index.css`), which prefer
+  Capacitor's injected variables over `env()`. The tab bar's icons moved from
+  `Sidebar` into `components/NavIcon` (same markup), and sign-in logic into
+  `lib/useSignInForm` (used by both `AuthStatus` and `AccountSheet`).
+- **Page actions in the top bar**: a page renders `<TopBarActions>` (a portal
+  into the bar's slot, `lib/mobileShell.ts`); nothing renders on desktop.
+  Solve's "Start over" is the first one. The inline "Reset" stays until Phase
+  2 rebuilds the Solve phone page.
+- **Account sheet triggers**: the top bar, the signed-out Library (a Sign in
+  button on the old notice), and a signed-out Save, wired once in
+  `useReferenceChart.save()` via `useOpenAccountSheet()` (null on desktop).
+  Solve has no phone Save yet (Phase 3).
+- **Per-tab state: Solve is kept mounted, hidden, on phones**
+  (`SolveKeepAlive`), not persisted to session storage. Serializing the 25-odd
+  pieces of `useSolveSetup` state would be fragile, and Phase 2 needs the
+  same thing anyway ("the solve keeps running if the user switches tabs").
+  Arriving with route state (Ranges' "solve from here", a Library open) still
+  starts a fresh setup from it, keyed by the arrival. To survive a trip into
+  the Drill too, the phone shell stays mounted (hidden) under the Drill.
+  Ranges and Library are remembered by **route** (each tab links back to the
+  path + query it was left on) and scroll position, not component state:
+  their phone pages are rebuilt in Phases 4 and 5, which should keep their
+  choices in the URL. The Drill's X (`/`) goes back to the last tab on phones.
+- **Desktop parity, on purpose**: on desktop Solve still unmounts when you
+  leave it, the shell still unmounts under the Drill, and `/` still goes to
+  `/solve`. Keeping state across tabs on desktop too would be a one-line
+  change in `SolveKeepAlive`, but the redesign's rule is that desktop doesn't
+  change, so that's for the team to ask for.
+- **Back closes a sheet first**: an open `BottomSheet` pushes a history entry
+  (keeping React Router's own state in it), and popping it closes the sheet;
+  closing another way goes back over the entry. Pops that land on another
+  sheet entry are ignored, which is what makes StrictMode's double mount in
+  development safe.
+- **`SegmentedControl` under 1024px** is now the mobile mockup's touch-sized
+  pill (40px items); desktop rules unchanged. It's used on phones by the
+  Ranges mode switch and the account sheet.
+- **Copy**: the password placeholder says "At least 6 characters", not the
+  mockup's 8, because 6 is what Supabase (and the existing form) enforces.
+  When sign-up needs email confirmation, the sheet now says so instead of
+  closing silently.
+
+**Checked.** Build, lint (no new warnings), 367 tests passing, including new
+ones for the shell (tab memory, Solve kept across tabs, the Drill returning
+to the last tab, desktop still starting Solve blank) and for each phone
+component. Desktop screenshots at 1440px are pixel-identical to the Phase 0
+build for Solve, Library, Ranges (Pick) and Ranges (Type it). Phone
+screenshots at 390×844 in dark mode match the mockup's shell, account sheet
+and simulated safe-area insets. A screenshot also caught a real bug before
+commit: the keep-alive compared `pathname === "/solve"`, so `/solve/` rendered
+nothing on desktop; it now uses the router's matching (regression test
+added). Still not checked on a real Android device (no SDK here): Back closing
+a sheet, and the insets.
+
+---
+
 ## 2026-11-03 — Mobile redesign Phase 0: the status bar no longer covers content
 
 **Status:** proposed.

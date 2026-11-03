@@ -1,0 +1,58 @@
+/* docs/mobile-redesign.md §3.1; values from docs/mobile-redesign/mockup.
+   The background runs the full width; the content lines up with the page
+   column (max 560px, §3.4). */
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--divider);
+}
+
+.top-bar__inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 0 6px 0 16px;
+}
+
+.top-bar__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-strong);
+}
+
+.top-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.top-bar__actions:empty {
+  display: none;
+}
+
+.top-bar__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 700;
+}

@@ -1,5 +1,5 @@
-/* Under 1024px: the same look as SolvePage's existing "Click through the
-   hand / From a hand history" toggle, so phones get nothing new-looking. */
+/* Base look (the old phone toggle), refined per width below. Under 1024px
+   that is the mobile redesign's pill; at >= 1024px, the desktop one. */
 .seg {
   display: inline-flex;
   align-self: flex-start;
@@ -32,6 +32,47 @@
 
   .seg-item[aria-pressed="true"]:hover:not(:disabled) {
     background: var(--accent-subtle);
+  }
+}
+
+/* Phones and tablets: the mobile mockup's inset pill, sized for touch
+   (docs/mobile-redesign/mockup; 40px items in a 3px inset, 46px overall). */
+@media (max-width: 1023px) {
+  .seg {
+    gap: 3px;
+    padding: 3px;
+    background: var(--bg);
+    border-color: var(--border);
+    border-radius: 12px;
+    overflow: visible;
+  }
+
+  .seg-item {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .seg-item[aria-pressed="true"] {
+    background: var(--surface-3);
+    color: var(--text-strong);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@media (max-width: 1023px) and (hover: hover) {
+  .seg-item:hover:not(:disabled) {
+    background: transparent;
+    color: var(--text-strong);
+  }
+
+  .seg-item[aria-pressed="true"]:hover:not(:disabled) {
+    background: var(--surface-3);
   }
 }
 

@@ -16,6 +16,15 @@
   --divider: #ebeaf0;
   --surface-hover: #ececf1;
   --surface-3: #e6e6ec;
+  /* Phone shell (docs/mobile-redesign.md §3): the top bar and tab bar, the
+     active tab, chips and bottom sheets. Only phone CSS (< 1024px) uses
+     these. */
+  --bar-bg: #f5f5f8;
+  --nav-active: var(--accent);
+  --chip-border: #dcdbe3;
+  --chip-border-hover: #b9b8c3;
+  --chip-selected: rgba(124, 58, 237, 0.12);
+  --scrim: rgba(0, 0, 0, 0.45);
 
   /* Text */
   --text: #46434f;
@@ -108,6 +117,12 @@
     --divider: #2a2a34;
     --surface-hover: #22222b;
     --surface-3: #2c2c38;
+    --bar-bg: #17171e;
+    --nav-active: #c4b5fd;
+    --chip-border: #34343f;
+    --chip-border-hover: #55546a;
+    --chip-selected: rgba(167, 139, 250, 0.18);
+    --scrim: rgba(0, 0, 0, 0.6);
 
     --text: #b7b5c3;
     --text-strong: #f4f3f8;
@@ -157,16 +172,23 @@ body {
   color: var(--text);
   /* index.html sets viewport-fit=cover so content can draw under a notch/
      status bar/gesture-nav bar on native builds -- these insets pull it
-     back in. No top inset here: padding on body scrolls away with the page,
-     which let content scroll under the Android status bar (see
-     docs/decisions.md, 2026-11-03). The phone header covers the top inset
-     instead (App.css, .app__header), staying stuck to the top.
-     --safe-area-inset-*: Capacitor 8's built-in SystemBars plugin sets these
-     on Android, including on older WebViews where env() reports 0. On a
-     browser they're unset and env() applies (0 without a notch). */
-  padding: 0 var(--safe-area-inset-right, env(safe-area-inset-right, 0px))
-    var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))
-    var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+     back in. No top or bottom inset here: padding on body scrolls away with
+     the page, which let content scroll under the Android status bar (see
+     docs/decisions.md, 2026-11-03). The phone shell's sticky top bar covers
+     the top inset and its fixed tab bar the bottom one (App.css,
+     components/mobile/). Use the --safe-* shorthands below for insets. */
+  padding: 0 var(--safe-right) 0 var(--safe-left);
+}
+
+:root {
+  /* Safe-area insets. Capacitor 8's built-in SystemBars plugin sets
+     --safe-area-inset-* on Android, including on older WebViews where env()
+     reports 0. On a browser they're unset and env() applies (0 without a
+     notch, so these are 0 on desktop). */
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 }
 
 #root {

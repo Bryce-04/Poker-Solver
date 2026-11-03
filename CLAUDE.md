@@ -336,12 +336,40 @@ the mirror of the desktop one: **desktop (>= 1024px) must not change**.
 inset (that padding scrolled away, letting content slide under the Android
 status bar). The phone header (`.app__header`) is sticky with a solid
 background and pads itself by the top inset, under `@media (max-width: 1023px)`.
-Read insets as `var(--safe-area-inset-X, env(safe-area-inset-X, 0px))`:
-Capacitor 8's built-in SystemBars plugin sets those variables on Android
-(older WebViews report `env()` as 0), so no status-bar plugin is needed. Until
-Phase 1 swaps it for the 56px top bar, the whole old header (tagline, nav,
-inline sign-in) is what stays pinned. That was a deliberate choice; see
-`docs/decisions.md`. Not yet confirmed on a real Android device.
+Read insets as `--safe-top` / `--safe-right` / `--safe-bottom` / `--safe-left`
+(`index.css`), which prefer Capacitor's injected `--safe-area-inset-*` over
+`env()`: Capacitor 8's built-in SystemBars plugin sets those on Android (older
+WebViews report `env()` as 0), so no status-bar plugin is needed. Not yet
+confirmed on a real Android device.
+**Phase 1 (shell) is done**: under 1024px `App.tsx` renders `TopBar` (sticky,
+covers the status bar; page title, page actions, account button), the page in
+a column at most 560px wide, a fixed `TabBar` (covers the gesture bar), and
+`AccountSheet`. All of them are in `components/mobile/`, along with
+`BottomSheet`, `ChipGroup`, `ActionBar` and a shared `mobile.css` (`.m-btn`
+roles, `.icon-button`, `.m-label`). The old phone header and its inline sign-in
+form are gone. `body` pads by no top or bottom inset.
+- A page puts actions in the top bar with `<TopBarActions>` (a portal; nothing
+  on desktop). Solve's "Start over" is the first.
+- `useOpenAccountSheet()` (`lib/mobileShell.ts`) opens the account sheet. It's
+  null on desktop, where the sidebar has its own sign-in. A signed-out Save
+  opens it via `useReferenceChart.save()`, and so does the signed-out
+  Library's Sign in button.
+- `BottomSheet` pushes a history entry while open, so Android back / browser
+  back closes it first.
+- Tabs remember their route and scroll position. **Solve is kept mounted but
+  hidden** (`SolveKeepAlive` in `App.tsx`), so its setup survives a tab switch
+  and a trip into the Drill. The phone shell stays mounted under the Drill,
+  and the Drill's X (`/`) returns to the last tab. Route state (prefill, a
+  Library open) starts a fresh Solve. **Desktop keeps its old behavior on
+  purpose**: Solve unmounts when you leave, `/` goes to `/solve`.
+- Ranges and Library are remembered by URL only. When Phases 4 and 5 rebuild
+  them, keep their choices in the URL.
+- `SegmentedControl` under 1024px is now the mockup's 40px pill.
+- Sign-in logic lives in `lib/useSignInForm.ts`, shared with `AuthStatus`.
+- Nav icons are in `components/NavIcon`, shared with `Sidebar`.
+- New tokens: `--bar-bg`, `--nav-active`, `--chip-border`,
+  `--chip-border-hover`, `--chip-selected`, `--scrim`.
+- See `docs/decisions.md`.
 
 ## Commands
 

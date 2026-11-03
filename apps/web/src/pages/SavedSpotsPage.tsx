@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Spot } from "@poker-solver/schema";
 import { listSpots } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { useOpenAccountSheet } from "../lib/mobileShell";
 import { summarize } from "../lib/spotText";
 import "../components/SpotBuilder/SpotBuilder.css";
 
@@ -30,6 +31,7 @@ function formatSavedAt(spot: Spot): string | null {
  */
 export function SavedSpotsPage() {
   const auth = useAuth();
+  const openAccountSheet = useOpenAccountSheet();
   const signedInAs = auth.status === "signed-in" ? (auth.email ?? "") : null;
   // Each fetch result is tagged with the account it was fetched for, so a
   // result from a previous account reads as "loading" until the new fetch
@@ -65,6 +67,11 @@ export function SavedSpotsPage() {
       <div className="spot-builder__status-block spot-builder__status-block--info">
         <p className="spot-builder__status-title">Not signed in.</p>
         <p>Sign in to see and save your own spots.</p>
+        {openAccountSheet && (
+          <button type="button" className="m-btn m-btn--primary" onClick={openAccountSheet}>
+            Sign in
+          </button>
+        )}
       </div>
     );
   }
