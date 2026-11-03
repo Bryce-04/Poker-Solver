@@ -11,6 +11,21 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Phones and tablets: the header sticks to the top with a solid background
+   and covers the status bar's height itself (docs/mobile-redesign.md §2).
+   body no longer pads by the top inset, because that padding scrolled away
+   and let content slide under the Android status bar. The header only
+   renders under 1024px (App.tsx), and the media query keeps it that way. */
+@media (max-width: 1023px) {
+  .app__header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  }
+}
+
 .app__title {
   display: flex;
   align-items: center;

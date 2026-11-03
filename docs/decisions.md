@@ -6,6 +6,53 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Mobile redesign Phase 0: the status bar no longer covers content
+
+**Status:** proposed.
+
+**Context.** On Android, content scrolled underneath the status bar (the clock
+overlapped "Poker Solver" and the range buttons). `index.html` sets
+`viewport-fit=cover` and `body` was padded by `env(safe-area-inset-*)`, but
+padding on `body` scrolls away with the page, so nothing kept the status-bar
+area covered. The app targets SDK 36, where Android 15+ always draws the app
+edge to edge, so this hit every phone. `docs/mobile-redesign.md` §2.
+
+**Decision.** As the spec says:
+- `body` drops its top inset and keeps left, right and bottom (`index.css`).
+- The phone header (`.app__header`, `App.css`) is `position: sticky; top: 0`
+  with a solid `var(--bg)` background, `z-index: 10`, and
+  `padding-top` equal to the top inset. That's inside `@media (max-width: 1023px)`,
+  and the header only renders under 1024px anyway, so desktop is untouched.
+  Scrolled to the top, the header sits where it did before, because the inset
+  moved from `body`'s padding to the header's.
+- Insets are read as `var(--safe-area-inset-top, env(safe-area-inset-top, 0px))`.
+  **No new plugin was needed** for the spec's "what if `env()` is 0 in the
+  WebView" fallback: Capacitor 8.5's built-in SystemBars plugin (default
+  `insetsHandling: "css"`) already handles it. On Android WebView 140+ it
+  passes the real insets through to `env()` and also sets the
+  `--safe-area-inset-*` variables. On older WebViews it pads the native view
+  itself, so the page never draws under the bar. On a browser the variables
+  are unset and `env()` applies.
+
+**Trade-off, knowingly accepted.** Until Phase 1 replaces it with the 56px top
+bar (§3.1), the sticky header is the *whole* current header: logo, tagline,
+nav and, signed out, the inline sign-in form. That's a lot of a phone screen
+staying pinned for one phase. A slimmer alternative (a fixed strip just the
+height of the status bar, the header scrolling as before) was offered and
+declined in favor of following the spec.
+
+**Checked.** Build, lint, tests. Desktop at 1440px is byte-identical before and
+after (headless Chrome screenshots of the production build). A 390px phone
+simulation with `--safe-area-inset-top: 40px` scrolled down shows the header
+pinned under the status bar where the old build let the form scroll under it.
+**Not yet checked on a real Android device**: no Android SDK on the machine
+this was done on. The spec's acceptance is to scroll every phone screen to the
+bottom on the Android build, with no overlap at the status bar. The Drill is
+unchanged (it's `position: fixed` with its own insets and never depended on
+`body`'s padding).
+
+---
+
 ## 2026-10-21 — Solver speed: 2.4x to 4.3x faster, answers unchanged
 
 **Status:** proposed.

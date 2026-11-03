@@ -325,6 +325,24 @@ category labels and "Why?" (Phase 6).
   honesty note ("the percentages come from the solve; the explanation is a
   rule of thumb").
 
+**Mobile redesign (agreed 2026-11-03; Phase 0 done)**: `docs/mobile-redesign.md`
+is the spec for everything under 1024px except the Drill, with the design as
+clickable HTML plus screenshots in `docs/mobile-redesign/mockup/`. Read both
+before touching phone layout. Phases 0-5 are built in order as one commit each
+on the `mobile-redesign` branch, with a single PR at the end (not the spec's
+PR per phase; the team's call). Hard rule,
+the mirror of the desktop one: **desktop (>= 1024px) must not change**.
+**Phase 0 (status bar) is done**: `body` no longer pads by the top safe-area
+inset (that padding scrolled away, letting content slide under the Android
+status bar). The phone header (`.app__header`) is sticky with a solid
+background and pads itself by the top inset, under `@media (max-width: 1023px)`.
+Read insets as `var(--safe-area-inset-X, env(safe-area-inset-X, 0px))`:
+Capacitor 8's built-in SystemBars plugin sets those variables on Android
+(older WebViews report `env()` as 0), so no status-bar plugin is needed. Until
+Phase 1 swaps it for the 56px top bar, the whole old header (tagline, nav,
+inline sign-in) is what stays pinned. That was a deliberate choice; see
+`docs/decisions.md`. Not yet confirmed on a real Android device.
+
 ## Commands
 
 This is a pnpm workspace (`apps/*`, `packages/*`) plus two standalone
