@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Solve 4 · Ready / solving</title>
+<!-- Design mockup for docs/mobile-redesign.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#0d0d11}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.topbar{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:#17171e;border-bottom:1px solid #2a2a34}
+.ttl{flex:1;font-size:18px;font-weight:700;color:#f4f3f8;letter-spacing:-.01em}
+.iconbtn{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#b7b5c3;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;font:inherit}
+.iconbtn:hover{background:#24242e;color:#f4f3f8}
+.avatar{width:30px;height:30px;border-radius:50%;background:#2c2c38;color:#f4f3f8;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.tabbar{height:64px;flex:none;display:flex;background:#17171e;border-top:1px solid #2a2a34}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:#8a8899;text-decoration:none}
+.tab:hover{color:#f4f3f8}
+.tab[aria-current=page]{color:#c4b5fd}
+.actionbar{flex:none;display:flex;gap:10px;padding:10px 16px;background:#131318;border-top:1px solid #2a2a34}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:8px 18px;border-radius:12px;font:650 15px/1.25 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;border:1px solid transparent;box-sizing:border-box}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.btn-primary:hover{background:#c4b5fd;color:#1a1030}
+.btn-secondary{background:#24242e;color:#f4f3f8;border-color:#43424f}
+.btn-secondary:hover{background:#2c2c38;color:#f4f3f8}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #2a2a34}
+.label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a8899}
+button:focus-visible,a:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app" style="width:390px;margin:0 auto"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #131318; color: #b7b5c3; font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif">
+
+  <header class="topbar">
+    <span class="ttl">Solve</span>
+    <button type="button" class="iconbtn" aria-label="Start over"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"></path></svg></button>
+    <a href="account.html" class="iconbtn" aria-label="Account"><span class="avatar">P</span></a>
+  </header>
+
+  <nav aria-label="Solve steps" style="flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px 16px 10px">
+    <a href="solve-1-hand.html" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #f4f3f8; font-size: 12px; font-weight: 600"><span aria-hidden="true" style="height: 4px; border-radius: 2px; background: #a78bfa"></span>Hand</a>
+    <a href="solve-2-board.html" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #f4f3f8; font-size: 12px; font-weight: 600"><span aria-hidden="true" style="height: 4px; border-radius: 2px; background: #a78bfa"></span>Board</a>
+    <a href="solve-3-ranges.html" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #f4f3f8; font-size: 12px; font-weight: 600"><span aria-hidden="true" style="height: 4px; border-radius: 2px; background: #a78bfa"></span>Ranges</a>
+    <a href="solve-4-ready.html" aria-current="step" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: #f4f3f8; font-size: 12px; font-weight: 600"><span aria-hidden="true" style="height: 4px; border-radius: 2px; background: #a78bfa"></span>Solve</a>
+  </nav>
+
+  <sc-if value="{{idle}}" hint-placeholder-val="{{ true }}">
+    <main style="flex: 1; overflow-y: auto; padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 18px">
+      <div>
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #f4f3f8; letter-spacing: -0.01em">Ready to solve</h1>
+        <p style="margin: 4px 0 0; font-size: 14px">BB acts first on the flop, so the solver works out BB's best mix of plays.</p>
+      </div>
+      <div style="border: 1px solid #2a2a34; border-radius: 14px; background: #1b1b23; overflow: hidden">
+        <div class="row">
+          <div><span class="label">Hand</span><p style="margin: 2px 0 0; color: #f4f3f8">BB vs BTN · BTN raised, BB called</p></div>
+          <a href="solve-1-hand.html" style="font-size: 14px; font-weight: 600">Edit</a>
+        </div>
+        <div class="row">
+          <div style="display: flex; flex-direction: column; gap: 6px"><span class="label">Board</span>
+            <span style="display: flex; gap: 6px">
+              <span role="img" aria-label="Queen of spades" style="width: 36px; height: 50px; border-radius: 6px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 15px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>Q</span><span>♠</span></span>
+              <span role="img" aria-label="Five of clubs" style="width: 36px; height: 50px; border-radius: 6px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 15px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>5</span><span>♣</span></span>
+              <span role="img" aria-label="Two of clubs" style="width: 36px; height: 50px; border-radius: 6px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 15px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>2</span><span>♣</span></span>
+            </span>
+          </div>
+          <a href="solve-2-board.html" style="font-size: 14px; font-weight: 600">Edit</a>
+        </div>
+        <div class="row">
+          <div><span class="label">Pot · Stacks</span><p style="margin: 2px 0 0; color: #f4f3f8">5.5bb · 97.5bb</p></div>
+        </div>
+        <div class="row" style="border-bottom: 0">
+          <div><span class="label">Ranges</span><p style="margin: 2px 0 0; color: #f4f3f8">BB 39.4% · BTN 40.0% of hands</p></div>
+          <a href="solve-3-ranges.html" style="font-size: 14px; font-weight: 600">Edit</a>
+        </div>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: #8a8899">Usually takes 10–90 seconds. This is a real solve, not a lookup. You can switch tabs while it runs.</p>
+    </main>
+    <div class="actionbar">
+      <a href="solve-3-ranges.html" class="btn btn-secondary" style="flex: 0 0 96px">Back</a>
+      <button type="button" class="btn btn-primary" style="flex: 1" onClick="{{start}}">Solve BB's flop</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{running}}" hint-placeholder-val="{{ false }}">
+    <main style="flex: 1; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center">
+      <div role="progressbar" aria-label="Solving" style="width: 100%; height: 8px; border-radius: 4px; background: #2b2b34; overflow: hidden"><span style="display: block; height: 100%; width: {{progress}}; background: #a78bfa; border-radius: 4px"></span></div>
+      <h1 style="margin: 0; font-size: 22px; color: #f4f3f8">Solving BB's flop…</h1>
+      <p style="margin: 0; font-size: 14px">It keeps refining until the strategy is within 0.5% of the pot of perfect play. You can switch tabs; we'll keep going.</p>
+    </main>
+    <div class="actionbar">
+      <button type="button" class="btn btn-secondary" style="flex: 1" onClick="{{cancel}}">Cancel</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+    <main style="flex: 1; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center">
+      <span aria-hidden="true" style="width: 56px; height: 56px; border-radius: 50%; background: rgba(70,176,106,.15); display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#46b06a" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>
+      <h1 style="margin: 0; font-size: 22px; color: #f4f3f8">Solved in 18 seconds</h1>
+      <p style="margin: 0; font-size: 14px">Very accurate: within 0.4% of the pot of perfect play.</p>
+    </main>
+    <div class="actionbar">
+      <a href="solve-result.html" class="btn btn-primary" style="flex: 1">See the result</a>
+    </div>
+  </sc-if>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="solve-1-hand.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Solve</a>
+    <a class="tab" href="ranges.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Ranges</a>
+    <a class="tab" href="library.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>Library</a>
+    <a class="tab" href="#drill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>Drill</a>
+  </nav>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { phase: 'idle', pct: 0 }; }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    var self = this, st = this.state;
+    return {
+      idle: st.phase === 'idle', running: st.phase === 'running', done: st.phase === 'done',
+      progress: st.pct + '%',
+      start: function () {
+        self.setState({ phase: 'running', pct: 5 });
+        clearInterval(self.timer);
+        self.timer = setInterval(function () {
+          var p = self.state.pct + 12;
+          if (p >= 100) { clearInterval(self.timer); self.setState({ phase: 'done', pct: 100 }); }
+          else self.setState({ pct: p });
+        }, 250);
+      },
+      cancel: function () { clearInterval(self.timer); self.setState({ phase: 'idle', pct: 0 }); }
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>

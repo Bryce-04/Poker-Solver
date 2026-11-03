@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Solve · Result</title>
+<!-- Design mockup for docs/mobile-redesign.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#0d0d11}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.topbar{height:56px;flex:none;display:flex;align-items:center;gap:2px;padding:0 6px;background:#17171e;border-bottom:1px solid #2a2a34}
+.ttl{flex:1;font-size:17px;font-weight:700;color:#f4f3f8;letter-spacing:-.01em}
+.iconbtn{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#b7b5c3;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;font:inherit;flex:none}
+.iconbtn:hover{background:#24242e;color:#f4f3f8}
+.avatar{width:30px;height:30px;border-radius:50%;background:#2c2c38;color:#f4f3f8;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.tabbar{height:64px;flex:none;display:flex;background:#17171e;border-top:1px solid #2a2a34}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:#8a8899;text-decoration:none}
+.tab:hover{color:#f4f3f8}
+.tab[aria-current=page]{color:#c4b5fd}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:8px 18px;border-radius:12px;font:650 15px/1.25 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;border:1px solid transparent;box-sizing:border-box}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.btn-primary:hover{background:#c4b5fd;color:#1a1030}
+.pill{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:22px;border:1px solid #43424f;background:#1b1b23;color:#f4f3f8;font:600 14px/1 system-ui,'Segoe UI',Roboto,sans-serif;text-decoration:none;white-space:nowrap}
+.pill:hover{border-color:#a78bfa;color:#f4f3f8}
+.cell{border:0;padding:0;aspect-ratio:1/1;border-radius:3px;font:650 9px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:0;letter-spacing:-.02em}
+.cell[aria-pressed=true]{outline:2px solid #ffffff;outline-offset:-1px;position:relative;z-index:1}
+.label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a8899}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end;z-index:5}
+.sheet{background:#1b1b23;border-radius:20px 20px 0 0;padding:8px 16px 20px;border-top:1px solid #34343f;display:flex;flex-direction:column;gap:12px}
+.handle{width:40px;height:4px;border-radius:2px;background:#55546a;margin:4px auto 0}
+summary{cursor:pointer;color:#c4b5fd;font-weight:600;min-height:32px;display:flex;align-items:center}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app" style="width:390px;margin:0 auto"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #131318; color: #b7b5c3; font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif">
+
+  <header class="topbar">
+    <a href="solve-4-ready.html" class="iconbtn" aria-label="Back to setup"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <span class="ttl">BB's flop strategy</span>
+    <button type="button" class="iconbtn" aria-label="Save spot"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg></button>
+    <a href="account.html" class="iconbtn" aria-label="Account"><span class="avatar">P</span></a>
+  </header>
+
+  <main style="flex: 1; overflow-y: auto; padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="display: flex; gap: 4px">
+        <span role="img" aria-label="Queen of spades" style="width: 26px; height: 36px; border-radius: 4px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 12px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>Q</span><span>♠</span></span>
+        <span role="img" aria-label="Five of clubs" style="width: 26px; height: 36px; border-radius: 4px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 12px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>5</span><span>♣</span></span>
+        <span role="img" aria-label="Two of clubs" style="width: 26px; height: 36px; border-radius: 4px; background: #ffffff; color: #141319; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 12px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>2</span><span>♣</span></span>
+      </span>
+      <span style="flex: 1; font-size: 13px">BB vs BTN · pot 5.5bb</span>
+      <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: rgba(70,176,106,.14); color: #7fd39b; font-size: 12px; font-weight: 650"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Very accurate</span>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: #1b1b23; border: 1px solid #2a2a34">
+      <p style="margin: 0; font-size: 19px; font-weight: 700; color: #f4f3f8; line-height: 1.3">BB checks {{checkPct}}% of the time on this flop.</p>
+      <p style="margin: 0; font-size: 14px">It bets with its strongest hands and some top pairs and draws. Almost everything else checks.</p>
+      <div role="img" aria-label="{{mixAria}}" style="display: flex; height: 28px; border-radius: 7px; overflow: hidden">
+        <sc-for list="{{mix}}" as="a" hint-placeholder-count="4"><span style="width: {{a.width}}; background: {{a.color}}"></span></sc-for>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; font-size: 13px">
+        <sc-for list="{{mix}}" as="a" hint-placeholder-count="4">
+          <span style="display: flex; align-items: center; gap: 6px; color: #f4f3f8"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 3px; background: {{a.color}}"></span>{{a.label}}<span style="margin-left: auto; color: #8a8899; font-variant-numeric: tabular-nums">{{a.pctText}}</span></span>
+        </sc-for>
+      </div>
+    </section>
+
+    <div role="grid" aria-label="BB's strategy by hand" style="display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; margin: 0 -8px; padding: 4px; background: #1b1b23; border-radius: 10px; border: 1px solid #2a2a34">
+      <sc-for list="{{cells}}" as="cell" hint-placeholder-count="169">
+        <button type="button" role="gridcell" class="cell" aria-pressed="{{cell.pressed}}" aria-label="{{cell.aria}}" onClick="{{cell.pick}}" style="background: {{cell.bg}}; color: {{cell.fg}}; opacity: {{cell.opacity}}">{{cell.label}}</button>
+      </sc-for>
+    </div>
+    <p style="margin: 0; font-size: 12px; color: #8a8899">Each square is a starting hand, colored by how often BB takes each action. Tap one for details.</p>
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <span class="label">Keep exploring</span>
+      <div style="display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px">
+        <a href="solve-1-hand.html" class="pill">If BB checks, what does BTN do?</a>
+        <a href="solve-1-hand.html" class="pill">If BB bets small</a>
+        <a href="solve-2-board.html" class="pill">Deal a turn</a>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="solve-1-hand.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Solve</a>
+    <a class="tab" href="ranges.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Ranges</a>
+    <a class="tab" href="library.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>Library</a>
+    <a class="tab" href="#drill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>Drill</a>
+  </nav>
+
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ true }}">
+    <div class="scrim">
+      <section class="sheet" role="dialog" aria-label="Hand details">
+        <span class="handle" aria-hidden="true"></span>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start">
+          <div>
+            <p style="margin: 0; font-size: 30px; font-weight: 750; color: #f4f3f8; line-height: 1.1">{{sel.label}}</p>
+            <p style="margin: 2px 0 0; font-size: 14px; color: #c4b5fd; font-weight: 600">{{sel.category}}</p>
+            <p style="margin: 0; font-size: 12px; color: #8a8899">{{sel.combos}}</p>
+          </div>
+          <button type="button" class="iconbtn" aria-label="Close" onClick="{{close}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <sc-if value="{{sel.inRange}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{sel.rows}}" as="row" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <span style="display: flex; justify-content: space-between; font-size: 14px; color: #f4f3f8"><span>{{row.label}}</span><span style="font-weight: 700; font-variant-numeric: tabular-nums">{{row.pctText}}</span></span>
+                <span style="height: 8px; border-radius: 4px; background: #2b2b34; overflow: hidden; display: block"><span style="display: block; height: 100%; width: {{row.width}}; background: {{row.color}}"></span></span>
+              </div>
+            </sc-for>
+          </div>
+          <p style="margin: 0; padding: 12px; border-radius: 10px; background: #24242e; color: #f4f3f8; font-size: 14px">{{sel.advice}}</p>
+          <details>
+            <summary>Why?</summary>
+            <p style="margin: 6px 0 0; font-size: 14px">{{sel.why}}</p>
+            <p style="margin: 6px 0 0; font-size: 12px; color: #8a8899">The percentages come from the solve. This explanation is a standard rule of thumb.</p>
+          </details>
+        </sc-if>
+        <sc-if value="{{sel.outOfRange}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; font-size: 14px">BB doesn't get here with this hand. It folds or re-raises it before the flop.</p>
+        </sc-if>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+var R = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+function ix(c) { return R.indexOf(c); }
+function handAt(r, c) { if (r === c) return R[r] + R[c]; return r < c ? R[r] + R[c] + 's' : R[c] + R[r] + 'o'; }
+function buildRange(pairMin, suited, off, over) {
+  var m = {};
+  for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+    var h = handAt(r, c), w = 0;
+    if (r === c) w = r <= ix(pairMin) ? 1 : 0;
+    else if (r < c) w = suited[R[r]] && c <= ix(suited[R[r]]) ? 1 : 0;
+    else w = off[R[c]] && r <= ix(off[R[c]]) ? 1 : 0;
+    if (over[h] !== undefined) w = over[h];
+    if (w > 0) m[h] = w;
+  }
+  return m;
+}
+function combosOf(h) { return h.length === 2 ? 6 : (h[2] === 's' ? 4 : 12); }
+var BB = buildRange('2', { A: '2', K: '2', Q: '4', J: '6', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' },
+  { A: '2', K: '8', Q: '9', J: '9', T: '9' }, { AA: 0.25, KK: 0.25, QQ: 0.5, AKs: 0.25, AKo: 0.25, A5s: 0.5, A4s: 0.5 });
+var ACTIONS = [
+  { label: 'Check', color: '#f0b93d' },
+  { label: 'Bet small', color: '#f0897c' },
+  { label: 'Bet medium', color: '#e8654f' },
+  { label: 'Bet large', color: '#d4483a' }
+];
+var CATS = {
+  set: { name: 'Set: three of a kind', mix: [35, 15, 30, 20], why: 'One of the best hands on this board. Betting builds the pot while BTN still has hands that will pay.' },
+  twopair: { name: 'Two pair', mix: [40, 20, 25, 15], why: 'Very strong, but a flush could still arrive. Betting charges draws and gets paid by top pairs.' },
+  overpair: { name: 'Overpair', mix: [45, 40, 15, 0], why: 'Ahead of almost every pair BTN can have. Small bets get called by worse.' },
+  tptk: { name: 'Top pair, strong kicker', mix: [50, 35, 15, 0], why: 'Beats most hands that call a small bet. Checking sometimes keeps bluffs in and protects BB’s checks.' },
+  toppair: { name: 'Top pair, weaker kicker', mix: [65, 30, 5, 0], why: 'Good but easy to outkick, so BB mostly keeps the pot small.' },
+  underpair: { name: 'Pair below the queen', mix: [75, 25, 0, 0], why: 'Beats bluffs but loses to any queen. Checking keeps the pot small.' },
+  smallpair: { name: 'Small pocket pair', mix: [90, 10, 0, 0], why: 'Weak, with little room to improve. Check and see what BTN does.' },
+  lowpair: { name: 'Middle or bottom pair', mix: [80, 20, 0, 0], why: 'Some showdown value, but hard to bet for value.' },
+  nutdraw: { name: 'Ace high, maybe a flush draw', mix: [55, 30, 15, 0], why: 'With clubs it can make the best flush, so betting as a semi-bluff works some of the time.' },
+  straightdraw: { name: 'Straight draw', mix: [60, 25, 15, 0], why: 'Not much yet, but plenty of cards improve it.' },
+  suitedair: { name: 'High cards, maybe a draw', mix: [80, 20, 0, 0], why: 'Mostly nothing yet; the club versions sometimes bluff.' },
+  air: { name: 'High cards, no pair', mix: [95, 5, 0, 0], why: 'Missed completely and not a good bluff. Check and usually give up.' }
+};
+function classify(h) {
+  var a = h[0], b = h[1], pair = h.length === 2, suited = h[2] === 's';
+  if (pair) { if (a === 'Q' || a === '5' || a === '2') return 'set'; if (a === 'A' || a === 'K') return 'overpair'; return ix(a) < ix('5') ? 'underpair' : 'smallpair'; }
+  if (a === 'Q' || b === 'Q') { var o = a === 'Q' ? b : a; if (o === '5' || o === '2') return 'twopair'; return (o === 'A' || o === 'K') ? 'tptk' : 'toppair'; }
+  if (a === '5' && b === '2') return 'twopair';
+  if (a === '5' || b === '5' || b === '2') return 'lowpair';
+  if (suited && a === 'A') return 'nutdraw';
+  if ({ A3: 1, A4: 1, '43': 1, '64': 1, '63': 1, '74': 1 }[a + b]) return 'straightdraw';
+  return suited ? 'suitedair' : 'air';
+}
+function gradient(mix) {
+  var stops = [], at = 0;
+  for (var i = 0; i < 4; i++) { if (!mix[i]) continue; stops.push(ACTIONS[i].color + ' ' + at + '% ' + (at + mix[i]) + '%'); at += mix[i]; }
+  return stops.length === 1 ? ACTIONS[mix.indexOf(100)].color : 'linear-gradient(to right, ' + stops.join(', ') + ')';
+}
+
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'AQo' }; }
+  renderVals() {
+    var self = this, sel = this.state.sel, totals = [0, 0, 0, 0], mass = 0, cells = [];
+    for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+      (function (h) {
+        var w = BB[h] || 0;
+        if (w) {
+          var cat = CATS[classify(h)], m = combosOf(h) * w;
+          for (var i = 0; i < 4; i++) totals[i] += cat.mix[i] * m;
+          mass += m;
+          cells.push({ label: h, bg: gradient(cat.mix), fg: '#1a1030', opacity: String(0.4 + 0.6 * w), pressed: String(sel === h),
+            pick: function () { self.setState({ sel: h }); }, aria: h + ': ' + cat.name });
+        } else {
+          cells.push({ label: h, bg: '#1f1f27', fg: '#6c6a7a', opacity: '1', pressed: String(sel === h),
+            pick: function () { self.setState({ sel: h }); }, aria: h + ': not in BB’s range' });
+        }
+      })(handAt(r, c));
+    }
+    var mix = ACTIONS.map(function (a, i) {
+      var p = Math.round(totals[i] / mass);
+      return { label: a.label, color: a.color, width: p + '%', pctText: p + '%', p: p };
+    }).filter(function (a) { return a.p > 0; });
+    var info = { label: '', category: '', combos: '', inRange: false, outOfRange: false, rows: [], advice: '', why: '' };
+    if (sel) {
+      var w = BB[sel] || 0;
+      if (w) {
+        var cat = CATS[classify(sel)];
+        var order = cat.mix.map(function (p, i) { return { p: p, i: i }; }).sort(function (x, y) { return y.p - x.p; });
+        var top = ACTIONS[order[0].i].label.toLowerCase(), second = ACTIONS[order[1].i].label.toLowerCase();
+        var n = combosOf(sel) * w;
+        info = { label: sel, category: cat.name, inRange: true, outOfRange: false,
+          combos: (n % 1 ? n.toFixed(1) : n) + ' combos in BB’s range',
+          rows: cat.mix.map(function (p, i) { return { label: ACTIONS[i].label, pctText: p + '%', width: p + '%', color: ACTIONS[i].color, p: p }; }).filter(function (x) { return x.p > 0; }),
+          advice: order[0].p >= 80 ? 'Almost always ' + top + '.' : order[0].p >= 50 ? 'Usually ' + top + ', sometimes ' + second + '. Both are fine: the solver mixes so BTN can’t read BB’s hand.' : 'A close mix. Any of the top plays is fine.',
+          why: cat.why };
+      } else {
+        info = { label: sel, category: 'Not in BB’s range', combos: '0 combos', inRange: false, outOfRange: true, rows: [], advice: '', why: '' };
+      }
+    }
+    return {
+      cells: cells, mix: mix, checkPct: mix[0].p,
+      mixAria: mix.map(function (a) { return a.label + ' ' + a.pctText; }).join(', '),
+      sheetOpen: !!sel, sel: info,
+      close: function () { self.setState({ sel: null }); }
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>

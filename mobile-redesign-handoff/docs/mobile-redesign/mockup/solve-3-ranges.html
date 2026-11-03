@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Solve 3 · The ranges</title>
+<!-- Design mockup for docs/mobile-redesign.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#0d0d11}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.topbar{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:#17171e;border-bottom:1px solid #2a2a34}
+.ttl{flex:1;font-size:18px;font-weight:700;color:#f4f3f8;letter-spacing:-.01em}
+.iconbtn{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#b7b5c3;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;font:inherit}
+.iconbtn:hover{background:#24242e;color:#f4f3f8}
+.avatar{width:30px;height:30px;border-radius:50%;background:#2c2c38;color:#f4f3f8;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.tabbar{height:64px;flex:none;display:flex;background:#17171e;border-top:1px solid #2a2a34}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:#8a8899;text-decoration:none}
+.tab:hover{color:#f4f3f8}
+.tab[aria-current=page]{color:#c4b5fd}
+.actionbar{flex:none;display:flex;gap:10px;padding:10px 16px;background:#131318;border-top:1px solid #2a2a34}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:8px 18px;border-radius:12px;font:650 15px/1.25 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;border:1px solid transparent;box-sizing:border-box}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.btn-primary:hover{background:#c4b5fd;color:#1a1030}
+.btn-secondary{background:#24242e;color:#f4f3f8;border-color:#43424f}
+.btn-secondary:hover{background:#2c2c38;color:#f4f3f8}
+.seg{display:flex;padding:3px;gap:3px;background:#0f0f14;border:1px solid #2f2f3a;border-radius:12px}
+.seg-item{flex:1 1 0;min-height:40px;padding:0 6px;border:0;border-radius:9px;background:transparent;color:#b7b5c3;font:600 14px/1.2 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.seg-item[aria-pressed=true]{background:#2c2c38;color:#f4f3f8;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.chip{min-height:44px;padding:0 4px;border-radius:12px;border:1px solid #34343f;background:#1b1b23;color:#f4f3f8;font:650 14px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.chip[aria-pressed=true]{background:rgba(167,139,250,.2);border-color:#a78bfa}
+.cell{border:0;padding:0;aspect-ratio:1/1;border-radius:3px;font:650 9px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:0;letter-spacing:-.02em}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;justify-content:flex-end;z-index:5}
+.sheet{background:#1b1b23;border-radius:20px 20px 0 0;padding:8px 16px 20px;border-top:1px solid #34343f;display:flex;flex-direction:column;gap:14px}
+.handle{width:40px;height:4px;border-radius:2px;background:#55546a;margin:4px auto 0}
+button:focus-visible,a:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app" style="width:390px;margin:0 auto"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #131318; color: #b7b5c3; font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif">
+
+  <header class="topbar">
+    <span class="ttl">Solve</span>
+    <button type="button" class="iconbtn" aria-label="Start over"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"></path></svg></button>
+    <a href="account.html" class="iconbtn" aria-label="Account"><span class="avatar">P</span></a>
+  </header>
+
+  <nav aria-label="Solve steps" style="flex: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 12px 16px 10px">
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+      <a href="{{s.href}}" aria-current="{{s.current}}" style="display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: {{s.color}}; font-size: 12px; font-weight: 600"><span aria-hidden="true" style="height: 4px; border-radius: 2px; background: {{s.bar}}"></span>{{s.label}}</a>
+    </sc-for>
+  </nav>
+
+  <main style="flex: 1; overflow-y: auto; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 14px">
+    <div>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #f4f3f8; letter-spacing: -0.01em">Which hands could they have?</h1>
+      <p style="margin: 4px 0 0; font-size: 14px">Loaded from the preflop action. Tap a hand to change it, or switch to Paint to drag.</p>
+    </div>
+
+    <div class="seg" role="group" aria-label="Whose range">
+      <sc-for list="{{players}}" as="p" hint-placeholder-count="2">
+        <button type="button" class="seg-item" aria-pressed="{{p.pressed}}" onClick="{{p.pick}}" style="min-height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px"><span>{{p.name}}</span><span style="font-size: 12px; font-weight: 500; color: #8a8899">{{p.pct}}% of hands</span></button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: center">
+      <div class="seg" role="group" aria-label="Edit mode" style="flex: 1">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="2"><button type="button" class="seg-item" aria-pressed="{{m.pressed}}" onClick="{{m.pick}}">{{m.label}}</button></sc-for>
+      </div>
+      <button type="button" class="iconbtn" aria-label="Reload from the preflop action" onClick="{{reset}}" style="border: 1px solid #34343f; border-radius: 12px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4"></path></svg></button>
+    </div>
+
+    <sc-if value="{{isPaint}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div role="group" aria-label="Brush" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{brushes}}" as="b" hint-placeholder-count="5"><button type="button" class="chip" aria-pressed="{{b.pressed}}" onClick="{{b.pick}}">{{b.label}}</button></sc-for>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #8a8899">Drag across the chart to paint. The page won't scroll while Paint is on.</p>
+      </div>
+    </sc-if>
+
+    <div role="grid" aria-label="{{active}}'s range" style="display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 2px; margin: 0 -8px; padding: 4px; background: #1b1b23; border-radius: 10px; border: {{gridBorder}}">
+      <sc-for list="{{cells}}" as="cell" hint-placeholder-count="169">
+        <button type="button" role="gridcell" class="cell" aria-label="{{cell.aria}}" onClick="{{cell.pick}}" style="background: {{cell.bg}}; color: {{cell.fg}}">{{cell.label}}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; font-size: 13px">
+      <span style="color: #f4f3f8; font-variant-numeric: tabular-nums"><strong>{{combos}}</strong> combos · {{pct}}%</span>
+      <span style="display: flex; gap: 10px; color: #8a8899; font-size: 12px; align-items: center">
+        <span style="display: flex; gap: 4px; align-items: center"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 2px; background: #46b06a"></span>Always</span>
+        <span style="display: flex; gap: 4px; align-items: center"><span aria-hidden="true" style="width: 10px; height: 10px; border-radius: 2px; background: linear-gradient(to top, #46b06a 50%, #33333d 50%)"></span>Sometimes</span>
+      </span>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <a href="solve-2-board.html" class="btn btn-secondary" style="flex: 0 0 96px">Back</a>
+    <a href="solve-4-ready.html" class="btn btn-primary" style="flex: 1">Next: review &amp; solve</a>
+  </div>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="solve-1-hand.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Solve</a>
+    <a class="tab" href="ranges.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Ranges</a>
+    <a class="tab" href="library.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>Library</a>
+    <a class="tab" href="#drill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>Drill</a>
+  </nav>
+
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="scrim">
+      <section class="sheet" role="dialog" aria-label="Edit hand">
+        <span class="handle" aria-hidden="true"></span>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start">
+          <div>
+            <p style="margin: 0; font-size: 30px; font-weight: 750; color: #f4f3f8">{{sel.hand}}</p>
+            <p style="margin: 0; font-size: 13px">{{sel.desc}}</p>
+          </div>
+          <button type="button" class="iconbtn" aria-label="Close" onClick="{{close}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <p style="margin: 0; color: #f4f3f8; font-weight: 600">How often does {{active}} have this hand here?</p>
+        <div role="group" aria-label="Weight" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{weights}}" as="w" hint-placeholder-count="5"><button type="button" class="chip" aria-pressed="{{w.pressed}}" onClick="{{w.pick}}" style="min-height: 52px">{{w.label}}</button></sc-for>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: #8a8899">0% = never, 100% = every time. In-between means the player sometimes plays it another way (for example, re-raises instead of calling).</p>
+        <button type="button" class="btn btn-primary" onClick="{{close}}">Done</button>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+var R = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+function ix(c) { return R.indexOf(c); }
+function handAt(r, c) { if (r === c) return R[r] + R[c]; return r < c ? R[r] + R[c] + 's' : R[c] + R[r] + 'o'; }
+function buildRange(pairMin, suited, off, over) {
+  var m = {};
+  for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+    var h = handAt(r, c), w = 0;
+    if (r === c) w = r <= ix(pairMin) ? 1 : 0;
+    else if (r < c) w = suited[R[r]] && c <= ix(suited[R[r]]) ? 1 : 0;
+    else w = off[R[c]] && r <= ix(off[R[c]]) ? 1 : 0;
+    if (over && over[h] !== undefined) w = over[h];
+    if (w > 0) m[h] = w;
+  }
+  return m;
+}
+function combosOf(h) { return h.length === 2 ? 6 : (h[2] === 's' ? 4 : 12); }
+function kind(h) { return h.length === 2 ? 'pocket pair' : (h[2] === 's' ? 'suited' : 'offsuit'); }
+function look(w) {
+  if (!w) return { bg: '#2b2b34', fg: '#9896a6' };
+  if (w >= 1) return { bg: '#46b06a', fg: '#0f1a12' };
+  var p = Math.round(w * 100);
+  return { bg: 'linear-gradient(to top, #46b06a ' + p + '%, #3a3a46 ' + p + '%)', fg: '#f4f3f8' };
+}
+var BASE = {
+  BB: buildRange('2', { A: '2', K: '2', Q: '4', J: '6', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' },
+    { A: '2', K: '8', Q: '9', J: '9', T: '9' }, { AA: 0.25, KK: 0.25, QQ: 0.5, AKs: 0.25, AKo: 0.25, A5s: 0.5, A4s: 0.5 }),
+  BTN: buildRange('2', { A: '2', K: '2', Q: '5', J: '7', T: '6', '9': '6', '8': '6', '7': '5', '6': '5', '5': '4' },
+    { A: '2', K: '7', Q: '9', J: 'T' }, {})
+};
+
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { player: 'BB', mode: 'tap', brush: 1, edits: { BB: {}, BTN: {} }, sel: null }; }
+  range(p) {
+    var r = Object.assign({}, BASE[p]), e = this.state.edits[p];
+    for (var k in e) { if (e[k] > 0) r[k] = e[k]; else delete r[k]; }
+    return r;
+  }
+  setWeight(h, w) {
+    var edits = Object.assign({}, this.state.edits), mine = Object.assign({}, edits[this.state.player]);
+    mine[h] = w; edits[this.state.player] = mine; this.setState({ edits: edits });
+  }
+  renderVals() {
+    var self = this, st = this.state, rg = this.range(st.player), n = 0, cells = [];
+    for (var k in rg) n += combosOf(k) * rg[k];
+    for (var r = 0; r < 13; r++) for (var c = 0; c < 13; c++) {
+      (function (h) {
+        var w = rg[h] || 0, l = look(w);
+        cells.push({ label: h, bg: l.bg, fg: l.fg, aria: h + (w ? ', ' + Math.round(w * 100) + '%' : ', not in range'),
+          pick: function () {
+            if (st.mode === 'tap') self.setState({ sel: h });
+            else self.setWeight(h, w === st.brush ? 0 : st.brush);
+          } });
+      })(handAt(r, c));
+    }
+    var selW = st.sel ? (rg[st.sel] || 0) : 0;
+    return {
+      steps: [['Hand', 'Main'], ['Board', 'Board'], ['Ranges', 'RangesStep'], ['Solve', 'Ready']].map(function (x, i) {
+        return { label: x[0], href: x[1] + '.dc.html', current: i === 2 ? 'step' : 'false',
+          bar: i <= 2 ? '#a78bfa' : '#2c2c38', color: i <= 2 ? '#f4f3f8' : '#8a8899' };
+      }),
+      players: ['BB', 'BTN'].map(function (p) {
+        var r2 = self.range(p), m = 0; for (var k in r2) m += combosOf(k) * r2[k];
+        return { name: p + (p === 'BB' ? ' · acts first' : ' · acts last'), pct: (m / 1326 * 100).toFixed(1), pressed: String(st.player === p),
+          pick: function () { self.setState({ player: p, sel: null }); } };
+      }),
+      modes: [['tap', 'Tap to edit'], ['paint', 'Paint']].map(function (m) {
+        return { label: m[1], pressed: String(st.mode === m[0]), pick: function () { self.setState({ mode: m[0], sel: null }); } };
+      }),
+      isPaint: st.mode === 'paint',
+      gridBorder: st.mode === 'paint' ? '2px solid #a78bfa' : '1px solid #2a2a34',
+      brushes: [[1, '100%'], [0.75, '75%'], [0.5, '50%'], [0.25, '25%'], [0, 'Erase']].map(function (b) {
+        return { label: b[1], pressed: String(st.brush === b[0]), pick: function () { self.setState({ brush: b[0] }); } };
+      }),
+      reset: function () { var e = Object.assign({}, st.edits); e[st.player] = {}; self.setState({ edits: e }); },
+      cells: cells, active: st.player,
+      combos: Math.round(n), pct: (n / 1326 * 100).toFixed(1),
+      sheetOpen: !!st.sel,
+      sel: { hand: st.sel || '', desc: st.sel ? kind(st.sel) + ' · ' + combosOf(st.sel) + ' combos' : '' },
+      weights: [0, 0.25, 0.5, 0.75, 1].map(function (w) {
+        return { label: Math.round(w * 100) + '%', pressed: String(selW === w), pick: function () { self.setWeight(st.sel, w); } };
+      }),
+      close: function () { self.setState({ sel: null }); }
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>
