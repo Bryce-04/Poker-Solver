@@ -6,6 +6,37 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Sheets closing as soon as they open, in development
+
+**Status:** proposed.
+
+**Context.** Reported after the mobile redesign merged: on the phone Solve
+board step, tapping a flop slot showed the card picker for a moment, then it
+vanished. Only in development (`pnpm dev:web`), so production screenshots
+never showed it.
+
+**Cause.** React's StrictMode mounts a component, unmounts it and mounts it
+again in development. `BottomSheet` pushes a history entry on open (so Back
+closes it) and goes Back over it on close. So the sequence was push, Back,
+push. Reproduced in real Chrome: the queued Back is resolved to the entry
+*before both* pushes. The reopened sheet saw a pop to a non-sheet entry, read
+it as the user pressing Back, and closed. jsdom resolves it differently,
+which is why the tests never caught it. Phase 1's guard (ignore pops that
+land on a sheet entry) assumed the Back would land between the two pushes.
+
+**Decision.** A closing sheet queues its Back for a moment (`setTimeout 0`)
+instead of running it at once. A sheet that opens in that moment cancels the
+Back and reuses the existing entry, without pushing. This also covers the card
+picker moving straight on to the next card (one sheet closes, the next
+opens), which now keeps a single history entry instead of pushing and popping.
+
+**Checked.** A development build in Chrome, before and after: before, no sheet;
+after, the picker stays open and picks K♠ then Q♥ through to "Pick the 3rd flop
+card". A new test covers a sheet reopening at once (no extra push, no Back).
+All 372 tests pass.
+
+---
+
 ## 2026-11-03 — Mobile redesign Phase 5: the Library on phones
 
 **Status:** proposed.
@@ -263,8 +294,9 @@ tab remember its state.
 - **Back closes a sheet first**: an open `BottomSheet` pushes a history entry
   (keeping React Router's own state in it), and popping it closes the sheet;
   closing another way goes back over the entry. Pops that land on another
-  sheet entry are ignored, which is what makes StrictMode's double mount in
-  development safe.
+  sheet entry are ignored. (This was meant to make StrictMode's double mount
+  in development safe, and wasn't: see the 2026-11-03 "Sheets closing as soon
+  as they open" entry.)
 - **`SegmentedControl` under 1024px** is now the mobile mockup's touch-sized
   pill (40px items); desktop rules unchanged. It's used on phones by the
   Ranges mode switch and the account sheet.

@@ -1,68 +1,78 @@
 # apps/web
 
-The React + TypeScript + Vite frontend. Stage 2's manual hand builder lives
-here: the button/dropdown **spot builder** and the **13×13 range grid**. See
+The React + TypeScript + Vite frontend. See
 [`../../docs/plan.md`](../../docs/plan.md) for the roadmap and where this fits.
 
-**Status:** routed into four destinations — Solve, Ranges, Library, Drill
+**Status:** four destinations — **Solve**, **Ranges**, **Library**, **Drill**
 (`react-router-dom`, `BrowserRouter` in `App.tsx`; nav items in
-`lib/navigation.ts`). The old routes redirect: `/` → `/solve`,
-`/saved` → `/library`, `/type-in` and `/import` →
-`/ranges?mode=type|paste`. See `## Desktop layout` below for what changes
-at 1024px and wider. The spot builder and range grid are wired end to
-end to `apps/api`'s reference-chart lookup; the range grid's
-weighted-brush / drag-paint / keyboard selection and weight shading are
-done, and the app has a design-token visual pass (light + dark). Two
-more entry paths converge on the same `lib/spot.ts` shapes: Stage 3's
-rule-based text parser (`lib/parseSpotText.ts`) and Stage 4's hand-history
-paste import (`lib/parseHandHistory.ts`, one format). The range grid is
-mounted **editable** everywhere a matched chart is shown (Builder,
-Type-in, Import) — adjust weights before "Save this spot" persists them,
-not a read-only display. Saved spots (the Saved screen, and the save
-button on the three entry screens) is wired to `apps/api`'s
-`POST`/`GET /spots`. Stage 6 auth (see `## Auth` below) works for saved
-spots: Supabase sign-in, session state, a "sign in to save spots" gate
-on all three save buttons, and `apps/api` verifying the token and
-returning only the signed-in user's own spots. **Solve** (`pages/
-SolvePage.tsx`) is Stage 5's new screen: a real MCCFR solve via `apps/api`'s
-`POST /spots/solve` — both players' ranges, a board (click cards via
-`components/CardPicker/CardPicker.tsx`, or type them via `lib/cards.ts` —
-see `docs/decisions.md`), and results as a color-coded strategy chart
-(`components/StrategyGrid/StrategyGrid.tsx`), not a single-weight range.
-Reaching a decision point now has two modes: a real click-through hand
-builder (`lib/handBuilder.ts`, `components/StreetActions/
-StreetActions.tsx` — the default) or pasting a hand history
-(`lib/parseHandHistory.ts`) — see the `## SolvePage` section below for
-both, and `docs/decisions.md`'s 2026-10-07 entries for the design.
+`lib/navigation.ts`). The old routes redirect: `/` → `/solve` (on phones, the
+last tab used), `/saved` → `/library`, `/type-in` and `/import` →
+`/ranges?mode=type|paste`. Every screen has two layouts, one for phones and
+tablets and one for desktop (see `## Two layouts`), over the same state and
+logic.
 
-## Desktop layout
+- **Solve** runs a real solve through `apps/api`'s `POST /spots/solve`: both
+  players' ranges, a board, and the hand so far (clicked through with real
+  bet sizes, or read from a pasted hand history), with the result as a
+  color-coded strategy chart. See `## Solve`.
+- **Ranges** shows the standard preflop chart for a spot described three ways
+  (pick it, type it, or paste a hand history), editable, savable, and one tap
+  from solving a flop. See `## Ranges`.
+- **Library** lists the signed-in user's saved spots, with open / rename /
+  duplicate / delete. Saving and listing need Supabase sign-in (see `## Auth`).
+- **Drill** is a full-screen practice game over a pre-solved deck. See
+  `## Poker Drill`.
 
-At **1024px and wider** the app has its own layout, built from the agreed
-spec and mockup in `docs/desktop-redesign.md`. **Under 1024px nothing
-changes visually**, which covers phones and the Capacitor builds. Phones
-keep the original screens: the Builder / Type in / Import pages under a
-mode switch on Ranges, the stacked Solve steps, and the Saved list.
+All three ways of describing a preflop spot converge on `lib/spot.ts`'s
+`Spot` builders: the Pick controls, Stage 3's rule-based text parser
+(`lib/parseSpotText.ts`) and Stage 4's hand-history import
+(`lib/parseHandHistory.ts`, one format).
 
-- **Which layout renders** is `lib/useIsDesktop.ts` (a `min-width: 1024px`
-  media query). jsdom has no `matchMedia`, so tests see the phone layout
-  unless they stub it, as the desktop test files do.
-- **Shell:** `components/Sidebar` on the left with nav, a guide card, and
-  `AuthStatus variant="sidebar"`; `components/PageHeader` across the top
-  of each page.
-- **Ranges:** `pages/RangesWorkspace.tsx`, a rail plus the chart. The chart
-  loads as the spot changes, with no submit button.
+## Two layouts
+
+Which one renders is `lib/useIsDesktop.ts` (a `min-width: 1024px` media
+query), not CSS. jsdom has no `matchMedia`, so tests see the phone layout
+unless they stub it, as the desktop test files do. Each page keeps its state
+in one place (a hook or the URL), so resizing across the breakpoint keeps a
+half-built hand.
+
+**Desktop (>= 1024px)**, built from `docs/desktop-redesign.md`:
+- **Shell:** `components/Sidebar` (nav, a guide card, `AuthStatus
+  variant="sidebar"`) and `components/PageHeader` across the top of each page.
 - **Solve:** `pages/solve/SolveWorkspace.tsx`, setup and result views.
-  `pages/solve/useSolveSetup.ts` holds all of Solve's state, shared with
-  the phone layout, so resizing keeps a half-built hand.
-- **Library:** `pages/library/LibraryWorkspace.tsx`, a table plus a
-  preview, with open / rename / duplicate / delete.
-- **Shared fetch-and-save:** `lib/useReferenceChart.ts` is the logic every
-  chart page uses, on both layouts.
-- **Styling:** every desktop-only rule sits inside
-  `@media (min-width: 1024px)`. `src/desktop.css` holds the button roles
-  (`.btn-primary` / `-secondary` / `-ghost` / `-danger`, one primary per
-  screen). Give every new button a role class: on desktop a bare
-  `<button>` in the shell is no longer accent-filled.
+- **Ranges:** `pages/RangesWorkspace.tsx`, a rail plus the chart.
+- **Library:** `pages/library/LibraryWorkspace.tsx`, a table plus a preview.
+- Every desktop-only rule sits inside `@media (min-width: 1024px)`.
+  `src/desktop.css` holds the button roles (`.btn-primary` / `-secondary` /
+  `-ghost` / `-danger`, one primary per screen). Give every new desktop
+  button a role class: a bare `<button>` in the shell is no longer
+  accent-filled there.
+
+**Phones and tablets (< 1024px)**, built from `docs/mobile-redesign.md`:
+- **Shell** (`components/mobile/`): a sticky `TopBar` (page title, the page's
+  actions via `<TopBarActions>`, an optional back arrow via `<TopBarTitle>`,
+  and the account button), a fixed `TabBar`, and the `AccountSheet`. The page
+  sits in a column at most 560px wide. The top bar covers the status bar and
+  the tab bar the gesture bar; read safe-area insets as `--safe-top` etc.
+  (`index.css`), which prefer Capacitor's injected values over `env()`.
+- **Tabs remember where you were**: each returns to the URL it was left on,
+  and Solve stays mounted (hidden) while another tab or the Drill shows, so a
+  half-built setup or a running solve survives (`SolveKeepAlive` in
+  `App.tsx`).
+- **Solve:** `pages/solve/phone/`, four steps plus a result screen.
+- **Ranges:** `pages/ranges/RangesPhone.tsx`.
+- **Library:** `pages/library/LibraryPhone.tsx`, cards plus a detail sheet.
+- **Shared phone components:** `BottomSheet` (focus trap, Esc, and Android /
+  browser Back closes it first), `ChipGroup`, `ActionBar` (the pinned bottom
+  bar, whose disabled button says why), `StepProgress`, `RangeEditor`.
+  `lib/mobileShell.ts` holds what pages share with the shell
+  (`useOpenAccountSheet()`, the Solve tab's dot, the top-bar slots).
+
+**Shared by both layouts:** `pages/solve/useSolveSetup.ts` (all of Solve's
+state and actions), `lib/useReferenceChart.ts` (fetch a chart, edit its range,
+save it), `lib/rangesSpot.ts` (Ranges' spot logic and auto-load),
+`pages/library/useLibrary.ts` (the Library's data and actions), and
+`pages/solve/solveText.ts` (wording).
 
 ## Commands
 
@@ -81,49 +91,60 @@ pnpm --filter web test       # vitest
 ```
 src/
   main.tsx                    entry — mounts <App> in StrictMode
-  App.tsx                     router shell: phone header or desktop sidebar + <Routes>,
-                              old-route redirects (BrowserRouter lives here, not
-                              main.tsx — see docs/decisions.md)
+  App.tsx                     router shell: phone top bar + tab bar, or desktop sidebar,
+                              + <Routes>; SolveKeepAlive; old-route redirects
+                              (BrowserRouter lives here, not main.tsx — see docs/decisions.md)
   index.css                   design tokens (--*), light/dark via
-                              prefers-color-scheme, base element styling
+                              prefers-color-scheme, base element styling, safe-area insets
   desktop.css                 desktop-only (>= 1024px) button roles, section labels
-  App.css                     shell + nav styling (phone header; desktop shell + page header)
+  App.css                     shell layout (phone column; desktop shell + page header)
   pages/
-    SolvePage.tsx              "/solve" — calls useSolveSetup once; phone markup
-                              (SolvePhone) or SolveWorkspace on desktop
-    solve/                    desktop Solve: SolveWorkspace, ActionTimeline, BoardSlots,
-                              StrategyResult, solveText.ts (wording), useSolveSetup.ts
-    RangesPage.tsx             "/ranges" — RangesWorkspace on desktop; on phones the
-                              three pages below under a Pick / Type it / Hand history switch
-    RangesWorkspace.tsx        desktop Ranges: rail + chart, auto-loading
-    BuilderPage.tsx            phone Ranges "Pick" — wraps SpotBuilder
-    TypeInPage.tsx             phone Ranges "Type it" — Stage 3's plain-language entry
-    ImportPage.tsx             phone Ranges "Hand history" — Stage 4's paste entry
-    LibraryPage.tsx            "/library" — LibraryWorkspace on desktop, SavedSpotsPage on phones
-    library/                  desktop Library: table, preview, open/rename/duplicate/delete
-    SavedSpotsPage.tsx         phone Library — the original saved-spots list
+    SolvePage.tsx              "/solve" — calls useSolveSetup once, then the phone flow
+                              or SolveWorkspace
+    solve/                    useSolveSetup.ts (state), solveText.ts (wording),
+                              SolveProblem, useAutoLoadRanges; desktop: SolveWorkspace,
+                              ActionTimeline, BoardSlots, StrategyResult
+    solve/phone/              phone Solve: SolvePhone (routes ?step=), HandStep,
+                              BoardStep, RangesStep, ReadyStep, ResultStep,
+                              phoneSteps.ts (pure logic)
+    RangesPage.tsx             "/ranges" — picks RangesWorkspace or ranges/RangesPhone
+    RangesWorkspace.tsx        desktop Ranges: rail + chart
+    ranges/                   phone Ranges (RangesPhone), ChartProblem (shared messages)
+    LibraryPage.tsx            "/library" — picks LibraryWorkspace or LibraryPhone
+    library/                  useLibrary (shared), LibraryWorkspace (desktop),
+                              LibraryPhone (phone)
     DrillPage.tsx              "/drill" — the Poker Drill; full screen, rendered
                               outside the shell (see ## Poker Drill)
   components/
+    mobile/                   phone shell and pieces: TopBar, TabBar, AccountSheet,
+                              BottomSheet, ChipGroup, ActionBar, StepProgress,
+                              RangeEditor, TopBarActions, TopBarTitle; mobile.css
     Sidebar/                  desktop nav sidebar (nav, guide card, account row)
     PageHeader/               desktop page title bar with page actions
+    AuthStatus/               desktop sign-in (the sidebar's account row and form)
+    NavIcon/                  the four nav icons (sidebar and tab bar)
     SegmentedControl/         one row of mutually exclusive choices (its own CSS, both widths)
     MiniRange/                a label-less 13×13 range thumbnail
-    SpotBuilder/              the spot builder form, reused by BuilderPage
     RangeGrid/                the 13×13 starting-hand grid
-    CardPicker/               click-to-toggle board-card grid (SolvePage)
-    StrategyGrid/             13×13 color-coded solve-result chart (SolvePage)
-    StreetActions/            one street's action log + "add an action"
-                              controls (SolvePage's click-through builder)
+    CardPicker/               click-to-toggle board-card grid (desktop Solve's board slots)
+    StrategyGrid/             13×13 color-coded solve-result chart
+    StreetActions/            one street's action log + controls (older; desktop uses
+                              ActionTimeline)
     PlayingCard/              a face-up card ("Ah"); the drill forces white faces
+    SpotBuilder/              SpotBuilder.css only: shared spot-builder__* classes
+                              (status blocks, fields) used across the app
     ErrorBoundary/            wraps every route (App.tsx): a render crash shows a
                               recoverable message, not a blank screen
   lib/
     api.ts                    fetch wrapper: fetchReferenceStrategy, saveSpot,
                               listSpots, renameSpot, deleteSpot, solveSpot, ...
+    auth.tsx, supabase.ts     Supabase session state (useAuth) and client
+    useSignInForm.ts          email/password sign-in and sign-up (AuthStatus, AccountSheet)
     useIsDesktop.ts           the 1024px breakpoint, for layout switches CSS can't do
+    mobileShell.ts            what phone pages share with the shell (contexts, hooks)
     navigation.ts             the four nav destinations + desktop page titles
     useReferenceChart.ts      fetch a chart, edit its range, save it (every chart page)
+    rangesSpot.ts             Ranges' Pick logic, chart titles, debounced auto-load
     solvePrefill.ts           route state into Solve: Ranges' "solve from here", or a
                               Library spot (seedFromSpot rebuilds a saved setup)
     spotText.ts               a saved spot in words (summarize, displayName, board text)
@@ -131,14 +152,16 @@ src/
                               helpers every entry path converges on
     parseSpotText.ts           Stage 3's rule-based parser (two phrasings, plus synonyms)
     parseHandHistory.ts        Stage 4's rule-based hand-history parser (one format),
-                              plus parseHandHistoryToPostflopSetup (SolvePage's
+                              plus parseHandHistoryToPostflopSetup (Solve's
                               "from a hand history" setup mode)
-    handBuilder.ts             SolvePage's click-through setup mode: walks
+    handBuilder.ts             Solve's click-through setup: walks
                               preflop -> flop -> turn -> river from real
                               actions, deriving pot_bb/effective_stack_bb
                               instead of them being typed in
-    cards.ts                   parseBoardText / boardFromCards — Stage 5's board
-                              validation (SolvePage), typed or picked
+    cards.ts                   parseBoardText / boardFromCards — board validation
+    chaining.ts                narrowing ranges by an earlier street's action
+    rangeCombos.ts             hand labels <-> specific combos, weights, combo counts
+    strategySummary.ts         a strategy's overall mix and action colors/labels
     drill.ts                   Poker Drill logic, no React: deck types, gradeAction,
                               legal-action split, bb/% amounts (mirrors the
                               solver's bet sizing), labels, shuffle
@@ -200,26 +223,24 @@ from the team's Supabase project, copied into a git-ignored
 `useAuth()` track session state (`loading` / `signed-out` / `signed-in`),
 mounted in `App.tsx` around `BrowserRouter`; `getAccessToken()` is a
 plain async export `lib/api.ts` calls directly, since that module isn't
-a component and can't use the hook. `components/AuthStatus/AuthStatus.tsx`
-is the phone header's email/password sign-in (and sign-up, same form,
-toggled) plus "Signed in as X / Sign out" UI. On desktop the same component
-renders in the sidebar (`variant="sidebar"`): an initial avatar, the email
-and a ghost Sign out, or a "Sign in" button that opens the form. There's no
-magic link, to avoid a redirect URL in the Supabase dashboard and native
-deep-link handling this Capacitor app doesn't have.
+a component and can't use the hook. Email/password sign-in and sign-up live
+in `lib/useSignInForm.ts`, shared by the two places you sign in: on desktop
+`components/AuthStatus` in the sidebar (an initial avatar, the email and a
+ghost Sign out, or a "Sign in" button that opens the form), and on phones
+`components/mobile/AccountSheet`, opened from the top bar's account button.
+There's no magic link, to avoid a redirect URL in the Supabase dashboard and
+native deep-link handling this Capacitor app doesn't have.
 
-`saveSpot`/`listSpots` (`lib/api.ts`) attach
+`saveSpot`/`listSpots`/`renameSpot`/`deleteSpot` (`lib/api.ts`) attach
 `Authorization: Bearer <token>` when a session exists, omitted (not
 blocked client-side) otherwise. `apps/api` verifies it and returns 401
 without it (`docs/decisions.md`'s 2026-09-30 and 2026-10-06 entries).
-Separately,
-every save button (the three phone entry screens, desktop Ranges' "Save to
-Library", desktop Solve's "Save spot") shows a sign-in prompt and skips the
-API call entirely when signed out (`lib/useReferenceChart.ts` and
-`SolveWorkspace` check `useAuth()`). `SavedSpotsPage` and the desktop Library
-show only a signed-out notice when signed out (neither calls `GET /spots`,
-which requires sign-in), and fetch the signed-in user's own spots,
-refetching when the account changes.
+Separately, every Save skips the API call entirely when signed out: on
+desktop it shows a sign-in prompt, and on phones it opens the account sheet
+(`useOpenAccountSheet()`, null on desktop). Both Library layouts show only a
+signed-out screen when signed out (neither calls `GET /spots`, which requires
+sign-in), and fetch the signed-in user's own spots, refetching when the
+account changes (`pages/library/useLibrary.ts`).
 
 ## Android (Capacitor)
 
@@ -259,53 +280,61 @@ Capabilities. TestFlight/App Store distribution needs the paid Apple
 Developer Program. Icons/splash come from `apps/web/assets/` via
 `npx capacitor-assets generate --ios`.
 
-## SpotBuilder
+## Ranges
 
-`components/SpotBuilder/SpotBuilder.tsx` (mounted by `pages/BuilderPage.tsx`)
-assembles a `Spot` client-side via `lib/spot.ts`'s `buildOpenSpot`/
-`buildVsRaiseSpot` — shared with `pages/TypeInPage.tsx`'s parser so both
-entry paths converge on the same `Spot` construction rather than each
-inlining their own. On a match, a "Save this spot" button calls
-`saveSpot()` and shows an inline saved/error status; `pages/TypeInPage.tsx`
-has the identical affordance. Fields:
+`/ranges` shows the standard preflop chart for a spot, described one of three
+ways (`?mode=`; none means Pick):
 
-- **Position** and **effective stack (bb)** inputs. The seat list is 6-max
-  (no UTG1/LJ — full-ring, no chart), and drops BB when the situation is an
-  unopened pot (BB is never first to act); switching back to "unopened"
-  with BB selected snaps the seat to BTN so the form never submits a spot
-  the schema rejects.
-- A two-option **situation picker** — an unopened pot (opening range), or
-  hero facing a single preflop raise from one seat (defending range). These
-  are the only shapes Stage 2's reference charts answer; the freeform
-  action-list editor was cut for this in `0226f78`. Raise size doesn't
-  affect the match, so the UI doesn't ask for it.
+- **Pick:** your seat, whether someone raised before you, who raised, and the
+  stack (about 40bb or 100bb). Impossible combinations are derived away
+  (`lib/rangesSpot.ts`'s `pickSpot`): BB is never first in, UTG never faces an
+  earlier raise, and the raiser acts before you.
+- **Type it:** Stage 3's rule-based parser (`lib/parseSpotText.ts`), with
+  example phrases.
+- **Hand history:** Stage 4's import (`lib/parseHandHistory.ts`), stopping at
+  your first decision.
 
-Picking a well-formed spot with no chart yet (e.g. HJ defending, or a stack
-between the ~40bb / ~100bb buckets) is a normal `no-match`, and that status
-block enumerates the current coverage. The matcher is owned by
-`apps/api/app/reference_charts.py` — the client does not re-implement it.
+All three converge on `lib/spot.ts`'s builders. There's no "get chart" button:
+the chart loads whenever the described spot changes (debounced 250ms; only the
+latest response is applied, `lib/useReferenceChart.ts`). The chart's range is
+editable before saving, can be reset to the chart, and "Solve a flop from
+here" takes it into Solve (`lib/solvePrefill.ts`). A chart opened from the
+Library shows its saved range and keeps its name.
 
-Each `ReferenceStrategyResult` `kind` renders its own status block; on `match`
-the returned range is shown read-only through `RangeGrid`.
+On phones (`pages/ranges/RangesPhone.tsx`) Pick's choices and the typed phrase
+live in the URL (`seat`, `before`, `raiser`, `stack`, `text`), so the tab comes
+back as it was left; Save opens a name sheet. On desktop
+(`pages/RangesWorkspace.tsx`) it's a rail plus the chart with a stats and save
+card.
 
-**Not here:** a board card picker. `pages/SolvePage.tsx` (Stage 5) is the
-screen that needed one — see `## SolvePage` below for the
-`CardPicker`/typed-text pair it ended up with.
+A well-formed spot with no chart yet (e.g. HJ defending, or a stack between
+the ~40bb / ~100bb buckets) is a normal `no-match`, and the message
+(`pages/ranges/ChartProblem.tsx`) lists the current coverage. The matcher is
+owned by `apps/api/app/reference_charts.py`; the client doesn't re-implement it.
 
-## SolvePage
+## Solve
 
-`pages/SolvePage.tsx` is Stage 5's screen: a real MCCFR solve
-(`apps/api`'s `POST /spots/solve`) instead of a static reference chart.
-This section describes the **phone layout**, whose behavior is unchanged.
-Its state now lives in `pages/solve/useSolveSetup.ts`. The desktop layout
-(`pages/solve/SolveWorkspace.tsx`, see `## Desktop layout`) uses the same
-state with a different presentation: an action timeline, board slots, a
-"Ready to solve" checklist, Ranges / Strategy tabs, auto-loaded ranges,
-Keep exploring, and per-hand categories with a "Why?" on flop solves.
-It's the first screen needing *two* ranges and a board, so it departs
-from the other entry paths in a few ways:
+`pages/SolvePage.tsx` is Stage 5's screen: a real solve (`apps/api`'s
+`POST /spots/solve`) instead of a static reference chart. All of its state is
+`pages/solve/useSolveSetup.ts`, called once in `SolvePage`; the two layouts
+are views over it:
 
-- **Two ways to reach a decision point**, picked via a radio toggle:
+- **Phones** (`pages/solve/phone/`): four steps, Hand → Board → Ranges →
+  Solve, then a result screen. The step is in the URL
+  (`/solve?step=hand|board|ranges|ready|result`, one history entry each, so
+  Android back walks back through them). Big buttons for each action, a raise
+  sheet, a rank-then-suit card sheet, tap-or-paint range editing, a Solving
+  screen with Cancel, and a result with a hand sheet and Keep exploring.
+- **Desktop** (`pages/solve/SolveWorkspace.tsx`): an action timeline, board
+  slots, a "Ready to solve" checklist, Ranges / Strategy tabs, and a result
+  view with an accuracy card and Keep exploring.
+
+Ranges load on their own once preflop closes (`useAutoLoadRanges`): from the
+preflop line when it's charted (`POST /spots/preflop-ranges`), otherwise each
+seat's typical range. On flop solves, each hand also gets a category and a
+"Why?". The design points that hold for both layouts:
+
+- **Two ways to reach a decision point**:
   - **Click through the hand (the default).** `lib/handBuilder.ts`
     walks preflop -> flop -> turn -> river as real actions with real bb
     sizes (not the solver's fixed menu — that's a backend-only
@@ -334,56 +363,30 @@ from the other entry paths in a few ways:
     what already happened rather than re-solving every earlier street
     (see `docs/decisions.md`'s entry on why that's cheap and stays out
     of real multi-street solving's scope). Shares header/seat parsing
-    with the original Stage 4 `parseHandHistory` (unchanged, still
-    backs `ImportPage`) but does a different job. Kept as a genuinely
+    with the original Stage 4 `parseHandHistory` (which backs Ranges'
+    Hand history mode) but does a different job. Kept as a genuinely
     separate mode rather than merged into the click-through builder's
     state — a pasted hand history already tells you pot/stack/board
     directly.
 
-  Neither mode touches either range: a hand history doesn't reveal
-  villain's actual cards, and the click-through builder's job is pot/
-  stack bookkeeping, not range reconstruction — both still come from
-  the reference-range buttons below or manual painting.
-- **Two positions, two `RangeGrid`s.** `apps/web/src/lib/spot.ts`'s
-  helpers only ever fill in hero's position/range; this screen defines
-  its own convention instead (matching `apps/api/app/solve.py`'s
-  contract): the first position picker is out-of-position/first-to-act
-  this street, the second is in position, and each gets its own
-  editable `RangeGrid` — submit is disabled until both have at least
-  one hand selected. A "Load \<position\>'s opening range" button next to
-  each grid calls `fetchReferenceStrategy`/`buildOpenSpot` (the same
-  Stage 2 chart data) to seed a real starting range instead of an empty
-  grid — an approximate preflop-opening starting point to tweak, not an
-  accurate postflop range; positions with no opening chart (BB, UTG1,
-  LJ) say so plainly rather than doing nothing.
-- **A board, two input modes.** A radio toggle switches between
-  `components/CardPicker/CardPicker.tsx` (click up to 5 cards on a
-  4-suit × 13-rank grid — the default) and `lib/cards.ts`'s
-  `parseBoardText` (type space-separated cards, `"Ks Qh 9d"`, for
-  pasting/power users). Both converge on the same `ParseBoardResult`
-  (`parseBoardText`/`boardFromCards`), so everything past that point —
-  `canSubmit`, the street shown, the submitted `Spot` — has one code
-  path regardless of which mode filled it in; 3/4/5 cards selects
-  flop/turn/river automatically, there's no separate street picker.
-  Switching modes doesn't clear the other mode's input. See
-  `docs/decisions.md`'s 2026-10-06 entries for why the text field
-  shipped first and the picker came as an addition, not a replacement.
-- **The "from a hand history" mode keeps its original "already
-  checked" toggle**, not a full action-history editor — it only ever
-  seeds a single check, even though `solve.py`'s contract no longer
-  requires that (generalized to accept any non-terminal action prefix,
-  with any bet/raise bucketed onto the bet-size menu — now **Bet Small
-  25% / Bet Medium 75% / Bet Large 125% / All-in**, was 33%/66%/100% —
-  see `docs/decisions.md`'s 2026-10-07 entry). The click-through mode
-  doesn't have this limitation: it submits whatever real action
-  sequence was actually built on the target street.
+  Neither mode sets a range: a hand history doesn't reveal villain's
+  cards, and the click-through builder's job is pot/stack bookkeeping.
+  Ranges come from the auto-load above, or are edited by hand.
+- **Two positions, two ranges.** The first seat is out of position (acts
+  first postflop), the second in position, matching
+  `apps/api/app/solve.py`'s contract; both ranges need hands before a
+  solve.
+- **A board, picked or typed.** Both converge on `lib/cards.ts`'s
+  `ParseBoardResult`, so everything past that point has one code path; 3, 4
+  or 5 cards selects flop, turn or river, with no separate street picker.
 - **Results are a 13×13 chart** (`components/StrategyGrid/StrategyGrid.tsx`),
   not a table — each cell is a left-to-right gradient of that hand's
   action mix (fold cool-colored, check/call gold, bet sizes a deepening
-  red ramp, all-in darkest), tap a cell for its exact breakdown below the
-  grid. Reuses `RangeGrid.css`'s grid/cell classes directly (same
-  shrink-to-fit-on-mobile sizing) with the fill set per-cell via an inline
-  gradient instead of the weight-based `color-mix`. Unlike every
+  red ramp, all-in darkest). Tap or click a cell for that hand's panel
+  (`StrategyResult.tsx`'s `HandPanel`: its mix as bars, advice, "Why?" and
+  the suit view), beside the chart on desktop and in a sheet on phones.
+  Reuses `RangeGrid.css`'s grid/cell classes directly with the fill set
+  per-cell via an inline gradient instead of the weight-based `color-mix`. Unlike every
   `ReferenceStrategyResult`/`HandRange` elsewhere in the app (one weight
   per hand), this is a genuine distribution over multiple actions per
   hand — `LiveSolveResponse.strategy` in `lib/api.ts`. A hand missing from
@@ -393,8 +396,9 @@ from the other entry paths in a few ways:
 - **A solve takes a few seconds, more for a wide-range flop** — it trains
   server-side until the result is within 0.5% of the pot of a true
   equilibrium, not a lookup. The loading state says so explicitly rather
-  than looking stuck, and the result shows the precision actually
-  reached (`LiveSolveResponse.exploitability_pct`, optional on the client
+  than looking stuck (the API reports no progress, so no percentage is
+  shown), Cancel stops waiting (the server still finishes; the result is
+  dropped), and the result shows the precision actually reached (`LiveSolveResponse.exploitability_pct`, optional on the client
   because an older deployed backend doesn't send it).
 
 **Precision, now measured rather than caveated:** until 2026-10-07 the
@@ -411,14 +415,16 @@ fields (e.g. `bucketed_actions` defaults to `[]`), and
 response shape shows "Something went wrong / Try again" instead of the
 blank screen a missing field once caused on a real phone.
 
-Reuses `SpotBuilder.css`'s `spot-builder__*` classes for every generic
-piece (fields, status blocks, buttons), same as `TypeInPage`/`ImportPage`.
+Status blocks (errors, notices) reuse `SpotBuilder.css`'s `spot-builder__*`
+classes, as other screens do.
 
 ## Poker Drill
 
 `pages/DrillPage.tsx` at `/drill`. A practice game, not a page of the app:
 `App.tsx` routes `/drill` to it directly, outside `Shell`, so there's no
-header or nav — an X (top-left) back to `/` and a settings cog (top-right). It
+header or nav — an X (top-left) back to `/` (on phones that's the last tab
+used; the phone shell stays mounted under the Drill) and a settings cog
+(top-right). It
 has three phases: a start screen (best score kept in `localStorage` under
 `drill.bestScore`), 15 hands, then a summary of the hands missed.
 
@@ -503,8 +509,16 @@ recommended for touch targets, but the whole chart stays visible and
 nothing fights the drag-to-paint gesture. Cell label font-size is a
 `clamp()` so it scales down with the cells instead of overflowing.
 
-Read-only mode (Stage 2's reference-chart display) renders the same shaded
-grid as static cells with none of the interaction wired up.
+Read-only mode renders the same shaded grid as static cells with none of the
+interaction wired up.
+
+**Phone modes** (`mode="tap" | "paint"`, used through
+`components/mobile/RangeEditor`): the grid hides its own toolbar, and the
+page draws the controls. In `"tap"` a tap calls `onCellTap` (to open a
+hand-weight sheet), edits nothing itself, and the page scrolls normally over
+the grid. In `"paint"` dragging writes `brush` (0 erases) and only then does
+the grid take the drag (`touch-action: none`). Leave `mode` unset everywhere
+else; desktop never sets it.
 
 ## Styling
 
@@ -521,6 +535,12 @@ colours; a few older aliases (`--text-h`, `--code-bg`, `--accent-bg`) are
 kept pointing at their replacements. The desktop redesign added
 `--sidebar-bg`, `--divider`, `--surface-hover`, `--surface-3`,
 `--success-text`, `--warning` / `--warning-subtle` and `--card-face` /
-`--card-ink` / `--card-red` (light and dark). Desktop-only rules always
-sit inside `@media (min-width: 1024px)`, so phones are untouched; see
-`## Desktop layout`.
+`--card-ink` / `--card-red`; the mobile redesign added `--bar-bg`,
+`--nav-active`, `--chip-border`, `--chip-border-hover`, `--chip-selected` and
+`--scrim` (all light and dark). Desktop-only rules sit inside
+`@media (min-width: 1024px)`. Phone pages build from
+`components/mobile/mobile.css`: buttons (`.m-btn` with `--primary` /
+`--secondary` / `--ghost`, `.icon-button`) and page blocks (`.m-step`,
+`.m-section`, `.m-label`, `.m-note`, `.m-field`, `.m-card`, `.m-link`,
+`.m-pills`). Phone chips are `.m-chip`, never `.chip`: `DrillPage.css` has a
+global `.chip` of its own. See `## Two layouts`.
