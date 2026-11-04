@@ -56,6 +56,19 @@ describe("Opening-hands lesson", () => {
   });
 });
 
+describe("Continuation-bet lesson", () => {
+  it("shows the flop and your hand, and grades against the solver's frequency", async () => {
+    const user = userEvent.setup();
+    renderTrain("/train?lesson=continuation-bets");
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+
+    expect(screen.getByLabelText(/the flop/i).querySelectorAll('[role="img"]')).toHaveLength(3);
+    expect(screen.getByLabelText(/your hand/i).querySelectorAll('[role="img"]')).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: /^bet$/i }));
+    expect(screen.getByText(/the solver bets this hand \d+% of the time/i)).toBeInTheDocument();
+  });
+});
+
 describe("Lesson player", () => {
   async function toFirstQuiz(user: ReturnType<typeof userEvent.setup>) {
     // Positions has three reading cards, then the questions.

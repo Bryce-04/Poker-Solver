@@ -180,6 +180,13 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
         question && (
         <article className="train__panel">
           <h2 className="train__heading">{question.prompt}</h2>
+          {question.board && (
+            <div className="train__hand" aria-label="The flop">
+              {question.board.map((card) => (
+                <PlayingCard key={card} card={card} size="md" />
+              ))}
+            </div>
+          )}
           {question.cards && (
             <div className="train__hand" aria-label="Your hand">
               <PlayingCard card={question.cards[0]} size="lg" />

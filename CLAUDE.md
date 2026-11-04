@@ -165,8 +165,9 @@ Drill reachable from it (the Drill itself is unchanged, still full screen at `/d
 plain data in `lib/lessons.ts` (reading cards + graded questions), played at `/train?lesson=<id>`,
 progress in localStorage. "Which hands to open" is graded against the reference opening ranges, shipped as
 `apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
-a test fails if it drifts). See `docs/decisions.md` for what's planned next (flop-solver-graded
-lessons, an AI coach, ranked play, opponent types).
+a test fails if it drifts). "The continuation bet" is graded by the Drill deck's solver frequencies
+(`lib/cbetLesson.ts`). See `docs/decisions.md` for what's planned next (an AI coach, a lesson guide,
+ranked play, opponent types).
 
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table

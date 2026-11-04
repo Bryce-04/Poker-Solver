@@ -35,13 +35,23 @@ the explanation ("not in the UTG range; it becomes an open from the HJ onward") 
 percentages quoted in the reading cards are computed too. The reference ranges are approximate
 (constructed from standard opening principles, not solver output), and the lesson says so.
 
-**Not done yet (planned).** Lessons graded against the flop solver (the c-bet lesson uses the Drill's
-solved spots), the AI coach (a provider-agnostic `POST /coach` in
+**Lesson 4, "The continuation bet" (graded by the flop solver).** Six "you raised from the BTN, the BB
+called and checked this flop: bet or check?" hands, taken from the Drill's pre-solved deck
+(`lib/cbetLesson.ts`; the BTN-in-position, facing-a-check spots, 24 of them). It shows the flop and
+your two cards; the answer is the solver's own frequency for that exact hand. Hands are picked from
+whatever the deck holds (seeded: three clear bets, three clear checks, alternating), so regenerating
+the deck changes the hands but cannot make the lesson wrong. "Bet" merges the three bet sizes; the
+explanation gives the bet/check split, the size the solver favors, and the Drill's rule-based
+reasoning for the hand (a rule of thumb, as the Drill says). A hand counts as a clear bet or check at
+60% or more. Mixed hands (nearer 50/50) are left out of the quiz on purpose, since "one right answer"
+would be a lie for them; a later lesson on mixed strategies can use them.
+
+**Not done yet (planned).** The AI coach (a provider-agnostic `POST /coach` in
 `apps/api`, starting on Gemini's free tier, with the existing rule-based explanations as the
 fallback), the lesson guide, ranked play (rated by decision quality against the solver, not by chips
 won, which swing too much), and opponent types (needs node-locking in the solver).
 
-**Tests.** `TrainPage.test.tsx`, `lessons.test.ts`, `test_open_ranges_data.py`, and two `App.test.tsx` cases (Drill opened from
+**Tests.** `TrainPage.test.tsx`, `lessons.test.ts`, `test_open_ranges_data.py`, the c-bet lesson's tests in `lessons.test.ts`, and two `App.test.tsx` cases (Drill opened from
 Train and back; a lesson is remembered when you leave and return to the tab).
 
 ---

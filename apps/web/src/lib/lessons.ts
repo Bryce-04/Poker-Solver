@@ -2,6 +2,8 @@
 // plain data -- short reading cards and multiple-choice questions -- so adding
 // one needs no new UI code. Progress is kept in this browser only for now.
 
+import { betFrequency, CLEAR_MAJORITY, explainCbet, pickCbetSpots } from "./cbetLesson";
+import type { DrillSpot } from "./drill";
 import { cardsFor as cardsForHand, earliestOpeningSeat, inOpenRange, openPercent, type OpenSeat } from "./openRanges";
 
 export interface Choice {
@@ -17,12 +19,18 @@ export type LessonStep =
   /** "Folded to you in this seat with this hand: open or fold?" Graded against
    * the reference opening range (lib/openRanges.ts), so the answer and its
    * explanation are worked out, not written. */
-  | { kind: "open"; seat: OpenSeat; hand: string };
+  | { kind: "open"; seat: OpenSeat; hand: string }
+  /** "The BB checks to you on this flop: bet or check?" Graded against the
+   * Drill's pre-solved spots (lib/cbetLesson.ts): the answer is the solver's
+   * own frequency for that exact hand. */
+  | { kind: "cbet"; spot: DrillSpot };
 
 /** What a graded step shows: the prompt, any cards, and the choices. */
 export interface Question {
   prompt: string;
   cards?: [string, string];
+  /** The flop, when the question is about one. */
+  board?: string[];
   choices: Choice[];
 }
 
@@ -177,6 +185,24 @@ export const LESSONS: Lesson[] = [
       ...opens("BTN", ["55", "KJo", "A5s", "Q8o", "72o"]),
     ],
   },
+  {
+    id: "continuation-bets",
+    title: "The continuation bet",
+    summary: "You raised before the flop and the big blind checked to you. When do you bet?",
+    minutes: 6,
+    steps: [
+      {
+        kind: "read",
+        title: "What a continuation bet is",
+        body: [
+          'When you raised before the flop and a player called, you were the aggressor. If they check to you on the flop, a bet from you is called a "continuation bet" (c-bet): you keep betting as if you had the strongest hand.',
+          "It works because the raiser usually does have the stronger range, and because the checker has to decide what to do with a hand they've already shown some weakness with.",
+          "It is not automatic. Bet hands that are strong enough to want a call from worse, and hands that make good bluffs, and check the rest. These six are pre-solved, so the answer is how often the solver bets that exact hand on that exact flop.",
+        ],
+      },
+      ...pickCbetSpots().map((spot): LessonStep => ({ kind: "cbet", spot })),
+    ],
+  },
 ];
 
 /** The open-or-fold explanation, from the range data. */
@@ -193,6 +219,19 @@ export function explainOpen(seat: OpenSeat, hand: string): string {
 /** The step as something to answer, or null for a reading card. */
 export function questionFor(step: LessonStep): Question | null {
   if (step.kind === "quiz") return { prompt: step.prompt, choices: step.choices };
+  if (step.kind === "cbet") {
+    const bet = betFrequency(step.spot) >= CLEAR_MAJORITY;
+    const why = explainCbet(step.spot);
+    return {
+      prompt: `You raised from the BTN and the BB called. The pot is ${step.spot.potBb}bb. The BB checks to you. Bet or check?`,
+      cards: step.spot.hand,
+      board: step.spot.board,
+      choices: [
+        { label: "Bet", correct: bet, why },
+        { label: "Check", correct: !bet, why },
+      ],
+    };
+  }
   if (step.kind !== "open") return null;
   const raise = inOpenRange(step.seat, step.hand);
   const why = explainOpen(step.seat, step.hand);
