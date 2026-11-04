@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "alembic>=1.13",
     "pyjwt[crypto]>=2.8",
+    "httpx>=0.27",
     "poker-solver-schema",
     "poker-solver-engine",
 ]

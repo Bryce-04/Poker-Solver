@@ -169,6 +169,12 @@ a test fails if it drifts). "The continuation bet" is graded by the Drill deck's
 (`lib/cbetLesson.ts`). See `docs/decisions.md` for what's planned next (an AI coach, a lesson guide,
 ranked play, opponent types).
 
+**AI coach (2026-11-05)**: each answered Train question has "Ask the coach", backed by
+`apps/api`'s `POST /coach` (`app/coach.py`): a model (Gemini free tier, `GEMINI_API_KEY` /
+`GEMINI_MODEL` env vars, unset = off) explains from the facts the lesson computed and never decides
+what's right; any failure, no key, or a rate limit falls back to the app's own explanation. Sign-in
+required. See `docs/decisions.md` (including the unverified-model-name caveat).
+
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
 colors, the pot on the table, bb amounts, and the "why" analysis with its

@@ -3,6 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { TrainPage } from "./TrainPage";
 import { LESSONS, readProgress } from "../lib/lessons";
+import { askCoach } from "../lib/api";
+import { useAuth } from "../lib/auth";
+
+vi.mock("../lib/api", () => ({ askCoach: vi.fn() }));
+vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
+const mockAsk = vi.mocked(askCoach);
+const mockUseAuth = vi.mocked(useAuth);
 
 function renderTrain(path = "/train") {
   return render(
@@ -12,7 +19,12 @@ function renderTrain(path = "/train") {
   );
 }
 
-beforeEach(() => window.localStorage.clear());
+beforeEach(() => {
+  window.localStorage.clear();
+  mockAsk.mockReset();
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({ status: "signed-in", email: "a@b.c" });
+});
 
 describe("Train hub", () => {
   it("lists every lesson, links to the full-screen Drill, and shows what is coming", () => {
@@ -116,5 +128,73 @@ describe("Lesson player", () => {
     renderTrain("/train?lesson=pot-odds");
     await user.click(screen.getByRole("button", { name: /all lessons/i }));
     expect(screen.getByRole("heading", { name: /^lessons$/i })).toBeInTheDocument();
+  });
+});
+
+describe("Ask the coach", () => {
+  async function toFirstAnswer(user: ReturnType<typeof userEvent.setup>) {
+    renderTrain("/train?lesson=opening-hands");
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+    await user.click(screen.getByRole("button", { name: /^fold$/i })); // wrong: AQo from UTG is a raise
+  }
+
+  it("only appears after you answer, and sends the facts the lesson computed", async () => {
+    mockAsk.mockResolvedValue({ kind: "answer", data: { answer: "AQo is strong enough to open.", source: "ai", reason: null } });
+    const user = userEvent.setup();
+    renderTrain("/train?lesson=opening-hands");
+    await user.click(screen.getByRole("button", { name: /^next$/i }));
+    expect(screen.queryByText(/ask the coach/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^fold$/i }));
+    await user.click(screen.getByRole("button", { name: /why isn.t the other choice better/i }));
+
+    expect(await screen.findByText("AQo is strong enough to open.")).toBeInTheDocument();
+    const [question, context] = mockAsk.mock.calls[0];
+    expect(question).toBe("Why isn't the other choice better?");
+    expect(context).toMatchObject({
+      lesson_title: "Which hands to open",
+      picked: "Fold",
+      correct: "Raise to 2.5bb",
+      hand: ["As", "Qh"],
+      board: [],
+    });
+    expect(context.explanation).toMatch(/AQo is in the UTG opening range/);
+  });
+
+  it("lets you type your own question", async () => {
+    mockAsk.mockResolvedValue({ kind: "answer", data: { answer: "Because of position.", source: "ai", reason: null } });
+    const user = userEvent.setup();
+    await toFirstAnswer(user);
+    await user.type(screen.getByLabelText(/your question for the coach/i), "Why UTG?");
+    await user.click(screen.getByRole("button", { name: /^ask$/i }));
+    expect(mockAsk.mock.calls[0][0]).toBe("Why UTG?");
+    expect(await screen.findByText("Because of position.")).toBeInTheDocument();
+  });
+
+  it("says when it is showing the app's own explanation instead of the AI", async () => {
+    mockAsk.mockResolvedValue({ kind: "answer", data: { answer: "Built-in explanation.", source: "fallback", reason: "rate_limited" } });
+    const user = userEvent.setup();
+    await toFirstAnswer(user);
+    await user.click(screen.getByRole("button", { name: /explain this in simpler words/i }));
+    expect(await screen.findByText("Built-in explanation.")).toBeInTheDocument();
+    expect(screen.getByText(/asked a lot of questions this hour/i)).toBeInTheDocument();
+  });
+
+  it("reports a network failure without losing the lesson", async () => {
+    mockAsk.mockResolvedValue({ kind: "network-error" });
+    const user = userEvent.setup();
+    await toFirstAnswer(user);
+    await user.click(screen.getByRole("button", { name: /what should i look for next time/i }));
+    expect(await screen.findByText(/couldn.t reach the server/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^next$/i })).toBeInTheDocument();
+  });
+
+  it("asks you to sign in instead of calling the API when signed out", async () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    const user = userEvent.setup();
+    await toFirstAnswer(user);
+    expect(screen.getByText(/sign in to ask the ai coach/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /explain this in simpler words/i })).not.toBeInTheDocument();
+    expect(mockAsk).not.toHaveBeenCalled();
   });
 });

@@ -471,3 +471,60 @@ export async function fetchPreflopRanges(spot: Spot): Promise<PreflopRangesResul
   }
   return { kind: "error", status: res.status };
 }
+
+// ---------------------------------------------------------------------------
+// The Train tab's AI coach (apps/api's POST /coach). The server answers from
+// the facts the lesson already computed; when the model is unavailable it
+// returns the app's own explanation with `source: "fallback"`, so a reply is
+// always usable.
+
+export interface CoachContext {
+  lesson_title: string;
+  prompt: string;
+  board: string[];
+  hand: string[];
+  picked: string;
+  correct: string;
+  explanation: string;
+}
+
+export interface CoachAnswer {
+  answer: string;
+  source: "ai" | "fallback";
+  reason: "not_configured" | "rate_limited" | "unavailable" | null;
+}
+
+export type AskCoachResult =
+  | { kind: "answer"; data: CoachAnswer }
+  | { kind: "signed-out" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Asks the coach a question about one lesson answer. Never throws. */
+export async function askCoach(question: string, context: CoachContext): Promise<AskCoachResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/coach`,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      data: { question, context },
+      // The model call can take several seconds; the server gives up at 20s.
+      connectTimeout: 15000,
+      readTimeout: 40000,
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) {
+    const body = asJson(res.data) as Partial<CoachAnswer>;
+    if (typeof body.answer !== "string") return { kind: "error", status: res.status };
+    return {
+      kind: "answer",
+      data: { answer: body.answer, source: body.source === "ai" ? "ai" : "fallback", reason: body.reason ?? null },
+    };
+  }
+  if (res.status === 401) return { kind: "signed-out" };
+  return { kind: "error", status: res.status };
+}

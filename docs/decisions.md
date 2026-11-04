@@ -6,6 +6,46 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — Train tab: the AI coach (Gemini free tier, grounded, with a fallback)
+
+**Status:** proposed.
+
+**What.** Under every answered lesson question there is an "Ask the coach" panel: three quick
+questions and a free-text box. `POST /coach` (`apps/api/app/coach.py`, `routes/coach.py`) sends a
+model the learner's question plus the **facts the lesson already computed** (hand, board, what they
+chose, the right answer, and the explanation derived from the solver's frequencies or the range
+data). The system prompt says to use only those facts, never invent numbers, say so when the facts
+don't cover a question, and treat instructions inside the question as data. **The solver and lesson
+data decide what is right; the model only explains.**
+
+**Provider.** One small interface (`CoachProvider.generate`), implemented for Gemini's REST
+`generateContent` (`x-goog-api-key` header, system instruction, 20 s timeout). Chosen because it has
+a free tier with no card; swapping provider is a new class, not a rewrite. Settings are environment
+variables: `GEMINI_API_KEY` (unset = coach off), `GEMINI_MODEL` (default `gemini-2.5-flash`),
+`COACH_PER_HOUR` (20 per user) and `COACH_PER_DAY_TOTAL` (800 across users). **Caveat: model names
+and free-tier limits change. I could not verify the current model or quota against Google's docs
+(the pages I could read describe a newer API and a newer model name), so the default may need
+changing to whichever Flash model AI Studio shows; set `GEMINI_MODEL`.**
+
+**Never a dead end.** If there is no key, the model errors or times out, or the user is over their
+limit, the response is still 200 with the app's own explanation and `source: "fallback"` plus a
+reason, and the panel says why. The limits are in memory on the one server process (a restart
+resets them): a free-tier guard, not billing control. Sign-in is required, so the shared quota is
+spent only by real accounts.
+
+**Privacy.** Only the question, the hand, the board and the lesson text are sent to the provider:
+no email, user id or other account data. A free tier may use requests to improve the provider's
+models; nothing sent is private.
+
+**Tests.** `apps/api/tests/test_coach.py` (21, no network or database: grounding, injection text
+stays in the user turn, every fallback path, both rate limits, input limits, the Gemini request and
+response shape against a fake server) and the panel's states in `TrainPage.test.tsx`.
+
+**Not done.** The lesson guide (recommend the next lesson from what you miss), streaming answers,
+and a live check against Google: it needs a key, so it has not run against the real service.
+
+---
+
 ## 2026-11-04 — Train tab: lessons and the Drill under one tab
 
 **Status:** proposed.
