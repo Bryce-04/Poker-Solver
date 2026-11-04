@@ -168,8 +168,12 @@ progress kept per account on the device (`lib/progress.ts`) and, signed in, on t
 "Which hands to open" is graded against the reference opening ranges, shipped as
 `apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
 a test fails if it drifts). "The continuation bet" is graded by the Drill deck's solver frequencies
-(`lib/cbetLesson.ts`). "Up next" is rule-based (`recommendNext`). See `docs/decisions.md` for what's
-planned next (ranked play, opponent types).
+(`lib/cbetLesson.ts`). "Up next" is rule-based (`recommendNext`). The Train hub also has a **6-max
+practice table** (`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`): preflop-first, the bots
+play the reference charts and every decision is graded against them (data in
+`apps/web/src/data/preflop-pairs.json`, regenerate with `python apps/api/scripts/make_preflop_pairs.py`;
+a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
+(generated lessons, postflop practice, ranked play, opponent types).
 
 **Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
 `done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own
@@ -551,6 +555,7 @@ cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
 cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
 cd apps/api && python scripts/make_open_ranges.py            # regenerate the Train tab's opening-range data
+cd apps/api && python scripts/make_preflop_pairs.py          # regenerate the practice table's preflop data
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer vs its frozen pre-speed-up copy

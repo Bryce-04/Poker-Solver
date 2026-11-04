@@ -42,6 +42,15 @@ describe("opening-hands lesson", () => {
     }
   });
 
+  it("never says everyone folded to the first seat to act, and says it for the others", () => {
+    const promptFor = (seat: string) => {
+      const step = lesson.steps.find((s) => s.kind === "open" && s.seat === seat)!;
+      return questionFor(step)!.prompt;
+    };
+    expect(promptFor("UTG")).toBe("You're under the gun (UTG) with 100bb, so you act first. Open or fold?");
+    expect(promptFor("BTN")).toBe("You're on the button (BTN) with 100bb and everyone has folded to you. Open or fold?");
+  });
+
   it("teaches what it says: the hands folded from UTG are opened on the button", () => {
     for (const hand of ["55", "KJo", "A5s"]) {
       expect(inOpenRange("UTG", hand)).toBe(false);
