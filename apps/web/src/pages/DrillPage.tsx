@@ -28,6 +28,8 @@ import {
 } from "../lib/drillTheme";
 import { readBetDisplay, readHaptics, writeBetDisplay, writeHaptics } from "../lib/drillSettings";
 import { haptic } from "../lib/haptics";
+import { drillCoachContext, suggestedQuestions } from "../lib/coach";
+import { CoachChat } from "../components/CoachChat/CoachChat";
 import "./DrillPage.css";
 
 const DECK_FILE = deckFile as unknown as DrillDeckFile;
@@ -460,6 +462,9 @@ function Playing({
   // Enter / Space moves on once an answer is showing.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Typing a question to the coach (Space, Enter) must not skip to the next hand.
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest(".coach, input, textarea")) return;
       if ((e.key === "Enter" || e.key === " ") && answer) {
         e.preventDefault();
         next();
@@ -650,6 +655,11 @@ function Feedback({
             </div>
           </details>
         )}
+        <CoachChat
+          key={spot.id}
+          context={drillCoachContext(spot, chosen, betDisplay)}
+          suggestions={suggestedQuestions(spot, chosen, betDisplay)}
+        />
       </main>
       <footer className="controls">
         <button type="button" className="game__primary" onClick={onNext} autoFocus>
