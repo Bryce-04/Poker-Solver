@@ -6,6 +6,63 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Mobile redesign Phase 4: the Ranges tab on phones
+
+**Status:** proposed.
+
+**Context.** `docs/mobile-redesign.md` §5: one phone Ranges page built on
+`useReferenceChart`, replacing the old Builder / Type in / Import pages that
+the desktop redesign deliberately left in place for phones.
+
+**Decisions.**
+- **`pages/ranges/RangesPhone.tsx`** is the phone layout: Pick (seat chips,
+  "Nobody raised | Facing a raise" with the impossible one disabled, "Who
+  raised?" chips, a 40bb | 100bb stack switch), Type it (input plus example
+  pills), Hand history (textarea, Read hand, Use an example). No "get chart"
+  button: the chart follows the spot (250ms debounce, as desktop). Then the
+  spot in words, "Standard chart: a starting point, not a live solve.", the
+  range editor, and "40.0% of all hands · 530 combos · edited".
+- **Shared with desktop, unchanged:** Pick's derivation, the chart's title,
+  the debounced auto-load and the "opened from the Library" handling moved
+  from `RangesWorkspace.tsx` into `lib/rangesSpot.ts`; the no-chart and
+  failed-request messages into `pages/ranges/ChartProblem.tsx`. Desktop is
+  pixel-identical.
+- **One range editor on phones**: `components/mobile/RangeEditor.tsx` (Tap |
+  Paint, brush row, chart, hand-weight sheet) is now used by both Solve's
+  ranges step and Ranges, with a round action button that reloads (Solve) or
+  resets to the chart (Ranges).
+- **Choices in the URL** (as Phase 1 planned): Pick writes all four of
+  `seat` / `before` / `raiser` / `stack`, replacing the history entry rather
+  than pushing (a seat change isn't something to go Back through), and Type
+  it writes `text`. So the tab bar returning to Ranges finds them as left.
+  `before` is the user's choice, not BB's forced "facing a raise", so moving
+  off BB restores it, as desktop's derived state does. A pasted hand history
+  is too long for the URL and starts over. Changing the mode now keeps the
+  other parameters (`RangesPage.setMode`); desktop never has any, so nothing
+  changes there.
+- **Save** (the action bar's secondary): signed out, the account sheet;
+  signed in, a "Save to Library" sheet with a name field (desktop's default
+  name). It closes once a save started from it succeeds, and the page says
+  "Saved to your Library." **Solve a flop from here** is the primary; while
+  there's no chart it says why ("Type a spot first", "Read a hand first",
+  "No chart for this spot").
+- **Deleted**: `BuilderPage`, `TypeInPage`, `ImportPage`, `RangesPage.css`,
+  and `components/SpotBuilder/SpotBuilder.tsx` (only Builder used it), with
+  their tests. `SpotBuilder.css` stays, as the spec says: its shared classes
+  are imported across the app. Their behaviors are covered again in
+  `pages/ranges/RangesPhone.test.tsx`: the assembled spot, edit then save the
+  edited range, reset, no-match vs unreachable, signed-out save, typed and
+  pasted spots, the Library's saved range, plus the URL state.
+- **A Library chart opens here on phones too** (route state `spot`, as desktop);
+  the phone Library that sends it is Phase 5.
+
+**Checked.** Build, lint, 363 tests. Desktop at 1440px pixel-identical to the
+Phase 3 build: Ranges (Pick with a chart, Type it, Hand history), Solve and
+Library. Phone screenshots of Pick and Type it match the mockup. Not checked on
+a real device.
+
+---
+
 ## 2026-11-03 — Mobile redesign Phase 3: the Solve result on phones
 
 **Status:** proposed.

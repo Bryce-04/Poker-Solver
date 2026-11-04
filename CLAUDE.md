@@ -423,6 +423,30 @@ one file per step: `HandStep`, `BoardStep`, `RangesStep`, `ReadyStep`, and
 - **The strategy chart scrolls on phones**: `.m-result__grid` undoes
   `RangeGrid`'s `touch-action: none` there.
 
+**Phase 4 (Ranges tab) is done**: on phones `/ranges` is
+`pages/ranges/RangesPhone.tsx`, and `RangesPage.tsx` only picks the layout.
+- **One page, three modes**: Pick, Type it, or Hand history. The chart follows
+  the spot, with no "get chart" button.
+- **Editing**: the range editor, then Save (a name sheet, or the account sheet
+  when signed out) and "Solve a flop from here".
+- **The old Builder / Type in / Import pages and `SpotBuilder.tsx` are
+  deleted.** `SpotBuilder.css` stays, because its classes are shared across
+  the app.
+- **Shared with desktop**: Pick's logic, the chart title, the debounced
+  auto-load and the Library-opened chart now live in `lib/rangesSpot.ts`, and
+  the no-chart and error messages in `pages/ranges/ChartProblem.tsx`. Both
+  layouts use them.
+- **One phone range editor**: `components/mobile/RangeEditor.tsx` (Tap / Paint,
+  brush, chart, hand-weight sheet), used by Solve's ranges step and Ranges.
+- **Choices in the URL**: Pick's are `seat` / `before` / `raiser` / `stack`
+  (replace, not push), and the typed phrase is `text`. Switching mode keeps the
+  rest of the query. A pasted hand history isn't kept.
+- **Shared CSS**: page building blocks (`.m-step`, `.m-section`, `.m-note`,
+  `.m-field`, `.m-card`, `.m-link`, `.m-pills`...) moved from Solve's
+  `phone.css` to `components/mobile/mobile.css`. Use them on new phone pages.
+- `ActionBar` takes a `backLabel`, so its secondary button can say something
+  other than "Back" ("Save").
+
 ## Commands
 
 This is a pnpm workspace (`apps/*`, `packages/*`) plus two standalone

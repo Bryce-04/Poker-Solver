@@ -57,12 +57,12 @@ describe('<App />', () => {
     render(<App />)
 
     await user.click(screen.getByRole('link', { name: /^ranges$/i }))
-    // Pick mode by default: the button builder's position control.
-    expect(screen.getByLabelText(/your position/i)).toBeInTheDocument()
+    // Pick mode by default: the seat chips.
+    expect(screen.getByRole('group', { name: 'Your seat' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^type it$/i }))
     expect(window.location.search).toBe('?mode=type')
-    expect(screen.getByText(/describe the spot/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/type the spot/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^hand history$/i }))
     expect(window.location.search).toBe('?mode=paste')

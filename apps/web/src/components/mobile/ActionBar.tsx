@@ -14,6 +14,8 @@ export interface ActionBarProps {
   /** The secondary Back button; left out when absent. */
   onBack?: () => void;
   backDisabled?: boolean;
+  /** What the secondary button says, when it isn't Back (Ranges' "Save"). */
+  backLabel?: string;
   /** The main button's look: primary (default), or secondary for a
    * button that stops something (the solve's Cancel). */
   variant?: "primary" | "secondary";
@@ -31,6 +33,7 @@ export function ActionBar({
   disabledReason,
   onBack,
   backDisabled,
+  backLabel = "Back",
   variant = "primary",
 }: ActionBarProps) {
   const disabled = Boolean(disabledReason);
@@ -46,7 +49,7 @@ export function ActionBar({
               onClick={onBack}
               disabled={backDisabled}
             >
-              Back
+              {backLabel}
             </button>
           )}
           <button

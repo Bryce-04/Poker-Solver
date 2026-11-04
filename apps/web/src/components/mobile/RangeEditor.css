@@ -1,0 +1,56 @@
+/* The phone range editor (components/mobile/RangeEditor): docs/mobile-redesign.md
+   §4.3 and §5; values from docs/mobile-redesign/mockup/solve-3-ranges.html. */
+
+.m-ranges__modes {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.m-ranges__modes > .seg {
+  flex: 1;
+}
+
+.m-ranges__reload {
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--chip-border);
+  border-radius: 12px;
+}
+
+.m-ranges__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.m-ranges__count {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-ranges__legend {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-ranges__key {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.m-ranges__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--range-in);
+}
+
+.m-ranges__swatch--half {
+  background: linear-gradient(to top, var(--range-in) 50%, var(--range-empty) 50%);
+}
