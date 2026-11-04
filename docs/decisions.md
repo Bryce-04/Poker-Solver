@@ -24,13 +24,24 @@ and "Pot odds and equity" (content checked against the formulas by `lessons.test
 played at `/train?lesson=<id>`; the query string is what makes the tab bar's "last place in each
 tab" return to it. Progress (done, score) is in `localStorage` only for now.
 
-**Not done yet (planned).** Lessons graded by the solver (preflop opens against the reference ranges,
-the flop c-bet against the Drill's solved spots), the AI coach (a provider-agnostic `POST /coach` in
+**Lesson 3, "Which hands to open" (solver-backed grading).** Ten "folded to you in seat X with hand
+Y: raise or fold?" questions (five from UTG, five from the BTN), graded against the repo's reference
+opening ranges rather than hand-written answers. The ranges ship as app data,
+`apps/web/src/data/open-ranges.json`, written by `apps/api/scripts/make_open_ranges.py` from
+`reference_charts.py` (the same pattern as the Drill deck, so it works offline), and
+`apps/api/tests/test_open_ranges_data.py` fails if the file drifts from the charts: rerun the script
+after changing them. A new lesson step kind, `open` (`lib/lessons.ts`), computes the right answer and
+the explanation ("not in the UTG range; it becomes an open from the HJ onward") from that data; the
+percentages quoted in the reading cards are computed too. The reference ranges are approximate
+(constructed from standard opening principles, not solver output), and the lesson says so.
+
+**Not done yet (planned).** Lessons graded against the flop solver (the c-bet lesson uses the Drill's
+solved spots), the AI coach (a provider-agnostic `POST /coach` in
 `apps/api`, starting on Gemini's free tier, with the existing rule-based explanations as the
 fallback), the lesson guide, ranked play (rated by decision quality against the solver, not by chips
 won, which swing too much), and opponent types (needs node-locking in the solver).
 
-**Tests.** `TrainPage.test.tsx`, `lessons.test.ts`, and two `App.test.tsx` cases (Drill opened from
+**Tests.** `TrainPage.test.tsx`, `lessons.test.ts`, `test_open_ranges_data.py`, and two `App.test.tsx` cases (Drill opened from
 Train and back; a lesson is remembered when you leave and return to the tab).
 
 ---

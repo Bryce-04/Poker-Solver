@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   LESSONS,
+  questionFor,
   quizCount,
   readProgress,
   writeProgress,
   type Lesson,
   type LessonProgress,
 } from "../lib/lessons";
+import { PlayingCard } from "../components/PlayingCard/PlayingCard";
 import "./TrainPage.css";
 
 /**
@@ -107,6 +109,7 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
 
   const total = quizCount(lesson);
   const step = lesson.steps[index];
+  const question = questionFor(step);
   const last = index === lesson.steps.length - 1;
 
   function next(nowCorrect: number) {
@@ -121,9 +124,9 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
   }
 
   function answer(choiceIndex: number) {
-    if (step.kind !== "quiz" || picked !== null) return;
+    if (!question || picked !== null) return;
     setPicked(choiceIndex);
-    if (step.choices[choiceIndex].correct) setCorrect((c) => c + 1);
+    if (question.choices[choiceIndex].correct) setCorrect((c) => c + 1);
   }
 
   if (result) {
@@ -174,10 +177,17 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
           </div>
         </article>
       ) : (
+        question && (
         <article className="train__panel">
-          <h2 className="train__heading">{step.prompt}</h2>
+          <h2 className="train__heading">{question.prompt}</h2>
+          {question.cards && (
+            <div className="train__hand" aria-label="Your hand">
+              <PlayingCard card={question.cards[0]} size="lg" />
+              <PlayingCard card={question.cards[1]} size="lg" />
+            </div>
+          )}
           <ul className="train__choices">
-            {step.choices.map((choice, i) => {
+            {question.choices.map((choice, i) => {
               const state =
                 picked === null ? "" : choice.correct ? "correct" : i === picked ? "wrong" : "";
               return (
@@ -198,11 +208,11 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
           </ul>
           {picked !== null && (
             <div className="train__feedback" role="status">
-              <p className="train__feedback-title">{step.choices[picked].correct ? "Right." : "Not quite."}</p>
-              <p className="train__text">{step.choices[picked].why}</p>
-              {!step.choices[picked].correct && (
+              <p className="train__feedback-title">{question.choices[picked].correct ? "Right." : "Not quite."}</p>
+              <p className="train__text">{question.choices[picked].why}</p>
+              {!question.choices[picked].correct && (
                 <p className="train__text">
-                  <strong>Answer:</strong> {step.choices.find((c) => c.correct)?.label}.
+                  <strong>Answer:</strong> {question.choices.find((c) => c.correct)?.label}.
                 </p>
               )}
               <div className="train__actions">
@@ -213,6 +223,7 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
             </div>
           )}
         </article>
+        )
       )}
     </div>
   );

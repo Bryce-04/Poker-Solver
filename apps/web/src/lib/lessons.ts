@@ -2,6 +2,8 @@
 // plain data -- short reading cards and multiple-choice questions -- so adding
 // one needs no new UI code. Progress is kept in this browser only for now.
 
+import { cardsFor as cardsForHand, earliestOpeningSeat, inOpenRange, openPercent, type OpenSeat } from "./openRanges";
+
 export interface Choice {
   label: string;
   correct?: boolean;
@@ -11,7 +13,18 @@ export interface Choice {
 
 export type LessonStep =
   | { kind: "read"; title: string; body: string[] }
-  | { kind: "quiz"; prompt: string; choices: Choice[] };
+  | { kind: "quiz"; prompt: string; choices: Choice[] }
+  /** "Folded to you in this seat with this hand: open or fold?" Graded against
+   * the reference opening range (lib/openRanges.ts), so the answer and its
+   * explanation are worked out, not written. */
+  | { kind: "open"; seat: OpenSeat; hand: string };
+
+/** What a graded step shows: the prompt, any cards, and the choices. */
+export interface Question {
+  prompt: string;
+  cards?: [string, string];
+  choices: Choice[];
+}
 
 export interface Lesson {
   id: string;
@@ -20,6 +33,8 @@ export interface Lesson {
   minutes: number;
   steps: LessonStep[];
 }
+
+const opens = (seat: OpenSeat, hands: string[]): LessonStep[] => hands.map((hand) => ({ kind: "open", seat, hand }));
 
 export const LESSONS: Lesson[] = [
   {
@@ -135,7 +150,61 @@ export const LESSONS: Lesson[] = [
       },
     ],
   },
+  {
+    id: "opening-hands",
+    title: "Which hands to open",
+    summary: "When it's folded to you, which hands are worth a raise from each seat.",
+    minutes: 6,
+    steps: [
+      {
+        kind: "read",
+        title: "Open or fold",
+        body: [
+          "When everyone folds to you, you can raise to start the pot (an \"open\") or fold. Calling the big blind (\"limping\") is rarely right, so the choice is really raise or fold.",
+          `You don't open every hand. A seat opens only the hands that win enough money over time, and that depends on who still has to act behind you. From UTG, five players act after you, so you open only about ${openPercent("UTG")}% of hands.`,
+          "The ranges here are the app's reference charts for 100bb at a 6-handed table: approximate, built from standard opening principles rather than from one solver's output.",
+        ],
+      },
+      ...opens("UTG", ["AQo", "T9s", "55", "KJo", "A5s"]),
+      {
+        kind: "read",
+        title: "Later seats open wider",
+        body: [
+          `The closer you are to the button, the fewer players are left to act behind you, and the more hands you can open. The cutoff opens about ${openPercent("CO")}% of hands, and the button about ${openPercent("BTN")}%.`,
+          "Notice that hands you just folded from UTG, like 55, KJo and A5s, become easy opens on the button. Same hand, different seat.",
+        ],
+      },
+      ...opens("BTN", ["55", "KJo", "A5s", "Q8o", "72o"]),
+    ],
+  },
 ];
+
+/** The open-or-fold explanation, from the range data. */
+export function explainOpen(seat: OpenSeat, hand: string): string {
+  const pct = openPercent(seat);
+  if (inOpenRange(seat, hand)) {
+    return `${hand} is in the ${seat} opening range, so it's a raise. The ${seat} opens about ${pct}% of hands.`;
+  }
+  const first = earliestOpeningSeat(hand);
+  const later = first ? ` It becomes an open from the ${first} onward, where the range is wider.` : " It's too weak to open from any seat.";
+  return `${hand} is not in the ${seat} opening range, so it's a fold. The ${seat} opens only about ${pct}% of hands.${later}`;
+}
+
+/** The step as something to answer, or null for a reading card. */
+export function questionFor(step: LessonStep): Question | null {
+  if (step.kind === "quiz") return { prompt: step.prompt, choices: step.choices };
+  if (step.kind !== "open") return null;
+  const raise = inOpenRange(step.seat, step.hand);
+  const why = explainOpen(step.seat, step.hand);
+  return {
+    prompt: `You're in the ${step.seat} at 100bb and everyone folds to you. Open or fold?`,
+    cards: cardsForHand(step.hand),
+    choices: [
+      { label: "Raise to 2.5bb", correct: raise, why },
+      { label: "Fold", correct: !raise, why },
+    ],
+  };
+}
 
 export interface LessonProgress {
   done: boolean;
@@ -164,4 +233,4 @@ export function writeProgress(id: string, progress: LessonProgress): void {
   }
 }
 
-export const quizCount = (lesson: Lesson): number => lesson.steps.filter((s) => s.kind === "quiz").length;
+export const quizCount = (lesson: Lesson): number => lesson.steps.filter((s) => s.kind !== "read").length;

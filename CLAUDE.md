@@ -163,8 +163,10 @@ sizes and roughly doubles per extra raise. No UI sets it yet.
 **Train tab (2026-11-04)**: the fourth tab is Train (`/train`), a lessons hub with the
 Drill reachable from it (the Drill itself is unchanged, still full screen at `/drill`). Lessons are
 plain data in `lib/lessons.ts` (reading cards + graded questions), played at `/train?lesson=<id>`,
-progress in localStorage. See `docs/decisions.md` for what's planned next (solver-graded lessons,
-an AI coach, ranked play, opponent types).
+progress in localStorage. "Which hands to open" is graded against the reference opening ranges, shipped as
+`apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
+a test fails if it drifts). See `docs/decisions.md` for what's planned next (flop-solver-graded
+lessons, an AI coach, ranked play, opponent types).
 
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
@@ -530,6 +532,7 @@ pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
 cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
+cd apps/api && python scripts/make_open_ranges.py            # regenerate the Train tab's opening-range data
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer vs its frozen pre-speed-up copy

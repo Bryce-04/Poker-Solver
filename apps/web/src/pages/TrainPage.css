@@ -198,3 +198,9 @@
   font: 650 15px/1.25 var(--sans);
   cursor: pointer;
 }
+
+.train__hand {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 4px;
+}

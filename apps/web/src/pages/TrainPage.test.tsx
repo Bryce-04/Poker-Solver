@@ -31,6 +31,31 @@ describe("Train hub", () => {
   });
 });
 
+describe("Opening-hands lesson", () => {
+  async function toFirstHand(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /^next$/i })); // the one reading card
+  }
+
+  it("shows the hand's two cards and grades a fold and a raise from the range data", async () => {
+    const user = userEvent.setup();
+    renderTrain("/train?lesson=opening-hands");
+    await toFirstHand(user);
+
+    // First hand is AQo from UTG: a raise.
+    expect(screen.getByRole("img", { name: /^A of spades$/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /^Q of hearts$/i })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^fold$/i }));
+    expect(screen.getByText(/not quite/i)).toBeInTheDocument();
+    expect(screen.getByText(/AQo is in the UTG opening range/i)).toBeInTheDocument();
+    expect(screen.getByText(/answer:/i).parentElement).toHaveTextContent(/raise to 2.5bb/i);
+  });
+
+  it("is on the hub as its own lesson", () => {
+    renderTrain();
+    expect(screen.getByRole("button", { name: /which hands to open/i })).toBeInTheDocument();
+  });
+});
+
 describe("Lesson player", () => {
   async function toFirstQuiz(user: ReturnType<typeof userEvent.setup>) {
     // Positions has three reading cards, then the questions.
