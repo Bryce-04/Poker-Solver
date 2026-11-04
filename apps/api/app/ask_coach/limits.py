@@ -1,60 +1,46 @@
-"""The Coach's daily per-user message limit (docs/coach.md §3.3).
+"""The Coach page's usage limit, which is the Train coach's: one limit for every
+Gemini question in the app (app/coach.py's `limiter`). That's COACH_PER_HOUR
+questions per user in any hour, and COACH_PER_DAY_TOTAL across all users per
+day, a guard for the free tier's shared quota. A Coach page message counts once,
+however many tool rounds it takes. See docs/decisions.md.
 
-COACH_DAILY_LIMIT (default 25) user messages per user per UTC day, counted from
-the `user_text` messages stored in the user's conversations, so the count
-survives restarts and needs no table of its own. Separate from the Train
-coach's COACH_PER_HOUR / COACH_PER_DAY_TOTAL (app/coach.py).
+The limiter is in memory, so a server restart resets it, which is fine for a
+free-tier guard rather than a billing control.
 
-Deleting a conversation deletes its messages, so it also gives back that day's
-messages. Accepted for now; noted in docs/decisions.md.
+`coach.limiter` is read on every call (never imported by name), so tests can
+swap it.
 """
 
-import os
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-
-from ..db import CoachConversationRow, CoachMessageRow
-from .store import now
-
-DEFAULT_DAILY_LIMIT = 25
-
-
-def daily_limit() -> int:
-    """Read on every call, so a changed environment needs no restart in tests."""
-    raw = os.environ.get("COACH_DAILY_LIMIT", "").strip()
-    try:
-        value = int(raw)
-    except ValueError:
-        return DEFAULT_DAILY_LIMIT
-    return value if value >= 0 else DEFAULT_DAILY_LIMIT
+from .. import coach as train_coach
 
 
 @dataclass(frozen=True)
 class Usage:
     used: int
     limit: int
+    # When the user's oldest counted message stops counting; now if none count.
     resets_at: datetime
-
-    @property
-    def exhausted(self) -> bool:
-        return self.used >= self.limit
+    # The all-users daily total is used up: nobody can ask until it frees up.
+    all_users_exhausted: bool
 
 
-def usage(db: Session, user_id: UUID) -> Usage:
-    current = now()
-    day_start = datetime.combine(current.date(), time(0), tzinfo=current.tzinfo)
-    used = db.scalar(
-        select(func.count())
-        .select_from(CoachMessageRow)
-        .join(CoachConversationRow, CoachConversationRow.id == CoachMessageRow.conversation_id)
-        .where(
-            CoachConversationRow.created_by == user_id,
-            CoachMessageRow.kind == "user_text",
-            CoachMessageRow.created_at >= day_start,
-        )
-    )
-    return Usage(used=used or 0, limit=daily_limit(), resets_at=day_start + timedelta(days=1))
+def take(user_id: UUID) -> bool:
+    """Counts one message if the limit allows it."""
+    return train_coach.limiter.allow(user_id)
+
+
+def give_back(user_id: UUID) -> None:
+    """Un-counts the user's latest message (Gemini was busy or isn't set up)."""
+    train_coach.limiter.refund(user_id)
+
+
+def usage(user_id: UUID) -> Usage:
+    limiter = train_coach.limiter
+    used, oldest_expires, all_exhausted = limiter.usage(user_id)
+    now = datetime.now(UTC)
+    resets_at = datetime.fromtimestamp(oldest_expires, UTC) if oldest_expires else now
+    return Usage(used=used, limit=limiter.per_hour, resets_at=resets_at, all_users_exhausted=all_exhausted)

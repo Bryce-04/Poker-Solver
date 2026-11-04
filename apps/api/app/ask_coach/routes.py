@@ -5,10 +5,10 @@ only ever touches the caller's own conversations; anyone else's is a 404.
     GET    /coach/conversations                  the caller's, newest first
     GET    /coach/conversations/{id}?after=N     {id, title, status, messages with seq > N}
     POST   /coach/conversations/{id}/messages    {text, attached_spot?} -> 202 {last_seq}
-                                                 409 while a turn runs, 429 {used, limit} over the limit
+                                                 409 while a turn runs, 429 {used, limit, all_users_exhausted}
     PATCH  /coach/conversations/{id}             {title}
     DELETE /coach/conversations/{id}             204, messages too
-    GET    /coach/usage                          {used, limit, resets_at}
+    GET    /coach/usage                          {used, limit, resets_at, all_users_exhausted}
 
 These share the /coach prefix with the Train coach (POST /coach, /coach/chat
 in ../routes/coach.py); the paths don't overlap.
@@ -35,7 +35,6 @@ log = logging.getLogger("ask_coach")
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
-TITLE_FROM_TEXT_CHARS = 40
 PREVIEW_CHARS = 80
 
 Status = Literal["idle", "working", "waiting_for_solver", "error"]
@@ -81,14 +80,13 @@ class RenameConversation(BaseModel):
 
 
 class UsageOut(BaseModel):
+    """The shared Gemini limit (limits.py): `used` of `limit` this hour, the
+    oldest of them stops counting at `resets_at`."""
+
     used: int
     limit: int
     resets_at: datetime
-
-
-def _title_from_text(text: str) -> str:
-    """Until Phase 2 titles a conversation from its first spot card."""
-    return " ".join(text.split())[:TITLE_FROM_TEXT_CHARS].rstrip()
+    all_users_exhausted: bool
 
 
 def _previews(db: Session, ids: list[UUID]) -> dict[UUID, str]:
@@ -202,10 +200,13 @@ def send_message(
     if row.status in store.BUSY_STATUSES:
         db.commit()
         raise HTTPException(status_code=409, detail="The Coach is still answering. Wait for it to finish.")
-    used = limits.usage(db, user_id)
-    if used.exhausted:
+    if not limits.take(user_id):
         db.commit()
-        return JSONResponse(status_code=429, content={"used": used.used, "limit": used.limit})
+        u = limits.usage(user_id)
+        return JSONResponse(
+            status_code=429,
+            content={"used": u.used, "limit": u.limit, "all_users_exhausted": u.all_users_exhausted},
+        )
 
     payload: dict = {"text": body.text}
     if body.attached_spot is not None:
@@ -214,7 +215,7 @@ def send_message(
         payload["attached_spot"] = body.attached_spot.model_dump(mode="json")
     message = store.append_message(db, row, "user_text", payload)
     if row.title is None:
-        row.title = _title_from_text(body.text)
+        row.title = store.title_from_text(body.text)
     row.status = store.WORKING
     db.commit()
 
@@ -248,8 +249,8 @@ def delete_conversation(
 
 
 @router.get("/usage")
-def get_usage(
-    db: Session = Depends(get_db), user_id: UUID = Depends(current_user_id)
-) -> UsageOut:
-    u = limits.usage(db, user_id)
-    return UsageOut(used=u.used, limit=u.limit, resets_at=u.resets_at)
+def get_usage(user_id: UUID = Depends(current_user_id)) -> UsageOut:
+    u = limits.usage(user_id)
+    return UsageOut(
+        used=u.used, limit=u.limit, resets_at=u.resets_at, all_users_exhausted=u.all_users_exhausted
+    )

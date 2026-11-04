@@ -1,7 +1,8 @@
 """The Coach's conversation endpoints (app/ask_coach), against local Postgres.
 
 The background worker is replaced by an inline call, so a turn has finished by
-the time POST .../messages returns. Phase 1's turn stores a fixed reply.
+the time POST .../messages returns, and Gemini by a scripted fake that answers
+"Fake answer." (tests/test_ask_coach_turns.py covers what a turn does with tools).
 """
 
 from uuid import uuid4
@@ -10,9 +11,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app.ask_coach import runner, store
+from app import coach as train_coach
+from app.ask_coach import gemini, runner, store
 from app.db import engine
 from app.main import app
+from ask_coach_fakes import FakeModel
 from conftest import make_token
 
 client = TestClient(app)
@@ -33,8 +36,17 @@ def inline_runner(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def default_limit(monkeypatch):
-    monkeypatch.delenv("COACH_DAILY_LIMIT", raising=False)
+def fake_model(monkeypatch):
+    model = FakeModel()
+    monkeypatch.setattr(gemini, "get_model", lambda: model)
+    return model
+
+
+@pytest.fixture(autouse=True)
+def fresh_limiter(monkeypatch):
+    limiter = train_coach.RateLimiter(per_hour=20, per_day_total=1000)
+    monkeypatch.setattr(train_coach, "limiter", limiter)
+    return limiter
 
 
 def other_headers() -> dict[str, str]:
@@ -103,7 +115,7 @@ def test_sending_stores_the_text_and_the_turn_stores_a_reply(auth_headers):
     assert body["status"] == "idle"
     assert [(m["seq"], m["kind"]) for m in body["messages"]] == [(1, "user_text"), (2, "coach_text")]
     assert body["messages"][0]["payload"] == {"text": "I have AQ on the button. What do I do?"}
-    assert body["messages"][1]["payload"] == {"paras": runner.PLACEHOLDER_REPLY}
+    assert body["messages"][1]["payload"] == {"paras": ["Fake answer."]}
 
 
 def test_after_returns_only_newer_messages(auth_headers):
@@ -157,11 +169,8 @@ def test_a_message_after_an_error_is_accepted(auth_headers):
     assert send(cid, auth_headers).status_code == 202
 
 
-def test_a_turn_that_fails_stores_an_error_and_status_error(auth_headers, monkeypatch):
-    def broken(db, conversation):
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(runner, "_reply", broken)
+def test_a_turn_that_fails_stores_an_error_and_status_error(auth_headers, fake_model):
+    fake_model.turns.append(RuntimeError("boom"))
     cid = new_conversation(auth_headers)
     assert send(cid, auth_headers).status_code == 202
     body = client.get(f"/coach/conversations/{cid}", headers=auth_headers).json()
@@ -225,7 +234,7 @@ def test_the_list_is_newest_first_with_a_preview(auth_headers):
     body = client.get("/coach/conversations", headers=auth_headers).json()
     assert [c["id"] for c in body] == [first, second]
     assert body[0]["title"] == "older conversation, newer message"
-    assert body[0]["preview"] == runner.PLACEHOLDER_REPLY[0][:80]
+    assert body[0]["preview"] == "Fake answer."
     assert body[0]["status"] == "idle"
     assert body[1]["preview"] is None and body[1]["title"] is None
 
@@ -278,42 +287,50 @@ def test_a_missing_conversation_is_the_same_404(auth_headers):
     assert other.json() == {"detail": "No such conversation."}
 
 
-# --- the daily limit ------------------------------------------------------------
+# --- the limit (shared with the Train coach) -----------------------------------
 
-def test_usage_counts_todays_messages(auth_headers):
-    cid = new_conversation(auth_headers)
-    send(cid, auth_headers)
+def test_usage_counts_this_users_messages_this_hour(auth_headers):
     send(new_conversation(auth_headers), auth_headers)
+    send(new_conversation(auth_headers), auth_headers)
+    other = other_headers()
+    send(new_conversation(other), other)
     body = client.get("/coach/usage", headers=auth_headers).json()
     assert body["used"] == 2
-    assert body["limit"] == 25
-    assert body["resets_at"].endswith(("T00:00:00Z", "T00:00:00+00:00"))
+    assert body["limit"] == 20
+    assert body["all_users_exhausted"] is False
+    assert body["resets_at"]
 
 
-def test_usage_ignores_yesterday_and_other_users(auth_headers):
-    cid = new_conversation(auth_headers)
-    send(cid, auth_headers)
-    with engine.begin() as conn:
-        conn.execute(text("UPDATE coach_messages SET created_at = created_at - interval '1 day'"))
-    send(new_conversation(other_headers()), other_headers())
-    assert client.get("/coach/usage", headers=auth_headers).json()["used"] == 0
+def test_the_train_coach_and_the_coach_page_share_one_limit(auth_headers, user_id, fresh_limiter):
+    fresh_limiter.allow(user_id)  # a Train coach question
+    send(new_conversation(auth_headers), auth_headers)
+    assert client.get("/coach/usage", headers=auth_headers).json()["used"] == 2
 
 
 def test_over_the_limit_is_429_with_used_and_limit(auth_headers, monkeypatch):
-    monkeypatch.setenv("COACH_DAILY_LIMIT", "2")
+    monkeypatch.setattr(train_coach, "limiter", train_coach.RateLimiter(per_hour=2, per_day_total=1000))
     cid = new_conversation(auth_headers)
     assert send(cid, auth_headers).status_code == 202
     assert send(cid, auth_headers).status_code == 202
 
     res = send(cid, auth_headers)
     assert res.status_code == 429
-    assert res.json() == {"used": 2, "limit": 2}
+    assert res.json() == {"used": 2, "limit": 2, "all_users_exhausted": False}
     # Nothing was stored for the refused message.
     assert len(client.get(f"/coach/conversations/{cid}", headers=auth_headers).json()["messages"]) == 4
 
 
-@pytest.mark.parametrize("raw,expected", [("", 25), ("nope", 25), ("-1", 25), ("0", 0), ("7", 7)])
-def test_the_limit_comes_from_the_environment(auth_headers, monkeypatch, raw, expected):
-    monkeypatch.setenv("COACH_DAILY_LIMIT", raw)
-    assert client.get("/coach/usage", headers=auth_headers).json()["limit"] == expected
+def test_the_all_users_daily_total_is_429_too(auth_headers, monkeypatch):
+    monkeypatch.setattr(train_coach, "limiter", train_coach.RateLimiter(per_hour=20, per_day_total=1))
+    other = other_headers()
+    assert send(new_conversation(other), other).status_code == 202
+    res = send(new_conversation(auth_headers), auth_headers)
+    assert res.status_code == 429
+    assert res.json() == {"used": 0, "limit": 20, "all_users_exhausted": True}
 
+
+def test_a_409_doesnt_count(auth_headers):
+    cid = new_conversation(auth_headers)
+    set_status(cid, "working")
+    send(cid, auth_headers)
+    assert client.get("/coach/usage", headers=auth_headers).json()["used"] == 0

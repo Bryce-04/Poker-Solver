@@ -31,6 +31,26 @@ def now() -> datetime:
     return datetime.now(UTC)
 
 
+TITLE_FROM_TEXT_CHARS = 40
+
+
+def title_from_text(text: str) -> str:
+    """A conversation's title before it has a spot: the start of its first message."""
+    return " ".join(text.split())[:TITLE_FROM_TEXT_CHARS].rstrip()
+
+
+def first_text_title(db: Session, conversation_id: UUID) -> str | None:
+    """The automatic title the first message gave the conversation. A title
+    still equal to it hasn't been renamed, so a spot card may replace it."""
+    first = db.scalar(
+        select(CoachMessageRow.payload)
+        .where(CoachMessageRow.conversation_id == conversation_id, CoachMessageRow.kind == "user_text")
+        .order_by(CoachMessageRow.seq)
+        .limit(1)
+    )
+    return title_from_text(first.get("text", "")) if first else None
+
+
 def own_conversation(
     db: Session, conversation_id: UUID, user_id: UUID, *, lock: bool = False
 ) -> CoachConversationRow:

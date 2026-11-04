@@ -82,6 +82,11 @@ class CoachUnavailable(Exception):
     """The model could not be reached or gave nothing usable."""
 
 
+class CoachBusy(CoachUnavailable):
+    """Every attempt was rate limited or overloaded: worth trying again in a minute. Raised by
+    `GeminiProvider.generate_turn` (the Coach page), which tells the user so."""
+
+
 class CoachProvider(Protocol):
     def generate(self, system: str, user: str) -> str: ...
 
@@ -212,6 +217,69 @@ class GeminiProvider:
         raise CoachUnavailable(last)
 
 
+    turn_timeout_s = 60.0
+
+    def generate_turn(
+        self, system: str, contents: list[dict], tools: list[dict] | None = None, *, allow_tools: bool = True
+    ) -> list[dict]:
+        """One non-streamed model turn with function calling, for the Coach page (app/ask_coach/).
+        `contents` is Gemini's own shape (role + parts, including functionCall / functionResponse
+        parts) and `tools` its function declarations. Returns the reply's parts, text and/or
+        functionCall, unchanged, so the caller can send them back as they came (Gemini 3 needs its
+        thought signatures returned). `allow_tools=False` asks for text only.
+
+        Same model list and rounds as `stream`. No thinking setting is sent: turning a description
+        into a spot is where the model's reasoning helps, and nobody is watching words arrive.
+        Raises CoachBusy when every attempt was rate limited, overloaded or unreachable, and
+        CoachUnavailable otherwise (a bad key, a malformed request)."""
+        body: dict = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": contents,
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
+        }
+        if tools:
+            body["tools"] = [{"functionDeclarations": tools}]
+            body["toolConfig"] = {"functionCallingConfig": {"mode": "AUTO" if allow_tools else "NONE"}}
+        last = "no model configured"
+        all_transient = True
+        for attempt in range(self.rounds):
+            transient = False
+            for model in self._models:
+                try:
+                    res = self._client.post(
+                        _GEMINI_URL.format(model=model),
+                        headers={"x-goog-api-key": self._key, "Content-Type": "application/json"},
+                        json=body,
+                        timeout=httpx.Timeout(self.turn_timeout_s, connect=5.0),
+                    )
+                except httpx.HTTPError as e:
+                    last, transient = f"{model}: {type(e).__name__}", True
+                    log.info("coach turn: %s", last)
+                    continue
+                if res.status_code != 200:
+                    # Status only: the body can echo request content.
+                    last = f"{model}: HTTP {res.status_code}"
+                    log.info("coach turn: %s", last)
+                    if res.status_code in _TRANSIENT:
+                        transient = True
+                    else:
+                        all_transient = False
+                    continue
+                try:
+                    parts = res.json()["candidates"][0]["content"]["parts"]
+                except (KeyError, IndexError, TypeError, ValueError):
+                    parts = None  # blocked, or no candidate at all
+                if parts and any(("text" in p and not p.get("thought")) or "functionCall" in p for p in parts):
+                    return parts
+                last, all_transient = f"{model}: empty answer", False
+            if not transient or attempt == self.rounds - 1:
+                break
+            self._sleep(self.pause_s)
+        if all_transient:
+            raise CoachBusy(last)
+        raise CoachUnavailable(last)
+
+
 class _HttpStatus(Exception):
     def __init__(self, status: int, body: str) -> None:
         super().__init__(f"HTTP {status}")
@@ -286,6 +354,26 @@ class RateLimiter:
             mine.append(now)
             self._all.append(now)
             return True
+
+    def refund(self, user: UUID) -> None:
+        """Gives back the user's latest question: the Coach page does this when Gemini was busy,
+        so a message the model never answered doesn't count."""
+        with self._lock:
+            if self._user[user]:
+                stamp = self._user[user].pop()
+                try:
+                    self._all.remove(stamp)
+                except ValueError:
+                    pass
+
+    def usage(self, user: UUID, now: float | None = None) -> tuple[int, float | None, bool]:
+        """(questions this user asked in the last hour, when the oldest of them stops counting
+        (None if none), whether the all-users daily total is used up). Doesn't count anything."""
+        now = time.time() if now is None else now
+        with self._lock:
+            mine = [t for t in self._user[user] if now - t <= 3600]
+            all_users = sum(1 for t in self._all if now - t <= 86400)
+            return len(mine), (mine[0] + 3600 if mine else None), all_users >= self.per_day_total
 
 
 def _int_env(name: str, default: int) -> int:

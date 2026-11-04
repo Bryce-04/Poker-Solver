@@ -6,6 +6,58 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-04 — The Coach page, Phase 2: Gemini, describe_spot, one client and one limit for the app
+
+Status: **proposed**. Spec: `docs/coach.md` §2-5 and §11.
+
+**What.** A Coach turn now runs Gemini with tools (`app/ask_coach/runner.py`): at most 4 rounds of
+tool calls, each card stored as it's made, then the model's text. `describe_spot` turns the user's
+description into a `Spot` (`spot_builder.py`); `give_general_advice` and `suggest_followups` store
+their cards. The two solver tools are declared, so the prompt is final, but answer "not connected
+yet" until Phase 3. Conversations are titled from their first spot card ("AQ on the button, Q-5-2
+flop") unless renamed. `scripts/coach_smoke.py` checks a key; `scripts/coach_eval.py` scores the
+model on `coach_eval/cases.jsonl` (51 messy descriptions).
+
+**The spec was written before the Train coach existed, so two things changed (the team's call).**
+- **One Gemini client.** Not the spec's `google-genai` SDK in its own `gemini.py`: the Coach uses
+  the Train coach's `GeminiProvider` (`app/coach.py`), which gained `generate_turn` (one
+  non-streamed function-calling turn). Same key, same comma-separated `GEMINI_MODEL` list tried in
+  order, same retry rounds. No new dependency. `ask_coach/gemini.py` is now the adapter: it builds
+  Gemini's contents from stored messages and is what tests replace with a fake.
+- **One limit.** The Coach page counts against the Train coach's `limiter` (`COACH_PER_HOUR` per user,
+  `COACH_PER_DAY_TOTAL` for everyone), once per message however many tool rounds it takes. Phase 1's
+  `COACH_DAILY_LIMIT` is gone. So `GET /coach/usage` and the 429 report *this hour*, not today, plus
+  `all_users_exhausted`. The spec's UI copy ("n of 25 messages left today", "resets at midnight UTC")
+  needs rewording in Phase 4. The limiter is in memory, so it resets when the server restarts.
+- **The Train coach's "Ask the coach" stays separate.** It doesn't open a Coach conversation.
+
+**Other choices.**
+- **No thinking setting is sent** on a Coach turn (the Train chat turns thinking down for speed).
+  Reading a messy description is where the model's reasoning helps, and a Coach turn isn't streamed.
+  This also keeps `generate_turn` independent of the thinking settings the `coach-on-train` branch
+  is changing.
+- **Busy means every attempt was rate limited, overloaded or unreachable.** That stores the
+  `gemini_busy` error and gives the message back to the user's limit. A bad key or a bad request is
+  an `internal` error and still counts. No key at all stores an error of a new kind,
+  `not_configured`, and doesn't count.
+- **`spot_builder.py` ports `handBuilder.ts`'s arithmetic** instead of trusting the model with pots.
+  `apps/web/src/lib/handBuilder.fixtures.json` (18 hands) is checked by both a Python and a TS test.
+  A spot is saved the way Solve saves a clicked-through hand, so "Open in Solve" (Phase 4) replays it.
+- **`describe_spot` takes three more preflop lines than the spec** for preflop questions:
+  `unopened`, `facing_open` and `facing_three_bet`. The spec's three lines all describe finished
+  preflop action, which leaves no way to ask "should I open A5s from UTG?".
+- **The model gets the backend's assumptions too.** Defaults the backend fills in (100bb, a 2.5bb
+  open, a 3x 3-bet, a 2.2x 4-bet) are added to the card's assumptions even if the model forgot to
+  list them.
+- **A pasted hand history** (`attached_spot`) is used as it is. Only the user's seat and cards come
+  from the model, and a card says "read from your hand history".
+- **The spot card's payload** carries `hero_position` and a one-line `summary` beyond the spec's
+  fields. The summary is how the card is shown to the model in later turns.
+
+**Not run yet:** the evaluation. It needs a key in `.env`, so the 90% target is unmeasured.
+
+---
+
 ## 2026-11-04 — The Coach page (Ask mode), Phase 1: conversations, the daily limit, no Gemini yet
 
 Status: **proposed**. Spec: `docs/coach.md` (design in `docs/coach/mockup/`).
@@ -41,15 +93,8 @@ labeling; it doesn't rely on the model's prose.
 - **A turn lost to a restart** is reset to `error` (with an `error` message, so the UI can offer
   Try again) when the conversation is read, listed, or sent to, if it has been busy and untouched
   for 5 minutes.
-- **The limit counts stored `user_text` messages**, as the spec says. So deleting a conversation
-  gives back that day's messages from it. That's accepted for now; if it's abused, count from a
-  separate log instead. `COACH_DAILY_LIMIT` is separate from the Train coach's `COACH_PER_HOUR` /
-  `COACH_PER_DAY_TOTAL`.
-
-**Open for Phase 2.** The spec asks for the `google-genai` SDK and a single `GEMINI_MODEL` id, but
-the Train coach already calls Gemini over `httpx` with a comma-separated model fallback list (free
-keys lose access to models without notice). Phase 2 should decide whether the Coach shares that
-client and those settings or uses the SDK as specified.
+- **The limit** was a separate `COACH_DAILY_LIMIT` counted from stored messages. Phase 2 replaced
+  it with the Train coach's limit (see the Phase 2 entry above).
 
 ---
 
