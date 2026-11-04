@@ -61,8 +61,12 @@ class CoachContext(BaseModel):
     hand: list[str] = Field(default_factory=list, max_length=2)
     picked: str = Field(max_length=120)
     correct: str = Field(max_length=120)
-    # What the app already computed (solver frequencies, range membership...).
+    # What the app already computed (solver frequencies, range membership...). Also the text shown
+    # when the model can't answer, so keep it short enough to read on its own.
     explanation: str = Field(max_length=1500)
+    # More facts for the model only, never shown as the fallback (the Drill's whole solver mix and
+    # every computed bullet). Optional: the lessons don't send it.
+    details: str = Field(default="", max_length=1500)
 
 
 class CoachRequest(BaseModel):
@@ -258,6 +262,8 @@ def build_user_prompt(req: CoachRequest) -> str:
         f"Correct answer: {c.correct}",
         f"App's explanation (from solver output or range charts): {c.explanation}",
     ]
+    if c.details:
+        facts.append(f"More facts from the solver: {c.details}")
     return "FACTS:\n" + "\n".join(facts) + f"\n\nLEARNER'S QUESTION:\n{req.question}"
 
 
@@ -318,7 +324,15 @@ def answer(req: CoachRequest, user: UUID, provider: CoachProvider | None) -> Coa
 # the lessons' one-shot `answer` above is unchanged.
 
 MAX_HISTORY = 12  # messages; about six exchanges
-FIRST_QUESTION = "Explain why that is the right play, and whether my pick was reasonable."
+FIRST_QUESTION = (
+    "In two or three short sentences, say why that is the right play and whether my pick was "
+    "reasonable."
+)
+# The chat is a quick answer, not an essay: say so, once, for every turn.
+CHAT_SYSTEM_PROMPT = SYSTEM_PROMPT + """
+
+For this chat: answer in two or three short sentences, in the plainest words you can. Lead with the \
+answer. Use a number only when it makes the point, and never recite the whole list of facts back."""
 
 
 class ChatMessage(BaseModel):
@@ -369,7 +383,7 @@ def chat_events(req: ChatRequest, user: UUID, provider) -> Iterator[dict]:
     if not limiter.allow(user):
         yield from app_explanation("rate_limited")
         return
-    deltas = provider.stream(SYSTEM_PROMPT, build_conversation(req))
+    deltas = provider.stream(CHAT_SYSTEM_PROMPT, build_conversation(req))
     try:
         first = next(deltas)
     except (CoachUnavailable, StopIteration) as e:

@@ -72,11 +72,11 @@ def test_it_streams_the_answer_then_says_done(monkeypatch):
     assert events(res) == [{"delta": "Bet because "}, {"delta": "you have top pair."}, {"done": True}]
 
 
-def test_the_first_message_is_the_grounded_facts_and_uses_the_lessons_system_prompt(monkeypatch):
+def test_the_first_message_is_the_grounded_facts_and_the_chat_asks_for_a_short_answer(monkeypatch):
     fake = use(monkeypatch, FakeStream())
     chat()
     system, messages = fake.calls[0]
-    assert system == coach.SYSTEM_PROMPT
+    assert system.startswith(coach.SYSTEM_PROMPT) and "two or three short sentences" in system
     assert len(messages) == 1 and messages[0]["role"] == "user"
     text = messages[0]["content"]
     assert "Learner chose: Check" in text and "Correct answer: Bet 1.8bb (33%)" in text
@@ -290,3 +290,18 @@ def test_thinking_is_off_by_default_and_the_environment_can_change_it(monkeypatc
     assert coach.get_provider()._thinking_budget == 256
     monkeypatch.setenv("GEMINI_THINKING_BUDGET", "garbage")
     assert coach.get_provider()._thinking_budget == 0
+
+
+def test_details_reach_the_model_but_are_never_the_fallback(monkeypatch):
+    ctx = {**CONTEXT, "details": "The solver's mix: Check 57%, Bet 23%."}
+    fake = use(monkeypatch, FakeStream())
+    chat(context=ctx)
+    assert "More facts from the solver: The solver's mix: Check 57%, Bet 23%." in fake.calls[0][1][0]["content"]
+    use(monkeypatch, None)
+    got = events(chat(context=ctx))
+    assert got[1] == {"delta": CONTEXT["explanation"]} and "Check 57%" not in got[1]["delta"]
+
+
+def test_the_lessons_one_shot_prompt_is_unchanged_without_details():
+    prompt = coach.build_user_prompt(coach.CoachRequest(question="q", context=CONTEXT))
+    assert "More facts" not in prompt

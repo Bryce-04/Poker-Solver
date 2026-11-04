@@ -44,14 +44,22 @@ export function drillCoachContext(
   const mix = ranked(spot)
     .map((a) => `${label(a)}: ${pct(spot.mix[a] ?? 0)}`)
     .join(", ");
-  const parts = [`The solver's mix for this exact hand: ${mix}.`];
   const analysis = spot.analysis;
-  if (analysis) {
-    parts.push(...analysis.bullets);
-    parts.push(
-      `This hand has ${analysis.facts.equityPct}% equity against the opponent's range and beats ${analysis.facts.rangePercentile}% of the hands in its own range.`,
-    );
-  }
+  // What the learner reads if the AI can't answer: short. The hand, and the reason (the first and
+  // third bullets); the mix is already on screen as bars, so it isn't repeated here.
+  const short = analysis
+    ? [analysis.bullets[0], analysis.bullets[2]].filter(Boolean).join(" ")
+    : `The solver plays ${label(ranked(spot)[0])} most often here (${pct(spot.mix[ranked(spot)[0]] ?? 0)}).`;
+  // Everything else goes to the model only.
+  const details = [
+    `The solver's mix for this exact hand: ${mix}.`,
+    ...(analysis
+      ? [
+          ...analysis.bullets,
+          `This hand has ${analysis.facts.equityPct}% equity against the opponent's range and beats ${analysis.facts.rangePercentile}% of the hands in its own range.`,
+        ]
+      : []),
+  ];
   return {
     lesson_title: "Poker Drill",
     prompt: situationText(spot).slice(0, 400),
@@ -59,7 +67,8 @@ export function drillCoachContext(
     hand: [...spot.hand],
     picked: label(chosen).slice(0, 120),
     correct: `${label(ranked(spot)[0])} (the solver's most frequent action)`.slice(0, 120),
-    explanation: parts.join(" ").slice(0, 1500),
+    explanation: short.slice(0, 1500),
+    details: details.join(" ").slice(0, 1500),
   };
 }
 

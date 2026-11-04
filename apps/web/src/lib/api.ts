@@ -485,7 +485,10 @@ export interface CoachContext {
   hand: string[];
   picked: string;
   correct: string;
+  /** Plain text for the learner; also what's shown when the model can't answer. */
   explanation: string;
+  /** More facts for the model only (never shown as the fallback). */
+  details?: string;
 }
 
 export interface CoachAnswer {
