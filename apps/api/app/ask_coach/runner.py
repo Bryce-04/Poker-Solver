@@ -113,6 +113,7 @@ def _run(conversation_id: UUID) -> UUID | None:
         store=lambda kind, payload, title: _store(conversation_id, kind, payload, title),
         attached_spot=Spot.model_validate(attached) if attached else None,
         current_spot=current,
+        user_texts=[(m.payload or {}).get("text", "") for m in messages if m.kind == "user_text"],
     )
     contents = gemini.build_contents(messages)
     stored_text = False

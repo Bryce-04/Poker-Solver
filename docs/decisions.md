@@ -55,7 +55,7 @@ model on `coach_eval/cases.jsonl` (51 messy descriptions).
   fields. The summary is how the card is shown to the model in later turns.
 
 **Evaluation (2026-11-04, `gemini-3-flash-preview`):** 65% exact on the first run, then **80%
-(41 of 51)** after these fixes. Still short of the 90% target, so the Coach isn't ready for anyone
+(41 of 51)** after these fixes, and **84%** after the suits check below. Still short of the 90% target, so the Coach isn't ready for anyone
 outside the team.
 - **Who raised preflop is worked out from the seats.** In a finished heads-up line the opener is
   always the seat that acts first preflop, so `describe_spot` no longer takes `aggressor`. The model
@@ -76,6 +76,22 @@ Remaining misses:
 - An action that never happened.
 - Guessing a position instead of asking.
 - Two genuinely ambiguous texts.
+
+**Then the suits check: 84% (43 of 51).** `spot_builder.keep_only_written_suits` keeps the two
+exact cards of the user's hand only if the user wrote both, in any form ("Ah", "A♥", "ace of
+hearts", "AsAd"), in any message of the conversation. Otherwise the hand becomes its type
+("As2s" becomes "A2s"), and `describe_spot` tells the model so. Invented suits can no longer
+reach the solver. `normalize_card` also reads suit symbols now ("Q♠").
+
+Two of that run's misses were the model sending a string where an object belongs. `spot_builder`
+had crashed on that, which the user would have seen as a broken tool. It's now a question for the
+user.
+
+Left:
+- An action that never happened (twice).
+- A board card misread ("7d" as "Id") or left out (twice).
+- Guessing a position instead of asking.
+- One ambiguous text.
 
 Runs vary from one to the next, so judge a prompt change on more than one run. The default model in
 `app/coach.py` on `main` (`gemini-2.5-flash`) answers 404 for new keys. The eval used

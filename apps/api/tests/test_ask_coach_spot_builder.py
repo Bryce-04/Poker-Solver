@@ -291,3 +291,58 @@ def test_an_attached_spot_needs_to_know_which_player_you_were():
 def test_an_attached_spot_rejects_your_cards_on_the_board():
     d = sb.from_attached(HISTORY_SPOT, {"hero_position": "BTN", "hero_hand": "QsQd"})
     assert any("also on the board" in p for p in d.problems)
+
+
+# --- suits the user didn't write --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "text,cards",
+    [
+        ("I'm on the button with A♥ Q♦.", {"Ah", "Qd"}),
+        ("I have AsAd.", {"As", "Ad"}),
+        ("flop Qs5c2c", {"Qs", "5c", "2c"}),
+        ("10h10d", {"Th", "Td"}),
+        ("A ♥ Q ♦", {"Ah", "Qd"}),
+        ("the ace of spades and the king of hearts", {"As", "Kh"}),
+        ("Thanks, as I said, ah well, ad hoc", set()),
+        ("pocket aces, AKs, A2s", set()),
+    ],
+)
+def test_written_cards(text, cards):
+    assert sb.written_cards([text]) == cards
+
+
+@pytest.mark.parametrize(
+    "hand,texts,kept",
+    [
+        ("AhQd", ["I'm on the button with A♥ Q♦."], ("AhQd", False)),
+        ("AhQd", ["I have AQ", "it was the Ah and the Qd"], ("AhQd", False)),  # any earlier message counts
+        ("As2s", ["I called from the BB with A2s."], ("A2s", True)),
+        ("AhAd", ["pocket aces"], ("AA", True)),
+        ("AhQd", ["AQ off, the Ah"], ("AQo", True)),  # one suit written isn't enough
+        ("AQo", ["AQo"], ("AQo", False)),
+        (None, [], (None, False)),
+    ],
+)
+def test_keep_only_written_suits(hand, texts, kept):
+    assert sb.keep_only_written_suits(hand, texts) == kept
+
+
+@pytest.mark.parametrize("raw,card", [("Qs", "Qs"), ("qS", "Qs"), ("10h", "Th"), ("Q♠", "Qs"), ("2 ♣", "2c"), ("Zz", None), ("Q", None)])
+def test_cards_in_any_form(raw, card):
+    assert sb.normalize_card(raw) == card
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"preflop": "open_call"},
+        {"postflop_actions": ["BB checks"]},
+        {"postflop_actions": "BB checks"},
+        {"board": "Qs 5c 2c"},
+    ],
+)
+def test_malformed_arguments_are_questions_not_crashes(change):
+    d = sb.describe({**BTN_VS_BB_FLOP, **change})
+    assert not d.ok and d.problems

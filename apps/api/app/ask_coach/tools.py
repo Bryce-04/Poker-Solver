@@ -154,6 +154,9 @@ class ToolContext:
     attached_spot: Spot | None = None
     # The latest spot card's payload: what follow-ups are about.
     current_spot: dict | None = None
+    # Everything the user has written in this conversation, to check the model
+    # didn't invent the suits of their hand (spot_builder.keep_only_written_suits).
+    user_texts: list[str] = field(default_factory=list)
     called: list[str] = field(default_factory=list)
 
 
@@ -174,6 +177,14 @@ def execute(name: str, args: dict | None, ctx: ToolContext) -> dict:
 
 
 def _describe_spot(args: dict, ctx: ToolContext) -> dict:
+    note = None
+    if args.get("hero_hand"):
+        given, _ = spot_builder.normalize_hand(args["hero_hand"])
+        kept, changed = spot_builder.keep_only_written_suits(given, ctx.user_texts)
+        if changed:
+            log.info("ask_coach: describe_spot dropped invented suits conversation=%s", ctx.conversation_id)
+            args = {**args, "hero_hand": kept}
+            note = f"The user didn't write those suits, so the hand is {kept}. Don't mention suits for it."
     if ctx.attached_spot is not None:
         d = spot_builder.from_attached(ctx.attached_spot, args)
     else:
@@ -198,6 +209,7 @@ def _describe_spot(args: dict, ctx: ToolContext) -> dict:
         "summary": d.summary,
         "assumptions": d.assumptions,
         "problems": [],
+        **({"note": note} if note else {}),
     }
 
 

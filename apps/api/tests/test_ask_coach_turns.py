@@ -50,7 +50,7 @@ def model(monkeypatch):
     return fake
 
 
-def ask(headers, message="BTN with AQ, BB calls, flop Qs5c2c, he checks. What now?", cid=None, **extra):
+def ask(headers, message="BTN with AhQd, BB calls, flop Qs5c2c, he checks. What now?", cid=None, **extra):
     cid = cid or client.post("/coach/conversations", headers=headers).json()["id"]
     res = client.post(f"/coach/conversations/{cid}/messages", json={"text": message, **extra}, headers=headers)
     assert res.status_code == 202, res.text
@@ -94,6 +94,23 @@ def test_a_full_turn_stores_cards_in_order(auth_headers, model):
     # Tool rounds send back the model's own parts unchanged (thought signatures included).
     assert model.requests[1]["contents"][-2] == {"role": "model", "parts": model.requests[1]["contents"][-2]["parts"]}
     assert model.requests[1]["contents"][-2]["parts"][1]["functionCall"]["name"] == "describe_spot"
+
+
+def test_invented_suits_become_the_hand_type(auth_headers, model):
+    model.turns += [[call("describe_spot", **{**BTN_AQ, "hero_hand": "As2s"})], []]
+    _, body = ask(auth_headers, "BTN with A2s, BB calls, flop Qs5c2c, he checks.")
+    card = next(m for m in body["messages"] if m["kind"] == "spot_card")["payload"]
+    assert card["hero_hand"] == "A2s"
+    result = responses(model.requests[1])["describe_spot"]
+    assert "didn't write those suits" in result["note"]
+
+
+def test_suits_the_user_wrote_are_kept(auth_headers, model):
+    model.turns += [[call("describe_spot", **BTN_AQ)], []]
+    _, body = ask(auth_headers, "BTN with A♥ Q♦, BB calls, flop Qs5c2c, he checks.")
+    card = next(m for m in body["messages"] if m["kind"] == "spot_card")["payload"]
+    assert card["hero_hand"] == "AhQd"
+    assert "note" not in responses(model.requests[1])["describe_spot"]
 
 
 def test_problems_go_back_to_the_model_and_no_card_is_stored(auth_headers, model):
@@ -188,7 +205,7 @@ def test_follow_ups_carry_the_history_and_the_spot(auth_headers, model):
 
     sent = model.requests[0]
     flat = [p["text"] for c in sent["contents"] for p in c["parts"]]
-    assert flat[0].startswith("BTN with AQ")
+    assert flat[0].startswith("BTN with AhQd")
     assert any(t.startswith("[Spot card shown:") for t in flat)
     assert "Bet small." in flat
     assert flat[-1] == "What if he bets instead?"

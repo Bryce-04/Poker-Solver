@@ -196,6 +196,8 @@ one usage limit**. One PR per phase.
   - It calls Gemini through `app/coach.py`'s `GeminiProvider.generate_turn`: function calling, the
     same key and `GEMINI_MODEL` fallback list.
   - At most 4 tool rounds, and each card is stored in its own transaction as it's made.
+  - `describe_spot` keeps the suits of the user's hand only if the user wrote them
+    (`keep_only_written_suits`); otherwise it uses the hand type.
   - `describe_spot` computes the pot itself: `spot_builder.py` ports `handBuilder.ts`, and the two
     are held together by `apps/web/src/lib/handBuilder.fixtures.json`. **Change both together.**
   - The solver tools answer "not connected yet" until Phase 3.
@@ -210,7 +212,7 @@ one usage limit**. One PR per phase.
 - **With a key** (`GEMINI_API_KEY` in the repo-root `.env`), from `apps/api`:
   `python scripts/coach_smoke.py` checks it, and `python scripts/coach_eval.py` scores the model on
   `coach_eval/cases.jsonl`. Run the eval before and after any prompt change; the target is 90%.
-  `--check-cases` validates the cases without a key. **Last result: 80% (41 of 51), below the 90%
+  `--check-cases` validates the cases without a key. **Last result: 84% (43 of 51), below the 90%
   target**; the misses are listed in `docs/decisions.md`. `main`'s default `gemini-2.5-flash` is a 404
   for new keys: until `coach-on-train` merges, set `GEMINI_MODEL` (that branch's list works).
 - **Migration clash to watch:** the unmerged `account-progress` branch also adds a `0003`. Whichever

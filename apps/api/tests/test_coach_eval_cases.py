@@ -49,3 +49,15 @@ def test_compare():
     assert compare({"asks": True}, {**args, "villain_position": "BB", "board": ["Qs", "5c", "2c"]}) == [
         "describe_spot found nothing to ask"
     ]
+
+
+def test_compare_applies_the_apps_suit_check():
+    expect = {"hand": "A2s"}
+    invented = {"hero_hand": "As2s", "preflop": {"line": "open_call"}}
+    assert compare(expect, invented) == ["hand='As2s'"]  # raw model output
+    assert compare(expect, invented, "I called from the BB with A2s.") == []  # what the app keeps
+
+
+def test_board_matching_reads_symbols_and_rejects_junk():
+    assert board_matches(["Q♠", "5♣", "2♣"], ["Qs", "5c", "2c"], "exact")
+    assert not board_matches(["Q?", "5c", "2c"], ["Qs", "5c", "2c"], "ranks")

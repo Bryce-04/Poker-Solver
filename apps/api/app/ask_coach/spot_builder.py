@@ -224,7 +224,11 @@ class Described:
 
 
 def normalize_card(raw: str) -> str | None:
-    m = _CARD.match(str(raw).strip())
+    """"Qs", "qS", "10h" or "Q♠" -> "Qs"; None if it isn't a card."""
+    text = str(raw).strip().replace(" ", "")
+    for symbol, letter in _SUIT_SYMBOLS.items():
+        text = text.replace(symbol, letter)
+    m = _CARD.match(text)
     if not m:
         return None
     rank = "T" if m.group(1) == "10" else m.group(1).upper()
@@ -251,6 +255,61 @@ def normalize_hand(raw: str) -> tuple[str | None, str | None]:
             return None, f"Is your {hi}{lo} suited or offsuit?"
         return hi + lo + kind, None
     return None, f"I couldn't read your hand ({raw!r}). Which two cards?"
+
+
+_SUIT_SYMBOLS = {"♠": "s", "♤": "s", "♥": "h", "♡": "h", "♦": "d", "♢": "d", "♣": "c", "♧": "c"}
+_RANK_WORDS = {
+    "ace": "A", "king": "K", "queen": "Q", "jack": "J", "ten": "T", "nine": "9", "eight": "8",
+    "seven": "7", "six": "6", "five": "5", "four": "4", "three": "3", "two": "2", "deuce": "2",
+}
+_SUIT_WORDS = {"spade": "s", "spades": "s", "heart": "h", "hearts": "h", "diamond": "d", "diamonds": "d", "club": "c", "clubs": "c"}
+# "Ah", "10s", "Q♦". A lowercase "a" isn't a rank ("as", "ah" are words), and a suit
+# letter mustn't run on into a word ("Thanks" isn't Th).
+_WRITTEN_CARD = re.compile(
+    r"(?<![A-Za-z0-9])(10|[2-9TJQKAtjqk])(?:([shdcSHDC])(?![a-z])|\s?([♠♤♥♡♦♢♣♧]))"
+)
+# Cards written together ("AsAd", "Qs5c2c") are split apart first.
+_RUN_TOGETHER = re.compile(r"(?<=[02-9TJQKA][shdc])(?=(?:10|[2-9TJQKA])[shdc])")
+_WORD_CARD = re.compile(
+    r"\b(" + "|".join(_RANK_WORDS) + r")s? of (" + "|".join(_SUIT_WORDS) + r")\b", re.IGNORECASE
+)
+
+
+def written_cards(texts: list[str]) -> set[str]:
+    """Every exact card the user wrote, in any form: "Ah", "A♥", "ace of hearts"."""
+    found: set[str] = set()
+    for raw in texts:
+        text = _RUN_TOGETHER.sub(" ", raw)
+        for rank, letter, symbol in _WRITTEN_CARD.findall(text):
+            card = normalize_card(rank + (letter or _SUIT_SYMBOLS.get(symbol, "")))
+            if card:
+                found.add(card)
+        for rank_word, suit_word in _WORD_CARD.findall(text):
+            found.add(_RANK_WORDS[rank_word.lower()] + _SUIT_WORDS[suit_word.lower()])
+    return found
+
+
+def keep_only_written_suits(hand: str | None, texts: list[str]) -> tuple[str | None, bool]:
+    """The model may not invent suits for the user's hand: suits change the
+    solver's answer (flush draws, blockers). Two exact cards are kept only if the
+    user wrote both; otherwise the hand becomes its type ("As2s" -> "A2s",
+    "AsAd" -> "AA"). Returns (hand, whether it was changed)."""
+    if not hand or len(hand) != 4:
+        return hand, False
+    written = written_cards(texts)
+    if hand[:2] in written and hand[2:] in written:
+        return hand, False
+    return hand_type(hand), True
+
+
+def hand_type(combo: str) -> str:
+    """"AhQd" -> "AQo", "As2s" -> "A2s", "AsAd" -> "AA"."""
+    a, b = combo[:2], combo[2:]
+    if _RANKS.index(b[0]) > _RANKS.index(a[0]):
+        a, b = b, a
+    if a[0] == b[0]:
+        return a[0] + b[0]
+    return a[0] + b[0] + ("s" if a[1] == b[1] else "o")
 
 
 def hand_ranks(hand: str) -> str:
@@ -329,7 +388,9 @@ def describe(args: dict) -> Described:
 
     hero = str(args.get("hero_position") or "").upper()
     villain = str(args.get("villain_position") or "").upper()
-    preflop = args.get("preflop") or {}
+    # The model sometimes sends a string where an object belongs; that's a
+    # question for the user, never a crash.
+    preflop = args.get("preflop") if isinstance(args.get("preflop"), dict) else {}
     line = str(preflop.get("line") or "")
     if line not in CLOSED_LINES + DECISION_LINES:
         problems.append("How did the preflop action go (who raised, who called)?")
@@ -415,6 +476,9 @@ def describe(args: dict) -> Described:
         problems.append("The preflop action wasn't finished, so there can't be action after the flop. What happened preflop?")
     last_street_index = 0
     for raw in postflop:
+        if not isinstance(raw, dict):
+            problems.append("I couldn't read the action after the flop. What happened, in order?")
+            break
         street = str(raw.get("street") or "")
         if street not in STREET_ORDER[1:]:
             problems.append(f"I couldn't tell which street an action was on ({street!r}).")

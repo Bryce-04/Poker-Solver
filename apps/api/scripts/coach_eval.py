@@ -61,7 +61,9 @@ def _suit_pattern(cards: list[str]) -> list[list[bool]]:
 
 
 def board_matches(got: list[str], want: list[str], mode: str) -> bool:
-    got = [sb.normalize_card(c) or c for c in got]
+    got = [sb.normalize_card(c) for c in got]
+    if None in got:
+        return False  # a card nobody could read
     if mode == "exact":
         return _flop_sorted(got) == _flop_sorted(want)
     if len(got) != len(want):
@@ -72,8 +74,10 @@ def board_matches(got: list[str], want: list[str], mode: str) -> bool:
     return mode == "ranks" or _suit_pattern(g) == _suit_pattern(w)
 
 
-def compare(expect: dict, args: dict | None) -> list[str]:
-    """The fields that don't match; empty means an exact match."""
+def compare(expect: dict, args: dict | None, text: str | None = None) -> list[str]:
+    """The fields that don't match; empty means an exact match. With the case's
+    `text`, the hand goes through the same suit check as the app
+    (spot_builder.keep_only_written_suits), so the score is what users get."""
     if expect.get("no_describe"):
         return [] if args is None else ["called describe_spot"]
     if expect.get("asks"):
@@ -81,7 +85,7 @@ def compare(expect: dict, args: dict | None) -> list[str]:
     if args is None:
         return ["no describe_spot call"]
     wrong = []
-    pre = args.get("preflop") or {}
+    pre = args.get("preflop") if isinstance(args.get("preflop"), dict) else {}
     checks = {
         "hero": str(args.get("hero_position", "")).upper(),
         "villain": str(args.get("villain_position", "")).upper(),
@@ -93,12 +97,17 @@ def compare(expect: dict, args: dict | None) -> list[str]:
             wrong.append(f"{key}={got!r}")
     if "hand" in expect:
         got_hand, _ = sb.normalize_hand(args.get("hero_hand") or "")
+        if text is not None:
+            got_hand, _ = sb.keep_only_written_suits(got_hand, [text])
         if got_hand != expect["hand"]:
             wrong.append(f"hand={args.get('hero_hand')!r}")
     if "board" in expect and not board_matches(args.get("board") or [], expect["board"], expect.get("board_match", "exact")):
         wrong.append(f"board={args.get('board')}")
     if "actions" in expect:
-        got = [[a.get("street"), a.get("actor"), a.get("action")] for a in args.get("postflop_actions") or []]
+        got = [
+            [a.get("street"), a.get("actor"), a.get("action")] if isinstance(a, dict) else [str(a)]
+            for a in args.get("postflop_actions") or []
+        ]
         if got != expect["actions"]:
             wrong.append(f"actions={got}")
     return wrong
@@ -164,9 +173,11 @@ def main() -> int:
             time.sleep(a.delay)
         try:
             args, called = first_describe_call(provider, c["text"])
-            wrong = compare(c["expect"], args)
+            wrong = compare(c["expect"], args, c["text"])
         except coach.CoachUnavailable as e:
             called, wrong = "error", [f"model error: {e}"]
+        except Exception as e:  # something the scorer couldn't read counts as a miss, not a crash
+            called, wrong = "error", [f"couldn't score: {type(e).__name__}: {e}"]
         exact += not wrong
         rows.append((c["id"], "ok" if not wrong else "MISS", called, "; ".join(wrong)))
         print(f"{rows[-1][1]:4}  {c['id']:28} {called:16} {rows[-1][3]}", flush=True)
