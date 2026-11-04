@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import {
   LESSONS,
   questionFor,
+  recommendNext,
   quizCount,
   readProgress,
   writeProgress,
@@ -33,8 +34,25 @@ export function TrainPage() {
 function TrainHub({ onOpen }: { onOpen: (id: string) => void }) {
   // Read once per visit to the hub: finishing a lesson remounts it.
   const [progress] = useState(readProgress);
+  const next = recommendNext(progress);
   return (
     <div className="train">
+      <section aria-label="Up next">
+        <div className="train__next">
+          <p className="train__coach-title">Up next</p>
+          <p className="train__next-text">{next.message}</p>
+          {next.kind === "finished" ? (
+            <Link to="/drill" className="train__primary train__primary--link">
+              Open the Drill
+            </Link>
+          ) : (
+            <button type="button" className="train__primary" onClick={() => onOpen(next.lessonId)}>
+              {next.kind === "start" ? "Start" : "Try again"}
+            </button>
+          )}
+        </div>
+      </section>
+
       <section aria-labelledby="train-lessons">
         <h2 id="train-lessons" className="train__heading">
           Lessons

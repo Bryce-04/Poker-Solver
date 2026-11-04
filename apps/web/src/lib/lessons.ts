@@ -272,4 +272,47 @@ export function writeProgress(id: string, progress: LessonProgress): void {
   }
 }
 
+/** Below this share right, a finished lesson is worth another go. */
+export const REVISIT_BELOW = 0.8;
+
+export type Recommendation =
+  | { kind: "start"; lessonId: string; message: string }
+  | { kind: "revisit"; lessonId: string; message: string }
+  | { kind: "finished"; message: string };
+
+/**
+ * What to do next, from progress alone. Deliberately plain rules, not a
+ * model: the first lesson you haven't finished, else the weakest finished one
+ * under REVISIT_BELOW, else you're done and the Drill is the next thing.
+ * Picking from the fixed course can't invent a lesson or a score.
+ */
+export function recommendNext(
+  progress: Record<string, LessonProgress>,
+  lessons: readonly Lesson[] = LESSONS,
+): Recommendation {
+  const first = lessons.find((l) => !progress[l.id]?.done);
+  if (first) {
+    const any = lessons.some((l) => progress[l.id]?.done);
+    return {
+      kind: "start",
+      lessonId: first.id,
+      message: any ? `Next lesson: ${first.title}.` : `Start with ${first.title}.`,
+    };
+  }
+  let weakest: { lesson: Lesson; share: number; p: LessonProgress } | null = null;
+  for (const lesson of lessons) {
+    const p = progress[lesson.id];
+    const share = p.total === 0 ? 1 : p.correct / p.total;
+    if (share < REVISIT_BELOW && (weakest === null || share < weakest.share)) weakest = { lesson, share, p };
+  }
+  if (weakest) {
+    return {
+      kind: "revisit",
+      lessonId: weakest.lesson.id,
+      message: `Worth another go: ${weakest.lesson.title}. You got ${weakest.p.correct} of ${weakest.p.total} right.`,
+    };
+  }
+  return { kind: "finished", message: "You've finished every lesson. Test yourself in the Drill." };
+}
+
 export const quizCount = (lesson: Lesson): number => lesson.steps.filter((s) => s.kind !== "read").length;

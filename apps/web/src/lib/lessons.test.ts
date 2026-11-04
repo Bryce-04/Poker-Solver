@@ -1,4 +1,4 @@
-import { LESSONS, explainOpen, questionFor, quizCount, readProgress, writeProgress } from "./lessons";
+import { LESSONS, REVISIT_BELOW, explainOpen, questionFor, quizCount, readProgress, recommendNext, writeProgress } from "./lessons";
 import { betFrequency, CLEAR_MAJORITY, CBET_CANDIDATES, explainCbet, favoriteSize, pickCbetSpots } from "./cbetLesson";
 import { gradeAction } from "./drill";
 import { cardsFor, comboCount, earliestOpeningSeat, inOpenRange, openPercent } from "./openRanges";
@@ -104,6 +104,41 @@ describe("continuation-bet lesson", () => {
     const check = spots.find((s) => betFrequency(s) <= 1 - CLEAR_MAJORITY)!;
     expect(explainCbet(check)).toMatch(/checks it \d+%/);
     expect(explainCbet(check)).not.toMatch(/mostly uses/);
+  });
+});
+
+describe("the lesson guide", () => {
+  const done = (correct: number, total = 10) => ({ done: true, correct, total });
+  const all = (correct: number) => Object.fromEntries(LESSONS.map((l) => [l.id, done(correct)]));
+
+  it("starts you at the first lesson, then walks the course in order", () => {
+    expect(recommendNext({})).toMatchObject({ kind: "start", lessonId: LESSONS[0].id });
+    expect(recommendNext({ [LESSONS[0].id]: done(3, 3) })).toMatchObject({ kind: "start", lessonId: LESSONS[1].id });
+  });
+
+  it("skips ahead past finished lessons but comes back to an unfinished one first", () => {
+    const progress = { [LESSONS[1].id]: done(3, 3) };
+    expect(recommendNext(progress)).toMatchObject({ kind: "start", lessonId: LESSONS[0].id });
+  });
+
+  it("once everything is finished, revisits the weakest lesson under the bar", () => {
+    const progress = { ...all(10) };
+    progress[LESSONS[2].id] = done(6); // 60%
+    progress[LESSONS[1].id] = done(7); // 70%
+    const rec = recommendNext(progress);
+    expect(rec).toMatchObject({ kind: "revisit", lessonId: LESSONS[2].id });
+    expect(rec.message).toContain("6 of 10");
+  });
+
+  it("treats exactly the bar as good enough, and sends a finished learner to the Drill", () => {
+    expect(recommendNext(all(REVISIT_BELOW * 10)).kind).toBe("finished");
+    expect(recommendNext(all(10)).message).toMatch(/Drill/);
+  });
+
+  it("only ever names lessons that exist", () => {
+    for (const rec of [recommendNext({}), recommendNext(all(1)), recommendNext(all(10))]) {
+      if (rec.kind !== "finished") expect(LESSONS.some((l) => l.id === rec.lessonId)).toBe(true);
+    }
   });
 });
 

@@ -43,6 +43,34 @@ describe("Train hub", () => {
   });
 });
 
+describe("Up next", () => {
+  it("points a new learner at the first lesson and opens it", async () => {
+    const user = userEvent.setup();
+    renderTrain();
+    expect(screen.getByText(/start with positions and the button/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^start$/i }));
+    expect(screen.getByRole("heading", { name: /six seats, one button/i })).toBeInTheDocument();
+  });
+
+  it("moves on after a lesson is finished", () => {
+    window.localStorage.setItem(
+      "poker-solver.train.progress.v1",
+      JSON.stringify({ positions: { done: true, correct: 3, total: 3 } }),
+    );
+    renderTrain();
+    expect(screen.getByText(/next lesson: pot odds and equity/i)).toBeInTheDocument();
+  });
+
+  it("sends someone who has finished everything strongly to the Drill", () => {
+    window.localStorage.setItem(
+      "poker-solver.train.progress.v1",
+      JSON.stringify(Object.fromEntries(LESSONS.map((l) => [l.id, { done: true, correct: 9, total: 10 }]))),
+    );
+    renderTrain();
+    expect(screen.getByRole("link", { name: /open the drill/i }).getAttribute("href")).toBe("/drill");
+  });
+});
+
 describe("Opening-hands lesson", () => {
   async function toFirstHand(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole("button", { name: /^next$/i })); // the one reading card

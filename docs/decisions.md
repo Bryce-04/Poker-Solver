@@ -37,12 +37,21 @@ spent only by real accounts.
 no email, user id or other account data. A free tier may use requests to improve the provider's
 models; nothing sent is private.
 
-**Tests.** `apps/api/tests/test_coach.py` (21, no network or database: grounding, injection text
+**Tests.** `recommendNext` and the Up next card in `lessons.test.ts` / `TrainPage.test.tsx`; `apps/api/tests/test_coach.py` (21, no network or database: grounding, injection text
 stays in the user turn, every fallback path, both rate limits, input limits, the Gemini request and
 response shape against a fake server) and the panel's states in `TrainPage.test.tsx`.
 
-**Not done.** The lesson guide (recommend the next lesson from what you miss), streaming answers,
-and a live check against Google: it needs a key, so it has not run against the real service.
+**The lesson guide ("Up next") is rules, not the model, on purpose.** The Train hub's top card
+(`recommendNext` in `lib/lessons.ts`) picks the first lesson you haven't finished, else the weakest
+finished lesson under 80% right (shown with your score), else sends you to the Drill. Choosing from
+the fixed course by plain rules means it can't invent a lesson or misreport a score, needs no key or
+network, and is fully testable. The model could later phrase the message, but the choice stays
+rule-based. It reads progress from this browser only; moving progress to the account (so the guide
+follows you across devices) is the next step and needs a table, so it is not done.
+
+**Not done.** Streaming answers, account-level progress, and a live check against Google: it needs a
+key, so the coach has not run against the real service. Also: Render deploys `main`, so the coach
+does nothing in the deployed app until the Train PR is merged.
 
 ---
 
