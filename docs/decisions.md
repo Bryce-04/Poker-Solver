@@ -6,6 +6,27 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — `GET /coach/status`: is the coach switched on in this deployment?
+
+**Why.** The lessons' coach and the Drill's coach only work where `GEMINI_API_KEY` is set. It was set
+in a teammate's local `.env`, not on Render, so in the deployed app every "Ask the coach" quietly
+fell back to the app's own explanation, and nothing from outside said why. Setting a host's
+environment variable cannot be done from the repo, so what the code can do is make the state
+checkable.
+
+**What.** `GET /coach/status` (no sign-in, no model call, so it costs no quota) returns
+`{"configured": bool, "models": [...]}`: whether a non-blank key is set and which model names are
+listed, never the key. After adding the key in Render's Environment tab (it redeploys), open
+`https://<api>/coach/status`: `configured: true` means the key is live. A real answer still needs a
+model name Google serves (see the model-name caveat in the coach entry), which only an actual
+question proves.
+
+**Fix for "the AI isn't on in the lessons":** set `GEMINI_API_KEY` (and, if needed, `GEMINI_MODEL`,
+e.g. `gemini-flash-latest`) on the Render service, then check `/coach/status`. No code change makes
+a key appear on the host.
+
+---
+
 ## 2026-11-05 — Lesson progress follows the account
 
 **Status:** proposed.
