@@ -269,15 +269,30 @@ def test_a_stream_that_breaks_after_text_is_not_restarted():
     assert got == ["half"] and len(calls) == 1
 
 
-def test_the_lessons_one_shot_uses_the_first_model_of_a_list():
+def test_the_lessons_one_shot_starts_with_the_first_model_and_streams_like_the_chat():
     seen = []
 
     def handler(request):
         seen.append(request.url.path)
-        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "hi"}]}}]})
+        return httpx.Response(200, content=sse("hi"))
 
     assert provider(handler).generate("s", "u") == "hi"
-    assert seen[0].endswith("/models/big:generateContent")
+    assert seen == ["/v1beta/models/big:streamGenerateContent"]
+
+
+def test_the_lessons_one_shot_falls_through_the_model_list_like_the_chat():
+    # It used to stop at the first model, so one busy or retired model meant "couldn't be reached"
+    # for every lesson question even when the next model on the list was fine.
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path.split("/")[-1].split(":")[0])
+        if "/models/big:" in request.url.path:
+            return httpx.Response(503, json={"error": {"message": "high demand"}})
+        return httpx.Response(200, content=sse("from the second model"))
+
+    assert provider(handler).generate("s", "u") == "from the second model"
+    assert seen == ["big", "small"]
 
 
 def test_thinking_is_off_by_default_and_the_environment_can_change_it(monkeypatch):

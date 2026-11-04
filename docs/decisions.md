@@ -6,6 +6,36 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — The lessons' coach retries across the model list, and `/coach/status` says why a call failed
+
+**Why.** With the key set on Render, a lesson question still answered "The AI coach couldn't be
+reached just now" (the app's own explanation, reason `unavailable`). `/coach/status` said
+`configured: true, models: ["gemini-flash-latest"]`, so the server was set up and the call to
+Gemini was failing, and nothing outside Render's logs said how. Two gaps, both fixed:
+
+- **The lessons' one-shot answer used only the first model and tried it once.** The Drill's chat
+  already tried every model on `GEMINI_MODEL`, twice, and retried a model that rejected the thinking
+  setting. `GeminiProvider.generate` is now the chat's `stream` joined into one string, so a busy
+  (503), rate-limited (429) or retired (404) first model no longer ends a lesson question when the
+  next model would answer. A blank answer is still an error.
+- **No way to see why.** `GET /coach/status` now also returns `last_failure` (`{"reason": "gemini-flash-latest:
+  HTTP 503", "at": <epoch>}`) and `last_ok_at`, kept in memory for this server process. The reason is the
+  model and the HTTP status only: Google's response body stays in the server log, not on a public
+  page. Ask a question, then open `/coach/status`: that is the check that needs no log access.
+  (`None` until a call happens after a deploy or restart.)
+
+**Reading the reason.** `HTTP 404`: that model name isn't available to this key, so change
+`GEMINI_MODEL`. `HTTP 403` or `400`: the key is wrong or restricted. `HTTP 429`: free-tier quota or
+rate limit. `HTTP 503`: the model is overloaded, so list more than one in `GEMINI_MODEL`
+(for example `gemini-flash-latest, gemini-2.5-flash`). `request failed` / a network error name: the
+server can't reach Google.
+
+**Tests.** The Gemini transport tests now describe the streaming request both paths share; a lessons
+question falls through to the second model when the first returns 503; the status reason carries no
+response body.
+
+---
+
 ## 2026-11-05 — CI guard: a failed web run must show up before the push, not after
 
 **Status:** proposed.

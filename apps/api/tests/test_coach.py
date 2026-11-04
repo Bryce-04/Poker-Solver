@@ -3,6 +3,8 @@ and no database: a fake provider stands in for the model."""
 
 from uuid import uuid4
 
+import json
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -39,6 +41,7 @@ class FakeProvider:
 def signed_in_and_fresh_limiter(monkeypatch):
     app.dependency_overrides[current_user_id] = lambda: USER
     monkeypatch.setattr(coach, "limiter", coach.RateLimiter(per_hour=3, per_day_total=100))
+    monkeypatch.setattr(coach, "_health", {"last_failure": None, "last_ok_at": None})
     yield
     app.dependency_overrides.pop(current_user_id, None)
 
@@ -147,8 +150,15 @@ def test_answers_are_capped():
 # --- the Gemini transport, against a fake server ------------------------------------------
 
 
+def sse(*texts):
+    chunks = [{"candidates": [{"content": {"parts": [{"text": x}]}}]} for x in texts]
+    return "".join(f"data: {json.dumps(c)}\r\n\r\n" for c in chunks).encode()
+
+
 def gemini(handler):
-    return coach.GeminiProvider("test-key", "some-model", httpx.Client(transport=httpx.MockTransport(handler)))
+    return coach.GeminiProvider(
+        "test-key", "some-model", httpx.Client(transport=httpx.MockTransport(handler)), sleep=lambda s: None
+    )
 
 
 def test_gemini_request_and_response_shape():
@@ -158,13 +168,17 @@ def test_gemini_request_and_response_shape():
         seen["url"] = str(request.url)
         seen["key"] = request.headers["x-goog-api-key"]
         seen["body"] = request.read().decode()
-        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "Hello "}, {"text": "there"}]}}]})
+        return httpx.Response(200, content=sse("Hello ", "there"))
 
     assert gemini(handler).generate("SYS", "USER") == "Hello there"
-    assert seen["url"].endswith("/models/some-model:generateContent")
+    assert request_path(seen["url"]).endswith("/models/some-model:streamGenerateContent")
     assert seen["key"] == "test-key"
     assert "SYS" in seen["body"] and "USER" in seen["body"] and "systemInstruction" in seen["body"]
     assert "test-key" not in seen["body"] and "key=" not in seen["url"]
+
+
+def request_path(url: str) -> str:
+    return url.split("?")[0]
 
 
 @pytest.mark.parametrize(
@@ -172,9 +186,9 @@ def test_gemini_request_and_response_shape():
     [
         httpx.Response(429, json={"error": {"message": "quota"}}),
         httpx.Response(500, text="oops"),
-        httpx.Response(200, json={"candidates": []}),
-        httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "  "}]}}]}),
-        httpx.Response(200, text="not json"),
+        httpx.Response(200, content=b""),  # no words at all
+        httpx.Response(200, content=sse("  ")),  # whitespace only is not an answer
+        httpx.Response(200, text="not an event stream"),
     ],
 )
 def test_gemini_failures_become_unavailable(response):
@@ -209,14 +223,15 @@ def test_status_says_off_without_a_key_and_needs_no_sign_in(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     res = client.get("/coach/status")
     assert res.status_code == 200
-    assert res.json() == {"configured": False, "models": []}
+    assert res.json() == {"configured": False, "models": [], "last_failure": None, "last_ok_at": None}
 
 
 def test_status_lists_models_but_never_the_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "super-secret-key")
     monkeypatch.setenv("GEMINI_MODEL", "gemini-flash-latest, gemini-2.5-flash")
     res = client.get("/coach/status")
-    assert res.json() == {"configured": True, "models": ["gemini-flash-latest", "gemini-2.5-flash"]}
+    assert res.json()["configured"] is True
+    assert res.json()["models"] == ["gemini-flash-latest", "gemini-2.5-flash"]
     assert "super-secret-key" not in res.text
 
     monkeypatch.delenv("GEMINI_MODEL")
@@ -226,3 +241,36 @@ def test_status_lists_models_but_never_the_key(monkeypatch):
 def test_a_blank_key_counts_as_off(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "   ")
     assert client.get("/coach/status").json()["configured"] is False
+
+
+# --- GET /coach/status says why the last call failed, with no logs needed ---------------------
+
+
+def test_status_reports_why_the_last_question_failed_without_the_response_body(monkeypatch):
+    use(monkeypatch, FakeProvider(error=coach.CoachUnavailable('some-model: HTTP 404: {"error": "model not found, project 123"}')))
+    assert ask().json()["reason"] == "unavailable"
+    body = client.get("/coach/status").json()
+    assert body["last_failure"]["reason"] == "some-model: HTTP 404"
+    assert isinstance(body["last_failure"]["at"], int)
+    assert "project 123" not in client.get("/coach/status").text  # Google's message stays in the server log
+    assert body["last_ok_at"] is None
+
+
+def test_status_reports_when_a_question_last_worked(monkeypatch):
+    use(monkeypatch, FakeProvider())
+    ask()
+    assert isinstance(client.get("/coach/status").json()["last_ok_at"], int)
+
+
+@pytest.mark.parametrize(
+    "detail, shown",
+    [
+        ("gemini-flash-latest: HTTP 503: {...}", "gemini-flash-latest: HTTP 503"),
+        ("small: HTTP 429: quota", "small: HTTP 429"),
+        ("big: ConnectError", "big: ConnectError"),
+        ("small: empty answer", "small: empty answer"),
+        ("no model configured", "no model configured"),
+    ],
+)
+def test_public_failure_reasons_are_the_model_and_status_only(detail, shown):
+    assert coach._public_reason(detail) == shown
