@@ -31,8 +31,13 @@ import threading
 import time
 
 from poker_solver.betting_round import DEFAULT_BET_MENU, BetMenu, BettingRoundState
-from poker_solver.cards import parse_card
-from poker_solver.range_cfr import RangeCfrTrainer, RangeSpotConfig
+from poker_solver.cards import card_str, parse_card
+from poker_solver.range_cfr import (
+    RangeCfrTrainer,
+    RangeSpotConfig,
+    RiverSpec,
+    estimate_joint_size,
+)
 
 from poker_solver_schema import ActionType, BettingAction, Spot
 
@@ -67,6 +72,17 @@ MAX_ITERATIONS = 250
 # before the deadline is checked (the equity matrix) and the network.
 MAX_SOLVE_SECONDS = 100.0
 
+# A joint (turn + river) solve is a far bigger game than one street: every turn line
+# that closes, times every river card, times the river's betting. So it is sized
+# BEFORE anything is built, and refused if it wouldn't fit -- a clear 422 beats the
+# host running out of memory mid-solve. The budget leaves room under Render's
+# 512 MB for the equity matrices and Python itself; measured estimates are in
+# docs/decisions.md. JOINT_DEFAULT_CARDS is how many river cards stand in for all of
+# them when the request doesn't say (12 is within ~2 points of the exact answer on
+# the spot it was measured on).
+JOINT_MEMORY_BUDGET_BYTES = 350 * 1024 * 1024
+JOINT_DEFAULT_CARDS = 12
+
 # One solve at a time. On a 0.1-CPU host, concurrent solves don't run in
 # parallel -- they split the CPU and ALL get slower, and a request the
 # phone already gave up on keeps computing anyway. A second request while
@@ -100,6 +116,44 @@ def _menu_from_spot(spot: Spot) -> BetMenu:
         )
     except ValueError as e:
         raise InvalidSolveRequest(f"bet_menu: {e}") from e
+
+
+def _river_from_spot(spot: Spot) -> RiverSpec | None:
+    """The joint-solve request on a Spot, as the solver's RiverSpec, or None for
+    an ordinary single-street solve. Needs a turn board."""
+    if spot.river is None:
+        return None
+    if len(spot.board) != 4:
+        raise InvalidSolveRequest(
+            "a joint turn+river solve needs a turn board (4 cards), "
+            f"got {len(spot.board)}."
+        )
+    menu = spot.river.bet_menu
+    if menu is not None:
+        try:
+            menu = BetMenu(sizes=tuple(menu.sizes), max_aggressive_actions=menu.max_aggressive_actions)
+        except ValueError as e:
+            raise InvalidSolveRequest(f"river.bet_menu: {e}") from e
+    return RiverSpec(bet_menu=menu, cards=spot.river.cards or JOINT_DEFAULT_CARDS)
+
+
+def _check_joint_fits(config: RangeSpotConfig) -> None:
+    """Refuse a joint solve that would not fit in memory, saying what it would
+    take and what to shrink."""
+    try:
+        size = estimate_joint_size(config)
+    except ValueError as e:
+        raise InvalidSolveRequest(str(e)) from e
+    if size.bytes > JOINT_MEMORY_BUDGET_BYTES:
+        raise InvalidSolveRequest(
+            f"this joint turn+river solve is too big for the server: the turn has "
+            f"{size.chance_nodes} lines that close, each dealing {size.cards} river cards with "
+            f"their own betting -- {size.decisions:,} decision nodes, about "
+            f"{size.bytes / 1024 / 1024:.0f} MB (the limit is "
+            f"{JOINT_MEMORY_BUDGET_BYTES / 1024 / 1024:.0f} MB). Use fewer river cards, a smaller "
+            f"river bet menu (or null for no river betting), or a smaller turn bet menu "
+            f"(fewer sizes or a lower raise cap)."
+        )
 
 
 def _bucket_bet_action(
@@ -252,7 +306,10 @@ def build_solve_config(
         first_to_act=first_to_act,
         prior_history=prior_history,
         bet_menu=menu,
+        river=_river_from_spot(spot),
     )
+    if config.river is not None:
+        _check_joint_fits(config)
     return config, first_to_act, bucket_notes
 
 
@@ -303,10 +360,11 @@ def solve_spot(
     hero = spot.positions_in_hand[deciding_player]
     villain = spot.positions_in_hand[1 - deciding_player]
     try:
-        if not config.bet_menu.is_default:
+        if config.river is not None or not config.bet_menu.is_default:
             # The notes' rules and bet-size arithmetic are written against the
-            # default menu's action names; a custom tree gets the strategy
-            # without them rather than notes about the wrong sizes.
+            # default menu's action names (and, for a joint solve, against one
+            # street's equity matrix); such a solve gets the strategy without
+            # them rather than notes about the wrong game.
             raise _NotesUnavailable
         # .value: the bullets are prose, and str() of a Position is "Position.BTN".
         categories, reasons = hand_notes(
@@ -346,6 +404,29 @@ def solve_spot(
             "sizes": {label: frac for frac, label in config.bet_menu.labelled_sizes},
             "max_aggressive_actions": config.bet_menu.max_aggressive_actions,
         },
+        # Present only for a joint solve: exactly what the river was solved with, so
+        # the answer can be read for what it is (an approximation when `exact` is
+        # false: `river_cards` stand in for all `river_cards_total`).
+        "joint": _joint_summary(config, trainer) if config.river is not None else None,
+    }
+
+
+def _joint_summary(config: RangeSpotConfig, trainer: RangeCfrTrainer) -> dict:
+    menu = config.river.bet_menu
+    cards = trainer.river_cards
+    return {
+        "river_cards": [card_str(c) for c in cards],
+        "river_cards_total": 52 - len(config.board),
+        "exact": len(cards) == 52 - len(config.board),
+        "river_bet_menu": (
+            None
+            if menu is None
+            else {
+                "sizes": {label: frac for frac, label in menu.labelled_sizes},
+                "max_aggressive_actions": menu.max_aggressive_actions,
+            }
+        ),
+        "closing_turn_lines": len(trainer._chances),
     }
 
 
@@ -409,7 +490,11 @@ def narrow_ranges(
     the long tail under 2% of the heaviest hand is trimmed
     (_trim_tail) and reported in "trimmed".
     Costs one full solve of the street."""
-    config, _, bucket_notes = build_solve_config(spot, allow_terminal_actions=True)
+    # Narrowing works out who would take this street's line; the river is none
+    # of its business, so a joint request is ignored here (not built, not sized).
+    config, _, bucket_notes = build_solve_config(
+        spot.model_copy(update={"river": None}), allow_terminal_actions=True
+    )
     # Solve the whole street, then walk the recorded line through it:
     # build_solve_config seeded the line as prior_history, which a
     # trainer never learns a strategy for, so undo that.

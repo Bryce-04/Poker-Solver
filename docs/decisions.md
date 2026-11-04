@@ -366,6 +366,198 @@ unchanged (it's `position: fixed` with its own insets and never depended on
 
 ---
 
+## 2026-10-21 — Checked against postflop-solver (Rust): same answers, ~20-100x slower
+
+**Status:** proposed.
+
+**Context.** After the speed work and the joint turn + river solve, the open question was how
+the solver stands against a mature one, on two things: are the answers right, and is the time
+"normal". `postflop-solver` (b-inary; Rust; AGPL-3.0) is the reference open implementation.
+
+**Method.** The same game on both sides (spot, ranges, menus and the harness are in
+`services/solver/benchmarks/external/`, with how to build it): Q J 7 3 turn, 100bb deep, BB's flat
+range vs BTN's open range, turn = one 50% size + all-in, river = one 75% size + all-in, no sized
+re-raises, all 48 river cards, DCFR on both. Their tree is made to match ours by turning off their
+auto all-in / merging / donk rules; the two players' EVs sum to the pot in both conventions.
+
+**Correctness: they agree.** OOP's equilibrium game value, which is unique, so it cannot hide behind
+tied actions:
+
+| precision (% of pot) | ours | postflop-solver |
+|---|--:|--:|
+| ~0.5 | 411.82 chips | 412.25 |
+| ~0.03 | **412.66** | **412.65** |
+
+The 0.01-chip agreement at tight precision (0.0001% of the pot) is strong independent confirmation
+that the joint solve's tree, chance handling, money accounting and payoffs are right (it is the
+check the exact self-equivalence tests could not give, because both sides of those share our code).
+Root strategy at 0.03%: check 90.6% / bet 9.4% (ours) vs 91.1% / 8.9% (theirs), max frequency
+difference 0.46 points, range-weighted per-hand strategy difference 0.010. At the rough 0.5% target the
+frequencies differ by 3.7 points; that was noise at near-tied actions (both converge to the same answer).
+Iteration counts are the same too (110 vs 130 to 0.5%; 750 vs 700 to ~0.02-0.03%): the algorithm
+converges equally fast, so the whole gap below is cost per iteration.
+
+**Time: much slower than a compiled solver.** (laptop, i5-11400H, 6 cores / 12 threads)
+
+| | postflop-solver, 12 threads | postflop-solver, 1 thread | ours |
+|---|--:|--:|--:|
+| to 0.5% of pot | 0.18 s | 0.92 s | 17.9-19.5 s |
+| to ~0.03% of pot | 1.3 s | | 106.6 s |
+| per iteration | 1.7 ms | 8.3 ms | 134-146 ms |
+| memory | 7.3 MB (3.9 compressed) | | 156 MB peak |
+
+So about **100x slower than their multithreaded run and ~20x slower single-thread**, and ~20x the
+memory. Our run does not speed up with more threads (it is single-thread bound: numpy's per-array
+passes; limiting BLAS to one thread made no difference, 17.4 s vs 19.0 s), theirs does (5x from 1 to
+12 threads). This is a ceiling of numpy, not a tuning gap: a pass over a node's regrets and strategies
+here is ~25 separate array operations over (actions x hands) float64 arrays; theirs is one fused SIMD
+loop over float32 (or 16-bit) data. The earlier 2.4-4.3x speed-up was real, and this shows how much
+room is left beyond what numpy can reach.
+
+**What this means.** Our numbers (seconds to a minute) are fine for a class project and for a local
+tool; they are NOT competitive with a compiled solver, and the single-street/joint sizes that fit
+within Render's budget are set by this gap. It also reframes the roadmap: a full flop + turn + river
+solve takes minutes in a compiled solver (TexasSolver's self-reported benchmark: 172 s for a flop setup), and at this gap would plausibly take far longer here (an extrapolation, not a measurement).
+
+**Options (not decided; each is a real trade).**
+1. *Keep Python, compile the hot loop* (numba, or a small Rust/C extension we write ourselves):
+   realistic 5-20x on the update/traversal passes; the equivalence tests (frozen reference, exact
+   float64) already exist to keep it honest. Adds a build/deploy dependency (numba on Render, or a
+   wheel).
+2. *Use postflop-solver as the engine behind the API.* Fastest by far, but it is AGPL-3.0: a network
+   service built on it must offer its source under the AGPL, and it is unmaintained (development
+   suspended Oct 2023; to build today it needed its serialization feature off and two compiler lints allowed). It would also replace
+   our abstractions (menus, narrowing, joint sampling) with theirs. A licensing decision for the team,
+   not a technical one.
+3. *Accept it* and keep tuning in numpy (float32 state, fewer passes): maybe 1.5-2x more.
+
+**Caveats.** One spot, one machine; their threading means the 12-thread ratio flatters them on a
+laptop and understates the single-core gap on a server; Render was not measured.
+
+---
+
+## 2026-10-21 — Joint turn + river solve: the first multi-street step
+
+**Status:** proposed.
+
+**Context.** A single-street solve ends where that street's betting ends and treats
+the rest as "the board runs out, no more betting". So a turn strategy can't know what
+the river will be like (a flush draw that bluffs now because it can bluff again; a hand
+that checks now to induce), and a range narrowed by a turn line carries that blind spot
+forward (the weakness recorded in the 2026-10-18 chaining entry). The fix is to solve the
+streets in ONE game. This is the first step: turn + river together.
+
+**What it is.** `Spot.river` (schema `RiverSpec`: `bet_menu`, `cards`) on a turn board.
+A turn line that closes without a fold leads to a chance node (the river card) and then
+that card's own river betting, each river card with its own strategies and its own
+equity matrix; the answer is still the TURN decision. In `range_cfr.py`: the tree gains
+chance nodes, terminals carry the river card, and money is counted across both streets
+(a river terminal's contribution is the turn's plus the river's, so payoffs are measured
+from the start of the turn throughout). The same level-scheduled pass runs it
+(`_Schedule` gets chance steps: a river card multiplies the reach vectors by which combos
+can still hold it), river showdowns are grouped by card and evaluated with one matrix
+product per card (player 1's win mass is its facing mass minus player 0's from the same
+reach, so one matrix per card is stored, not two). The single-street path is unchanged
+(bit-identical tests, same speed).
+
+**How it is validated (all exact, in float64).**
+1. *No river betting, every card == the plain turn solve.* Enumerating the river card is
+   just the turn's runout average done explicitly. Measured over 40 iterations:
+   strategies 1e-11, exploitability 5e-13 (test: `test_joint_solve.py`).
+2. *Turn already closed, each card == a standalone river solve of that card.* The cards
+   are independent subgames, so the joint trainer's strategies on a card must equal a
+   standalone river trainer's: 1e-11 over 12 river nodes on each card tested.
+3. Money: every terminal's pot is the start pot plus both players' total contributions.
+4. The Nash gap equals "best responses minus the pot" in any game that deals every card
+   (single street, joint with river betting, joint without): same number to 4 decimals
+   (0.0263%).
+The tests were mutation-checked: scaling the chance weight by 5%, or letting hands that
+hold the river card back into the sum, makes them fail.
+5. *Against an independent mature solver (b-inary's postflop-solver, Rust).* On the same turn
+   game (same ranges, menus and all 48 river cards) OOP's equilibrium game value agrees to 0.01
+   chip at tight precision (412.66 vs 412.65), and root frequencies to 0.46 points. See the
+   entry "Checked against postflop-solver" for the full comparison, including that our solver is
+   ~20x slower single-thread and ~100x slower than their multithreaded run.
+
+**Two things that went wrong first, and what they changed.**
+- *Sampled-card exploitability plateaued near 1% and went negative.* With a SAMPLE of the
+  river cards the game is no longer constant-sum: a turn fold ends before any card is dealt
+  (weight 1), while a hand that holds sampled cards is dealt fewer of them down the river
+  lines. "Best responses minus the pot" then has a floor it can't get below. The convergence
+  measure for a sampled solve is now the Nash gap (each player's best response minus what it
+  actually gets under the average strategies: `value_under_average`, a new "evaluate" pass),
+  which equals the old formula whenever the game IS constant-sum. With it every setting
+  (4, 12, 24, all 48 cards) converges: ~0.2% of the pot at 250 iterations, ~0.03% at 900.
+- *Sampling distorts the hands that hold sampled cards.* A hand holding a sampled card sees
+  fewer river cards, so its river-path value was attenuated against its turn-fold value.
+  Each hand's river value is now an average over the cards IT can see (per-hand
+  normalization; exactly 1/44 for every hand when all cards are enumerated). Measured against
+  the exact answer it cut per-hand strategy error by roughly a quarter at every sample size.
+
+**Sampling the river cards (the approximation).** Enumerating all 44-48 cards is exact but
+the tree is every closing turn line x every card x the river's betting. `cards` picks a
+sample spread over ranks AND suits (`select_river_cards`: evenly spaced along the live cards
+ordered by rank, suit order rotated per rank, so the flush can come in), deterministic. How
+close, measured (`benchmarks/bench_joint.py --accuracy`, Q J 7 3, the exact turn root is
+check 97.1% / bet 2.9%):
+
+| river cards | max turn-root frequency error | per-hand strategy error (range-weighted) |
+|-:|-:|-:|
+| 6 | 2.4 points | 0.054 |
+| 12 | 1.2 points | 0.039 |
+| 24 | 0.9 points | 0.013 |
+
+**Cost (measured, `benchmarks/bench_joint.py`, laptop, Q J 7 3, wide BB-flat vs BTN-open
+ranges, turn menu one 50% size with a raise cap of 2; to a Nash gap under 0.5% of the pot):**
+
+| setting | decision nodes | est. memory | ms/iteration | iterations | total |
+|---|--:|--:|--:|--:|--:|
+| river equity only (no river betting), all 48 cards | 12 | 65 MB | 24 | 55 | 1.7 s |
+| river 75% (no sized re-raise), 12 cards | 492 | 65 MB | 47 | 130 | 7.3 s |
+| river 75% with one raise, 12 cards | 636 | 82 MB | 76 | 155 | 12.5 s |
+| river 75%, 24 cards | 972 | 130 MB | 129 | 130 | 17.4 s |
+| river 75%, all 48 cards (exact) | 1,932 | 258 MB | 229 | 155 | 39.1 s |
+
+Memory scales with the number of hands as well as nodes. The default turn menu (3 sizes,
+raise cap 3) has 131 closing lines; with the default river and 12 cards that is 4,548 decision
+nodes and ~460 MB (refused at the 350 MB budget), and with all 48 cards 17,796 nodes and
+~1.8 GB. Hence small turn menus. Render: the measured single-street ratio is about 4x this
+laptop (a wide flop that takes ~3.3 s here took 13.0 s warm there; see the speed entry), so a
+12-card, no-re-raise joint solve (~7 s here) should take roughly 30 s there. That is an
+ESTIMATE: no joint solve has run on Render. The larger settings may still pass the 100 s time
+budget and come back `converged: false`.
+
+**The API (`POST /spots/solve`).** `river` on a turn spot. `bet_menu` defaults to one 75%
+size and no sized re-raise (`DEFAULT_RIVER_MENU`); `null` means no river betting; `cards`
+defaults to 12 on the server (`JOINT_DEFAULT_CARDS`). The game is SIZED BEFORE anything is
+built (`estimate_joint_size`: exact node counts per closing line, since a size that no
+longer fits collapses to all-in; a memory model measured against tracemalloc, ~8-18% above
+the real peak) and refused with a 422 naming what it would take and what to shrink if it
+exceeds `JOINT_MEMORY_BUDGET_BYTES` (350 MB, under Render's 512). A joint solve needs a turn
+board (422 otherwise); an invalid river menu is a 422 (`river.bet_menu: ...`). The response
+gains `joint` (null otherwise): `river_cards` used, `river_cards_total`, `exact`,
+`river_bet_menu`, `closing_turn_lines`. "Why?" notes and hand categories are skipped (they
+are written for one street's equity). `/spots/narrow` ignores a river request: narrowing is
+about this street's own line.
+
+**Not done.**
+- *No UI.* Nothing in the app sets `river`, and nothing displays `joint` (the type is in
+  `lib/api.ts`).
+- *Turn + river only.* A flop solve with the turn and river after it would put a chance node
+  inside a chance node (every turn card x every river card x betting on each street); that
+  needs card sampling at both streets and is the real next step toward a full-hand solve.
+- *One river menu per solve* (not per line), and no per-node custom trees.
+- *Render hasn't run one.* The cost estimates are laptop numbers and the ~4x factor is the
+  single-street one (measured).
+- *Range chaining doesn't use it yet.* `/spots/narrow` still narrows from a single-street
+  solve, so the weakness in the 2026-10-18 entry (narrowing by a rarely played line) is not
+  fixed by this alone; a joint solve is the tool that could fix it, and wiring that in is a
+  separate step.
+- *Memory could roughly halve* with float32 regret storage (not done; it would end the exact
+  float64 equivalence tests).
+
+---
+
 ## 2026-10-21 — Solver speed: 2.4x to 4.3x faster, answers unchanged
 
 **Status:** proposed.
@@ -528,9 +720,10 @@ on a laptop:
 | default, raise cap 4 | 12.7 | 0.40% |
 
 Time grows roughly linearly with the number of sizes and roughly doubles with
-each extra raise allowed. Render's free tier is about 10x slower than a laptop,
-so four sizes or a raise cap of 4 would reach its 100-second budget there and
-come back `converged: false`; the schema's limits (5 sizes, cap 5) are
+each extra raise allowed. Render's free tier was assumed to be about 10x slower than a laptop
+(later measured at about 4x for a single-street solve, see the speed entry), so four sizes or a
+raise cap of 4 would reach or pass its 100-second budget there and may come back
+`converged: false`; the schema's limits (5 sizes, cap 5) are
 deliberately generous and the time budget is the real guard.
 
 **A note on all-in.** All-in is always in the tree. With a lot behind, a

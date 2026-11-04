@@ -40,7 +40,18 @@ import numpy as np
 
 from .betting_round import DEFAULT_BET_MENU, BetMenu, BettingRoundState
 from .combos import Combo, combo_key, expand_range, label_to_combos
-from .equity import compute_equity_matrix
+from .cards import card_str
+from .equity import _compute_equity_matrix, collision_mask, compute_equity_matrix
+
+# What the per-river-card showdown matrices are stored as. float32 halves the
+# memory traffic of the hot product (and there can be 48 of them); the tests
+# switch it to float64 to compare algorithms without rounding in the way.
+_RIVER_MATRIX_DTYPE = np.float32
+
+# How the chance probability of a river card is applied. "own": a hand's river
+# value is an average over the cards IT can see (self-normalized per hand). "global":
+# one constant weight per card, the same for every hand.
+_CHANCE_NORMALIZATION = "own"
 
 # DCFR discount parameters (see the module docstring for why these differ from
 # Brown & Sandholm's recommended 1.5 / 0 / 2).
@@ -55,6 +66,52 @@ _DCFR_GAMMA = 3.0
 # combo of such a line "equal" and throw away the suit differences it exists
 # to keep.
 _COLLAPSE_TOLERANCE = 1e-3
+
+
+# The river menu a joint turn+river solve uses unless told otherwise: one size, and
+# once it is bet only fold / call / all-in remain. The river tree is replicated for
+# every river card under every way the turn can close, so its size multiplies the whole
+# solve; this keeps the default affordable (a second sized raise roughly doubles it --
+# see docs/decisions.md).
+DEFAULT_RIVER_MENU = BetMenu(sizes=(0.75,), max_aggressive_actions=1)
+
+
+@dataclass(frozen=True)
+class RiverSpec:
+    """Solve the river too, in the same game as the turn (a "joint" solve).
+
+    Without it, a turn solve ends where the turn's betting ends: "the river card
+    comes, nobody bets, showdown". With it, a turn line that closes without a
+    fold leads to a chance node -- the river card -- and then the river's own
+    betting, each river card with its own strategies, so the turn strategy is
+    worked out knowing what the river will be played like.
+
+    `bet_menu` is the river's menu (None: no river betting, just the river card
+    and a showdown -- the cheapest way to get exact river equity into the turn
+    strategy). `cards` is how many river cards to enumerate: None means every card
+    that can come (44-48), which is exact; a smaller number is an approximation that
+    stands in for the rest (select_river_cards), because the tree grows with it."""
+
+    bet_menu: BetMenu | None = DEFAULT_RIVER_MENU
+    cards: int | None = None
+
+
+def select_river_cards(board: tuple[int, ...], count: int) -> tuple[int, ...]:
+    """`count` river cards to enumerate in place of all of them: every live card
+    if `count` covers them all, otherwise evenly spaced along the live cards
+    ordered by rank, with the suit order rotated from rank to rank so ranks AND
+    suits are spread (a river that pairs the board, completes a flush or a
+    straight is a different spot, and a sample that skipped a whole suit would
+    never see the flush come in). Deterministic: the same spot always uses the
+    same cards."""
+    live = [c for c in range(52) if c not in set(board)]
+    if count >= len(live):
+        return tuple(live)
+    if count < 1:
+        raise ValueError("a joint solve needs at least one river card")
+    ordered = sorted(live, key=lambda c: (-(c // 4), (c % 4 + c // 4) % 4))
+    picks = np.unique(np.round(np.linspace(0, len(ordered) - 1, count)).astype(int))
+    return tuple(sorted(ordered[i] for i in picks))
 
 
 @dataclass
@@ -73,12 +130,92 @@ class RangeSpotConfig:
     # What a bet or raise can be on this street (betting_round.BetMenu); the
     # default is the fixed 25 / 75 / 125 / all-in menu.
     bet_menu: BetMenu = DEFAULT_BET_MENU
+    # Solve the river as well (turn boards only); see RiverSpec.
+    river: RiverSpec | None = None
 
     def __post_init__(self) -> None:
         if len(self.board) not in (3, 4, 5):
             raise ValueError(
                 f"board must be 3 (flop), 4 (turn), or 5 (river) cards, got {len(self.board)}"
             )
+        if self.river is not None and len(self.board) != 4:
+            raise ValueError(
+                "a joint solve adds the river to a TURN solve: the board needs 4 cards, "
+                f"got {len(self.board)}"
+            )
+
+
+@dataclass(frozen=True)
+class JointSize:
+    """How big a joint solve's game is, counted without building it."""
+
+    cards: int  # river cards enumerated
+    chance_nodes: int  # turn lines that close and deal a river card
+    decisions: int  # decision nodes, both streets, every river card
+    actions: int  # (node, action) rows -- what regrets and strategies are stored per combo for
+    terminals: int
+    bytes: int  # a conservative estimate of the memory the solve holds
+
+
+def _count_betting(state: BettingRoundState) -> tuple[int, int, int]:
+    """(decision nodes, actions, terminals) in the betting tree under `state`."""
+    if state.is_terminal():
+        return 0, 0, 1
+    decisions, actions, terminals = 1, 0, 0
+    for action in state.legal_actions():
+        d, a, t = _count_betting(state.apply(action))
+        decisions, actions, terminals = decisions + d, actions + a + 1, terminals + t
+    return decisions, actions, terminals
+
+
+def estimate_joint_size(config: RangeSpotConfig) -> JointSize:
+    """Counts a joint solve's tree (exactly: each closing turn line's river
+    betting is sized from ITS pot and stacks, since a size that no longer fits
+    collapses to all-in) and estimates the memory it needs, so a request that
+    would not fit can be refused before anything is allocated."""
+    river = config.river
+    if river is None:
+        raise ValueError("estimate_joint_size needs a config with a river")
+    blocked = frozenset(config.board)
+    n0 = len(_expand(config.range0, blocked)[0])
+    n1 = len(_expand(config.range1, blocked)[0])
+    live = 52 - len(config.board)
+    cards = live if river.cards is None else min(river.cards, live)
+
+    root = BettingRoundState.initial(
+        config.pot_bb, config.effective_stack_bb, config.first_to_act, config.prior_history, config.bet_menu
+    )
+    decisions = actions = terminals = chances = 0
+
+    def walk(state: BettingRoundState) -> None:
+        nonlocal decisions, actions, terminals, chances
+        if state.is_terminal():
+            if state.history and state.history[-1] == "fold":
+                terminals += 1
+                return
+            chances += 1
+            pot = state.pot_bb + state.contributed[0] + state.contributed[1]
+            remaining = state.stack_bb - state.contributed[0]
+            if river.bet_menu is None or remaining <= 1e-9:
+                terminals += cards
+                return
+            d, a, t = _count_betting(BettingRoundState.initial(pot, remaining, 0, (), river.bet_menu))
+            decisions, actions, terminals = decisions + cards * d, actions + cards * a, terminals + cards * t
+            return
+        decisions += 1
+        for action in state.legal_actions():
+            actions += 1
+            walk(state.apply(action))
+
+    walk(root)
+    nodes = decisions + terminals + chances
+    mean_combos = (n0 + n1) / 2
+    # Regrets, strategy sums, current strategies and the scratch action values
+    # (4 per action row); each player's value array and the two reach arrays
+    # (about 2 + 2 per node); plus one float32 equity matrix per river card. The
+    # 1.8 covers the temporaries a pass makes (measured against tracemalloc).
+    modelled = 8 * mean_combos * (4 * actions + 2 * nodes + 2 * decisions) + cards * n0 * n1 * 4
+    return JointSize(cards, chances, decisions, actions, terminals, int(1.8 * modelled))
 
 
 def _expand(range_weights: dict[str, float], blocked: frozenset[int]) -> tuple[list[Combo], np.ndarray, list[str]]:
@@ -173,6 +310,19 @@ class _PlayerStore:
         return np.where(positive, weights / np.where(positive, totals, 1.0), self.inv_actions)
 
 
+class _ChanceNode:
+    """A river card being dealt: a child per enumerated card, each the root of
+    that card's river betting (or, with no river betting, a showdown terminal)."""
+
+    __slots__ = ("index", "depth", "children", "card_indices")
+
+    def __init__(self, index: int, depth: int) -> None:
+        self.index = index
+        self.depth = depth
+        self.children: tuple = ()
+        self.card_indices: list[int] = []  # which enumerated river card each child is
+
+
 class _Schedule:
     """The tree walked for one updating player, planned once. The tree never
     changes, so which row of which array every node's reach vector lives in, and
@@ -185,60 +335,100 @@ class _Schedule:
     player's own reach is the same for every child of an opponent's decision. So
     a row is only created where a strategy is multiplied in -- and the terminals
     under one of the player's own decisions all share its row, one column of the
-    matrix product instead of several.
+    matrix product instead of several. A chance node's children each get rows of
+    their own: the reach is multiplied by which combos can still hold that river
+    card (and, for the opponent's, the chance probability).
 
-    Node ids: decisions are 0..D-1 (preorder), terminal t is D + t."""
+    Node ids: decisions are 0..D-1 (preorder), terminal t is D + t, chance node c
+    is D + T + c."""
 
     def __init__(self, trainer: RangeCfrTrainer, player: int) -> None:
-        decisions = trainer._decisions
-        D, T = len(decisions), len(trainer._terminal_pot)
-        unified = lambda ref: ref if ref >= 0 else D + ~ref  # noqa: E731
-        opp_row = np.full(D + T, -1, dtype=np.intp)
-        own_row = np.full(D, -1, dtype=np.intp)
-        opp_row[0] = own_row[0] = 0
+        decisions, chances = trainer._decisions, trainer._chances
+        D, T, C = len(decisions), len(trainer._terminal_pot), len(chances)
+        is_terminal = lambda u: D <= u < D + T  # noqa: E731
+        is_chance = lambda u: u >= D + T  # noqa: E731
+        opp_row = np.full(D + T + C, -1, dtype=np.intp)
+        own_row = np.full(D + T + C, -1, dtype=np.intp)
+        self.root_id = root = trainer._root_id
+        opp_row[root] = own_row[root] = 0
         opp_rows = own_rows = 1
-        by_depth_own: dict[int, list] = {}  # parent row, child row, store row of the action
-        by_depth_opp: dict[int, list] = {}
+        # depth -> [(parent row, child row, action row | river card)]
+        strategy_opp: dict[int, list] = {}
+        strategy_own: dict[int, list] = {}
+        chance_opp: dict[int, list] = {}
+        chance_own: dict[int, list] = {}
 
+        def link_chance(chance_id: int) -> None:
+            nonlocal opp_rows, own_rows
+            node = chances[chance_id - D - T]
+            for card, child in zip(node.card_indices, node.children):
+                chance_opp.setdefault(node.depth, []).append((opp_row[chance_id], opp_rows, card))
+                opp_row[child] = opp_rows
+                opp_rows += 1
+                if not is_terminal(child):
+                    chance_own.setdefault(node.depth, []).append((own_row[chance_id], own_rows, card))
+                    own_row[child] = own_rows
+                    own_rows += 1
+
+        if is_chance(root):
+            link_chance(root)
         for node in decisions:  # preorder: a node's own rows are set before its children's
-            for k, ref in enumerate(node.children):
-                child = unified(ref)
+            for k, child in enumerate(node.children):
                 action_row = node.col0 + k  # row in the ACTING player's store
                 if node.actor == player:
                     opp_row[child] = opp_row[node.index]  # shared
-                    if ref >= 0:
+                    if not is_terminal(child):
                         own_row[child] = own_rows
-                        by_depth_own.setdefault(node.depth, []).append(
+                        strategy_own.setdefault(node.depth, []).append(
                             (own_row[node.index], own_rows, action_row)
                         )
                         own_rows += 1
                 else:
                     opp_row[child] = opp_rows
-                    by_depth_opp.setdefault(node.depth, []).append(
+                    strategy_opp.setdefault(node.depth, []).append(
                         (opp_row[node.index], opp_rows, action_row)
                     )
                     opp_rows += 1
-                    if ref >= 0:
+                    if not is_terminal(child):
                         own_row[child] = own_row[node.index]  # shared
+                if is_chance(child):
+                    link_chance(child)
 
-        def arrays(entries):
-            parent, child, action = (np.array(column, dtype=np.intp) for column in zip(*entries))
-            return parent, child, action
+        def program(strategy: dict[int, list], chance: dict[int, list]) -> list:
+            """Top-down steps, shallowest first: ("s", parent rows, child rows,
+            strategy rows) multiplies in a strategy; ("c", ..., river cards) a
+            chance node's mask."""
+            steps = []
+            for depth in sorted(set(strategy) | set(chance)):
+                for kind, table in (("s", strategy), ("c", chance)):
+                    if depth in table:
+                        columns = (np.array(c, dtype=np.intp) for c in zip(*table[depth]))
+                        steps.append((kind, *columns))
+            return steps
 
-        # Top-down steps, shallowest first.
-        self.own_steps = [(d, *arrays(by_depth_own[d])) for d in sorted(by_depth_own)]
-        self.opp_steps = [(d, *arrays(by_depth_opp[d])) for d in sorted(by_depth_opp)]
+        self.opp_program = program(strategy_opp, chance_opp)
+        self.own_program = program(strategy_own, chance_own)
         self.opp_rows, self.own_rows = opp_rows, own_rows
 
-        # Terminals: each distinct opponent-reach row is one row of the matrix
-        # product; every terminal points at its row.
-        unique_rows, self.terminal_to_row = np.unique(opp_row[D:], return_inverse=True)
+        # Terminals: each distinct opponent-reach row is one row of a matrix
+        # product; every terminal points at its row. A row belongs to one river
+        # card (the terminals sharing it sit under one decision of one card's
+        # subtree), so the products are grouped by card -- each card has its own
+        # equity matrix. (Without a river there is one group, the turn's.)
+        unique_rows, self.terminal_to_row = np.unique(opp_row[D : D + T], return_inverse=True)
         self.matrix_rows = unique_rows
+        row_card = np.empty(len(unique_rows), dtype=np.intp)
+        row_card[self.terminal_to_row] = trainer._terminal_card
+        self.matrix_groups = [
+            (int(card), np.flatnonzero(row_card == card)) for card in np.unique(row_card)
+        ]
 
         # Bottom-up groups, deepest first: the player's own nodes (their action
-        # values feed regret updates) and the opponent's (plain sums of children).
+        # values feed regret updates), the opponent's (plain sums of children),
+        # and chance nodes (children summed over the cards the player can hold).
         self.levels = []
-        for depth in sorted({n.depth for n in decisions}, reverse=True):
+        depths = {n.depth for n in decisions} | {c.depth for c in chances}
+        for depth in sorted(depths, reverse=True):
             groups = []
             for mine in (True, False):
                 nodes = [n for n in decisions if n.depth == depth and (n.actor == player) == mine]
@@ -249,12 +439,25 @@ class _Schedule:
                 groups.append(
                     (
                         np.array([n.index for n in nodes], dtype=np.intp),
-                        np.array([unified(r) for n in nodes for r in n.children], dtype=np.intp),
+                        np.array([r for n in nodes for r in n.children], dtype=np.intp),
                         np.concatenate([[0], np.cumsum(sizes)[:-1]]).astype(np.intp),
                         np.array([n.col0 + k for n in nodes for k in range(len(n.children))], dtype=np.intp),
                         np.array([n.slot for n in nodes], dtype=np.intp),
                     )
                 )
+            at_depth = [c for c in chances if c.depth == depth]
+            if at_depth:
+                sizes = [len(c.children) for c in at_depth]
+                groups.append(
+                    (
+                        np.array([D + T + c.index for c in at_depth], dtype=np.intp),
+                        np.array([r for c in at_depth for r in c.children], dtype=np.intp),
+                        np.concatenate([[0], np.cumsum(sizes)[:-1]]).astype(np.intp),
+                        np.array([k for c in at_depth for k in c.card_indices], dtype=np.intp),
+                    )
+                )
+            else:
+                groups.append(None)
             self.levels.append(tuple(groups))
 
         # For the regret update: each of the player's rows' own-reach row.
@@ -262,17 +465,31 @@ class _Schedule:
         own_node_rows = np.array([own_row[n.index] for n in store.nodes], dtype=np.intp)
         self.own_row_of_action = own_node_rows[store.column_node] if store.nodes else own_node_rows
 
+        # The river-card tables a chance step multiplies by: the opponent's carry
+        # the chance probability too (a counterfactual reach includes it).
+        self.chance_scale = None
+        if trainer._river_cards:
+            self.own_table = trainer._live_masks[player]
+            if _CHANCE_NORMALIZATION == "own":
+                self.opp_table = trainer._live_masks[1 - player]
+                self.chance_scale = trainer._chance_scale[player]
+            else:
+                self.opp_table = trainer._chance_factor * trainer._live_masks[1 - player]
+        else:
+            self.opp_table = self.own_table = None
+
         # Scratch, reused every pass: reach vectors and values, one row each.
         combos, opponent_combos = len(trainer.combos[player]), len(trainer.combos[1 - player])
         self.opp = np.empty((opp_rows, opponent_combos))
         self.own = np.empty((own_rows, combos))
-        self.value = np.empty((D + T, combos))
+        self.value = np.empty((D + T + C, combos))
         self.action_values = np.empty((len(store.column_node), combos))
         self.node_value = np.empty((len(store.nodes), combos))
 
 
 class RangeCfrTrainer:
-    """Trains (and measures) one street's range-vs-range game.
+    """Trains (and measures) one street's range-vs-range game -- or, with
+    `config.river`, the turn and the river together.
 
     Speed notes, in the order they were found by profiling (docs/decisions.md,
     2026-10-21; tests/reference_range_cfr.py is the unoptimized original and
@@ -292,12 +509,17 @@ class RangeCfrTrainer:
         postflop-solver (b-inary) uses for its fold and showdown evaluation.
       * Regret-matched strategies are cached and refreshed only when regrets
         change, and every node's regrets, strategy sums and strategies live in
-        three contiguous arrays per player (a node owns a column slice), so the
-        DCFR update and the regret matching for the WHOLE tree are a handful of
-        array operations rather than ~25 numpy calls per node.
+        contiguous per-player arrays (a node owns a run of rows), so the DCFR
+        update and the regret matching for the WHOLE tree are a handful of array
+        operations rather than ~25 numpy calls per node.
       * Terminals that share an opponent-reach vector (the fold and the call under
-        one decision) share one column of the matrix multiply.
-    """
+        one decision) share one row of the matrix multiply.
+
+    A joint (turn + river) solve is the same machinery with chance nodes in the
+    tree: where a turn line closes without a fold, the river card is dealt, and
+    each card has its own river subtree, strategies and equity matrix. Money is
+    counted across both streets (a river terminal's contribution is the turn's plus
+    the river's), so payoffs are measured from the start of the turn throughout."""
 
     def __init__(self, config: RangeSpotConfig) -> None:
         self._config = config
@@ -308,25 +530,33 @@ class RangeCfrTrainer:
         self.weights = (weights0, weights1)
         self.labels = (labels0, labels1)
 
-        equity = compute_equity_matrix(combos0, combos1, config.board)
-        # NaN marks pairs that share a card -- they can never be dealt
-        # together, so they carry no weight at all (never "hero loses").
-        possible = (~np.isnan(equity)).astype(np.float64)
-        win0 = np.where(np.isnan(equity), 0.0, equity)
-        # Per player p, a stacked matrix taking the opponent's reach vector to
-        # [equity-weighted share p wins at showdown; total opponent weight p
-        # could be facing] for each of p's combos. Training uses only the top
-        # half (`_win`, a view; the bottom half is computed by card counting,
-        # `_mass_vs`); combo_equities uses both. float32 halves memory traffic
-        # (the product is the hot loop); regrets and strategy sums stay float64.
-        self._payoff = (
-            np.vstack([win0, possible]).astype(np.float32),
-            np.vstack([(possible - win0).T, possible.T]).astype(np.float32),
-        )
-        self._win = (
-            self._payoff[0][: len(combos0)],
-            self._payoff[1][: len(combos1)],
-        )
+        self._river = config.river
+        self._river_cards: tuple[int, ...] = ()
+        self._sampled = False
+        if config.river is None:
+            equity = compute_equity_matrix(combos0, combos1, config.board)
+            # NaN marks pairs that share a card -- they can never be dealt
+            # together, so they carry no weight at all (never "hero loses").
+            possible = (~np.isnan(equity)).astype(np.float64)
+            win0 = np.where(np.isnan(equity), 0.0, equity)
+            # Per player p, a stacked matrix taking the opponent's reach vector to
+            # [equity-weighted share p wins at showdown; total opponent weight p
+            # could be facing] for each of p's combos. Training uses only the top
+            # half (`_win`, a view; the bottom half is computed by card counting,
+            # `_mass_vs`); combo_equities uses both. float32 halves memory traffic
+            # (the product is the hot loop); regrets and strategy sums stay float64.
+            self._payoff = (
+                np.vstack([win0, possible]).astype(np.float32),
+                np.vstack([(possible - win0).T, possible.T]).astype(np.float32),
+            )
+            self._win = (
+                self._payoff[0][: len(combos0)],
+                self._payoff[1][: len(combos1)],
+            )
+        else:
+            possible = (~collision_mask(combos0, combos1)).astype(np.float64)
+            self._payoff = self._win = None
+            self._setup_river(config, combos0, combos1)
         self._chance_mass = float(weights0 @ possible @ weights1)
         if self._chance_mass <= 0:
             raise ValueError("no possible deal: every combo pair shares a card")
@@ -341,10 +571,13 @@ class RangeCfrTrainer:
         )
         self._nodes: dict[tuple[str, ...], _PublicNode] = {}
         self._decisions: list[_PublicNode] = []  # preorder: a parent precedes its children
+        self._chances: list[_ChanceNode] = []
         self._terminal_pot: list[float] = []
         self._terminal_contrib: list[tuple[float, float]] = []
         self._terminal_fold_winner: list[int] = []  # the non-folder's seat, or -1 for a showdown
-        self._build_tree(self._root)
+        self._terminal_card: list[int] = []  # the river card a terminal is under, or -1
+        root_ref = self._build_tree(self._root)
+        self._finalize_refs(root_ref)
         self._terminal_arrays = self._terminal_tables()
         self._stores = tuple(
             _PlayerStore([n for n in self._decisions if n.actor == player], len(self.combos[player]))
@@ -355,20 +588,127 @@ class RangeCfrTrainer:
 
     # --- setup ----------------------------------------------------------
 
-    def _build_tree(self, state: BettingRoundState, depth: int = 0) -> int:
-        """Builds the node and terminal records under `state`; returns its
-        child reference (see _PublicNode.children)."""
+    def _setup_river(self, config: RangeSpotConfig, combos0: list[Combo], combos1: list[Combo]) -> None:
+        """What a joint solve needs per river card: the cards to enumerate, each
+        card's showdown equity matrix, and which combos can still hold it."""
+        live = [c for c in range(52) if c not in set(config.board)]
+        count = len(live) if config.river.cards is None else min(config.river.cards, len(live))
+        self._river_cards = select_river_cards(config.board, count)
+        # One matrix per card, player 0 vs player 1 (player 1's is the complement,
+        # taken on the fly). Combos holding the river card get meaningless rows and
+        # columns; their reach is zero at that card, so nothing reads them.
+        self._river_win = []
+        for card in self._river_cards:
+            equity = _compute_equity_matrix(combos0, combos1, config.board + (card,))
+            self._river_win.append(np.where(np.isnan(equity), 0.0, equity).astype(_RIVER_MATRIX_DTYPE))
+        self._live_masks = tuple(
+            np.array([[0.0 if card in combo else 1.0 for combo in combos] for card in self._river_cards])
+            for combos in (combos0, combos1)
+        )
+        # Chance probability per enumerated card. Exactly 1 / 44 (cards left once
+        # both hands are out) when every card is enumerated; scaled up by
+        # (cards that can come) / (cards enumerated) when a subset stands in.
+        can_come = 52 - len(config.board)
+        k = len(self._river_cards)
+        # A sample of the river cards standing in for all of them makes the game
+        # only approximately constant-sum: a turn fold ends before any card is dealt,
+        # while a hand that holds sampled cards is dealt fewer of them down the river
+        # lines. "Best responses minus the pot" then has a floor it can't get below
+        # (it even goes negative), so exploitability() measures the Nash gap instead.
+        self._sampled = k < can_come
+        self._chance_factor = can_come / ((can_come - 4) * k)
+        # Per-hand normalization (see _CHANCE_NORMALIZATION): how many enumerated
+        # cards each combo holds, and so how many it can be dealt. With every card
+        # enumerated a hand holds 2 and the opponent averages 2, so this is exactly
+        # 1 / 44 for every hand -- the same as the constant weight. With a sample it
+        # corrects for hands that hold sampled cards seeing fewer of them.
+        held = [np.array([len(set(self._river_cards) & set(c)) for c in combos], dtype=np.float64) for combos in (combos0, combos1)]
+        mean_held = [float(self.weights[p] @ held[p] / self.weights[p].sum()) for p in (0, 1)]
+        self._held_cards = held
+        self._chance_scale = tuple(
+            1.0 / np.maximum(k - held[p] - mean_held[1 - p], 1.0) for p in (0, 1)
+        )
+
+    def _add_terminal(
+        self, pot: float, contributed: tuple[float, float], fold_winner: int, card: int
+    ) -> tuple[int, int]:
+        self._terminal_pot.append(pot)
+        self._terminal_contrib.append(contributed)
+        self._terminal_fold_winner.append(fold_winner)
+        self._terminal_card.append(card)
+        return (1, len(self._terminal_pot) - 1)
+
+    def _build_tree(
+        self,
+        state: BettingRoundState,
+        depth: int = 0,
+        carried: tuple[float, float] = (0.0, 0.0),
+        prefix: tuple[str, ...] = (),
+        card: int = -1,
+    ) -> tuple[int, int]:
+        """Builds the node and terminal records under `state`; returns a
+        reference to its root as (kind, index): kind 0 a decision, 1 a terminal,
+        2 a chance node (turned into plain ids by _finalize_refs). `carried` is
+        what each player put in on earlier streets; `card` the river card (an
+        index into the enumerated cards) this subtree is under, or -1."""
         if state.is_terminal():
-            self._terminal_pot.append(state.pot_bb + state.contributed[0] + state.contributed[1])
-            self._terminal_contrib.append(state.contributed)
+            pot = state.pot_bb + state.contributed[0] + state.contributed[1]
+            contributed = (carried[0] + state.contributed[0], carried[1] + state.contributed[1])
             # apply() has already flipped to_act to the non-folder on a fold.
-            self._terminal_fold_winner.append(state.to_act if state.history[-1] == "fold" else -1)
-            return ~(len(self._terminal_pot) - 1)
+            if state.history[-1] == "fold":
+                return self._add_terminal(pot, contributed, state.to_act, card)
+            if self._river_cards and card < 0:
+                return self._build_chance(state, depth, prefix)
+            return self._add_terminal(pot, contributed, -1, card)
         node = _PublicNode(state.legal_actions(), state.to_act, len(self._decisions), depth)
         self._decisions.append(node)
-        self._nodes[state.history] = node
-        node.children = tuple(self._build_tree(state.apply(action), depth + 1) for action in node.actions)
-        return node.index
+        self._nodes[prefix + state.history] = node
+        node.children = tuple(  # references until _finalize_refs
+            self._build_tree(state.apply(action), depth + 1, carried, prefix, card)
+            for action in node.actions
+        )
+        return (0, node.index)
+
+    def _build_chance(self, state: BettingRoundState, depth: int, prefix: tuple[str, ...]) -> tuple[int, int]:
+        """The turn has closed without a fold: deal the river card. Each card's
+        child is that card's river betting (starting with the out-of-position
+        player, on the pot the turn built and the stacks it left), or, with no
+        river betting or no chips left, a showdown."""
+        node = _ChanceNode(len(self._chances), depth)
+        self._chances.append(node)
+        pot = state.pot_bb + state.contributed[0] + state.contributed[1]
+        remaining = state.stack_bb - state.contributed[0]
+        menu = self._river.bet_menu
+        children = []
+        for index, card in enumerate(self._river_cards):
+            if menu is None or remaining <= 1e-9:
+                children.append(self._add_terminal(pot, state.contributed, -1, index))
+            else:
+                river = BettingRoundState.initial(pot, remaining, 0, (), menu)
+                children.append(
+                    self._build_tree(
+                        river, depth + 1, state.contributed,
+                        prefix + state.history + (f"river:{card_str(card)}",), index,
+                    )
+                )
+            node.card_indices.append(index)
+        node.children = tuple(children)
+        return (2, node.index)
+
+    def _finalize_refs(self, root_ref: tuple[int, int]) -> None:
+        """Replace (kind, index) references with plain node ids: decisions
+        0..D-1, terminal t as D + t, chance node c as D + T + c."""
+        D, T = len(self._decisions), len(self._terminal_pot)
+
+        def unify(ref: tuple[int, int]) -> int:
+            kind, index = ref
+            return index if kind == 0 else D + index if kind == 1 else D + T + index
+
+        for node in self._decisions:
+            node.children = tuple(unify(r) for r in node.children)
+        for chance in self._chances:
+            chance.children = tuple(unify(r) for r in chance.children)
+        self._root_id = unify(root_ref)
 
     def _terminal_tables(self) -> tuple:
         """Per player and terminal, the two coefficients that turn the opponent
@@ -376,7 +716,9 @@ class RangeCfrTrainer:
         (mass faced). A showdown is pot * win - own * facing; a fold is
         (share - own) * facing, where the share is the WHOLE pot for the
         non-folder (dead money from earlier streets included -- see
-        betting_round.terminal_utility) and nothing for the folder. Shapes (T,)."""
+        betting_round.terminal_utility) and nothing for the folder. `own` is
+        everything the player has put in since the start of the solve, across
+        streets. Shapes (T,)."""
         pot = np.array(self._terminal_pot)
         winner = np.array(self._terminal_fold_winner)
         contrib = np.array(self._terminal_contrib)  # (T, 2)
@@ -388,6 +730,7 @@ class RangeCfrTrainer:
             alpha = np.where(is_fold, 0.0, pot)
             beta = np.where(is_fold, fold_share - own, -own)
             per_player.append((alpha[:, None], beta[:, None]))
+        self._terminal_card = np.array(self._terminal_card, dtype=np.intp)
         return tuple(per_player)
 
     def _build_blockers(self, player: int) -> tuple:
@@ -412,13 +755,22 @@ class RangeCfrTrainer:
     def root(self) -> BettingRoundState:
         return self._root
 
+    @property
+    def river_cards(self) -> tuple[int, ...]:
+        """The river cards a joint solve enumerates (empty for a one-street solve)."""
+        return self._river_cards
+
     # --- evaluating terminals -------------------------------------------
 
-    def _mass_rows(self, player: int, rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _mass_rows(
+        self, player: int, rows: np.ndarray, card: int = -1
+    ) -> tuple[np.ndarray, np.ndarray]:
         """For each of `player`'s combos and each ROW of `rows` (a (T, opponent
         combos) array of reach weights): the equity-weighted opponent mass it wins
         at showdown, and the total opponent mass it could be facing (combos
-        sharing a card excluded). Shapes (T, own combos).
+        sharing a card excluded). Shapes (T, own combos). `card` is the river
+        card (an index into the enumerated ones) whose showdown this is, or -1
+        for the turn street's own equity matrix (every runout averaged).
 
         The win mass is one matrix multiply. The facing mass needs no matrix:
         total reach, minus the reach of opponent combos holding either of my
@@ -426,12 +778,23 @@ class RangeCfrTrainer:
         for both cards). Inclusion-exclusion over a 52-card table. One row per
         terminal (rather than one column) keeps each terminal's values
         contiguous, which is what the gathers and the bottom-up pass want."""
-        matrix = self._win[player]
-        win = (rows.astype(matrix.dtype, copy=False) @ matrix.T).astype(np.float64)
         first, second, incidence, same = self._blockers[player]
         per_card = rows @ incidence  # (T, 52): reach of opponent combos holding each card
         padded = np.concatenate([rows, np.zeros((rows.shape[0], 1))], axis=1)  # column m = "no identical twin"
         facing = rows.sum(axis=1)[:, None] - per_card[:, first] - per_card[:, second] + padded[:, same]
+        if card < 0 and self._win is None:
+            # A joint solve's turn-street terminals are all folds (a closing line
+            # goes to a river card instead), and a fold never reads the win mass.
+            win = np.zeros_like(facing)
+        elif card < 0:
+            matrix = self._win[player]
+            win = (rows.astype(matrix.dtype, copy=False) @ matrix.T).astype(np.float64)
+        else:
+            # One matrix per river card, player 0's. Player 1's win mass is what
+            # it faces minus what player 0 wins from the same reach.
+            matrix = self._river_win[card]
+            product = (rows.astype(matrix.dtype, copy=False) @ (matrix.T if player == 0 else matrix)).astype(np.float64)
+            win = product if player == 0 else facing - product
         return win, facing
 
     def _mass_vs(self, player: int, vectors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -442,39 +805,61 @@ class RangeCfrTrainer:
 
     # --- one pass over the tree ------------------------------------------
 
-    def _pass(self, player: int, *, train: bool) -> np.ndarray:
-        """One traversal for `player`. With train=True: both players play their
-        current strategies, `player`'s regrets and strategy sums are updated
-        (DCFR), and its strategies refreshed. With train=False: the opponent
-        plays its AVERAGE strategy and `player` best-responds -- the
-        exploitability measure. Returns `player`'s per-combo value at the root.
+    def _pass(self, player: int, *, mode: str) -> np.ndarray:
+        """One traversal for `player`, returning its per-combo value at the root.
+        mode "train": both players play their current strategies, `player`'s regrets
+        and strategy sums are updated (DCFR), and its strategies refreshed. mode
+        "best_response": the opponent plays its AVERAGE strategy and `player`
+        best-responds. mode "evaluate": both play their average strategies --
+        what the player actually gets (the exploitability measure needs it when the
+        game isn't constant-sum).
 
         Three phases, each a handful of array operations per tree level (the
         plan is in _Schedule) rather than a Python loop over every node."""
+        train = mode == "train"
         plan = self._schedules[player]
         mine, theirs = self._stores[player], self._stores[1 - player]
-        decisions = len(self._decisions)
+        terminals_from = len(self._decisions)
         opp, own, value = plan.opp, plan.own, plan.value
         opp[0] = self.weights[1 - player]
         own[0] = self.weights[player]
         opponent_strategy = theirs.current if train else theirs.normalize(theirs.strategy_sum)
+        own_average = mine.normalize(mine.strategy_sum) if mode == "evaluate" else None
 
         # Top-down: reach vectors. Both players' reach is multiplied by a strategy
-        # only where that player acts; everything else is a shared row.
-        for (_, parent, child, action) in plan.opp_steps:
-            opp[child] = opp[parent] * opponent_strategy[action]
+        # only where that player acts (or by a card mask where one is dealt);
+        # everything else is a shared row.
+        for kind, parent, child, third in plan.opp_program:
+            opp[child] = opp[parent] * (opponent_strategy[third] if kind == "s" else plan.opp_table[third])
         if train:
-            for (_, parent, child, action) in plan.own_steps:
-                own[child] = own[parent] * mine.current[action]
+            for kind, parent, child, third in plan.own_program:
+                own[child] = own[parent] * (mine.current[third] if kind == "s" else plan.own_table[third])
 
-        # Every terminal at once. Row t of `value[decisions:]` is terminal t's value
-        # for each of the player's combos.
+        # Every terminal at once (one product per river card). Row t of
+        # `value[terminals_from:...]` is terminal t's value for each of the
+        # player's combos.
         alpha, beta = self._terminal_arrays[player]
-        win, facing = self._mass_rows(player, opp[plan.matrix_rows])
-        value[decisions:] = alpha * win[plan.terminal_to_row] + beta * facing[plan.terminal_to_row]
+        rows = opp[plan.matrix_rows]
+        if len(plan.matrix_groups) == 1:
+            win, facing = self._mass_rows(player, rows, plan.matrix_groups[0][0])
+        else:
+            win = np.empty((len(rows), len(self.combos[player])))
+            facing = np.empty_like(win)
+            for card, index in plan.matrix_groups:
+                win[index], facing[index] = self._mass_rows(player, rows[index], card)
+        terminals = len(alpha)
+        value[terminals_from : terminals_from + terminals] = (
+            alpha * win[plan.terminal_to_row] + beta * facing[plan.terminal_to_row]
+        )
 
         # Bottom-up, deepest level first.
-        for own_group, opp_group in plan.levels:
+        for own_group, opp_group, chance_group in plan.levels:
+            if chance_group is not None:
+                nodes, children, starts, cards = chance_group
+                # A combo holding the river card can't be dealt it: its value
+                # under that card is meaningless and left out of the sum.
+                dealt = np.add.reduceat(value[children] * plan.own_table[cards], starts, axis=0)
+                value[nodes] = dealt if plan.chance_scale is None else dealt * plan.chance_scale
             if opp_group is not None:
                 nodes, children, starts, _, _ = opp_group
                 value[nodes] = np.add.reduceat(value[children], starts, axis=0)
@@ -485,6 +870,8 @@ class RangeCfrTrainer:
                     plan.action_values[action_rows] = action_values
                     node_value = np.add.reduceat(action_values * mine.current[action_rows], starts, axis=0)
                     plan.node_value[slots] = node_value
+                elif mode == "evaluate":
+                    node_value = np.add.reduceat(action_values * own_average[action_rows], starts, axis=0)
                 else:
                     node_value = np.maximum.reduceat(action_values, starts, axis=0)
                 value[nodes] = node_value
@@ -507,7 +894,7 @@ class RangeCfrTrainer:
             strategy_sum += own[plan.own_row_of_action] * current  # the strategy played THIS iteration
             # DCFR keeps (discounted) negative regrets, so take the positive part.
             current[...] = mine.normalize(np.maximum(regret, 0.0))
-        return value[0].copy()
+        return value[plan.root_id].copy()
 
     def train(self, iterations: int) -> None:
         for _ in range(iterations):
@@ -515,7 +902,7 @@ class RangeCfrTrainer:
             # Alternating updates: player 1's pass already sees player 0's
             # freshly updated strategy.
             for player in (0, 1):
-                self._pass(player, train=True)
+                self._pass(player, mode="train")
 
     def train_until(
         self,
@@ -560,12 +947,28 @@ class RangeCfrTrainer:
             raise KeyError(f"no node trained at history {history!r} -- train() first, or unreachable")
         return node.actions, node.average_strategy()
 
+    def river_strategy(
+        self, card: int, turn_history: tuple[str, ...], river_history: tuple[str, ...] = ()
+    ) -> tuple[tuple[str, ...], np.ndarray]:
+        """(actions, average strategy) at a river decision of a joint solve: the
+        player to act's combos on river card `card` (a card int, one of
+        river_cards), reached by `turn_history` (the turn line that closed) and
+        then `river_history` (the river's own betting so far)."""
+        key = turn_history + (f"river:{card_str(card)}",) + river_history
+        node = self._nodes.get(key)
+        if node is None:
+            raise KeyError(f"no river node at {key!r}")
+        return node.actions, node.average_strategy()
+
     def combo_equities(self, player: int) -> tuple[np.ndarray, float]:
         """Each of `player`'s combos' showdown equity against the opponent's
         whole weighted range (every runout counted, card-sharing pairs
         excluded), plus the range's overall equity -- read off the same
         matrix training uses, so nothing is recomputed. NaN for a combo that
-        can't be dealt against any of the opponent's range."""
+        can't be dealt against any of the opponent's range. Not available for a
+        joint solve (it has no single turn-street equity matrix)."""
+        if self._payoff is None:
+            raise NotImplementedError("combo_equities isn't available for a joint turn+river solve")
         n = len(self.combos[player])
         shares = self._payoff[player].astype(np.float64) @ self.weights[1 - player]
         wins, totals = shares[:n], shares[n:]
@@ -705,7 +1108,14 @@ class RangeCfrTrainer:
     def best_response_value(self, player: int) -> float:
         """Expected payoff (bb per deal) of `player`'s best response against
         the opponent's current average strategy."""
-        per_combo = self._pass(player, train=False)
+        per_combo = self._pass(player, mode="best_response")
+        return float(self.weights[player] @ per_combo) / self._chance_mass
+
+    def value_under_average(self, player: int) -> float:
+        """Expected payoff (bb per deal) of `player` when BOTH play their average
+        strategies -- what it actually gets, as opposed to what a best response
+        would get (best_response_value)."""
+        per_combo = self._pass(player, mode="evaluate")
         return float(self.weights[player] @ per_combo) / self._chance_mass
 
     def exploitability(self) -> float:
@@ -714,4 +1124,10 @@ class RangeCfrTrainer:
         an exact equilibrium. Payoffs always sum to the dead pot (pot_bb),
         so that's subtracted out. The principled convergence measure for
         choosing an iteration count, rather than eyeballing frequencies."""
+        if self._sampled:
+            # Not a constant-sum game any more (see _sampled): each player's gap
+            # between its best response and what it actually gets.
+            return sum(
+                self.best_response_value(p) - self.value_under_average(p) for p in (0, 1)
+            ) / 2
         return (self.best_response_value(0) + self.best_response_value(1) - self._config.pot_bb) / 2
