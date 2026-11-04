@@ -71,6 +71,7 @@ def test_the_model_answers_from_the_facts(monkeypatch):
     assert "Why is betting right?" in user
     assert "Why is betting right?" not in system
     assert "Never invent" in system
+    assert "Plain text only" in system  # the app does not render markdown, so stray asterisks showed up
 
 
 def test_an_injection_attempt_stays_data_in_the_user_turn(monkeypatch):
