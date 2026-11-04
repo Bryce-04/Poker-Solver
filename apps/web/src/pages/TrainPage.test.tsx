@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { TrainPage } from "./TrainPage";
-import { LESSONS } from "../lib/lessons";
+import { GROUP_ORDER, LESSONS } from "../lib/lessons";
 import { readProgress } from "../lib/progress";
 import { askCoach, fetchProgress, putProgress } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -48,6 +48,36 @@ describe("Train hub", () => {
   it("opens a lesson straight from ?lesson=", () => {
     renderTrain("/train?lesson=positions");
     expect(screen.getByRole("heading", { name: /six seats, one button/i })).toBeInTheDocument();
+  });
+});
+
+describe("the course on the hub", () => {
+  it("groups the lessons under headings, in course order, each lesson once", () => {
+    renderTrain();
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(GROUP_ORDER);
+    for (const lesson of LESSONS) {
+      expect(screen.getAllByRole("button", { name: new RegExp(`^${lesson.title}`, "i") }).length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("plays a generated lesson through, scores it, and offers the drill that matches", async () => {
+    const user = userEvent.setup();
+    renderTrain("/train?lesson=defend-sb");
+    await user.click(screen.getByRole("button", { name: /^next$/i })); // the intro card
+    // Six questions: pick the first choice each time (right or not, it must all be graded and counted).
+    for (let i = 0; i < 6; i++) {
+      await user.click(screen.getAllByRole("button").find((b) => b.classList.contains("train__choice"))!);
+      await user.click(screen.queryByRole("button", { name: /^next$/i }) ?? screen.getByRole("button", { name: /^finish$/i }));
+    }
+    expect(screen.getByText(/you got \d of 6 questions right/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /practice this at the table/i }));
+    expect(screen.getByRole("button", { name: /^defending$/i })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("a generated lesson says its numbers are a baseline", () => {
+    renderTrain("/train?lesson=open-co");
+    expect(screen.getByText(/baseline ranges, for a balanced opponent/i)).toBeInTheDocument();
   });
 });
 

@@ -168,7 +168,12 @@ progress kept per account on the device (`lib/progress.ts`) and, signed in, on t
 "Which hands to open" is graded against the reference opening ranges, shipped as
 `apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
 a test fails if it drifts). "The continuation bet" is graded by the Drill deck's solver frequencies
-(`lib/cbetLesson.ts`). "Up next" is rule-based (`recommendNext`). The Train hub also has a **6-max
+(`lib/cbetLesson.ts`). The course is 18 lessons in groups (`GROUP_ORDER` in `lib/lessons.ts`): ten are
+**generated from the data** (`lib/generatedLessons.ts`: opening per seat, defending per seat, facing a
+3-/4-bet, two postflop lessons from the Drill deck), graded by the same code as the practice table
+(`practiceTable.nodeFor`); two are hand-written principles, not graded (`lib/conceptLessons.ts`: the squeeze,
+playing against tendencies, **unreviewed**). The solver's play is a baseline against a balanced opponent, not
+a rule against real players: every generated lesson says so. "Up next" is rule-based (`recommendNext`). The Train hub also has a **6-max
 practice table** (`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`): preflop-first, the bots
 play the reference charts and every decision is graded against them (data in
 `apps/web/src/data/preflop-pairs.json`, regenerate with `python apps/api/scripts/make_preflop_pairs.py`;

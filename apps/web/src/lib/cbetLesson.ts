@@ -1,5 +1,5 @@
 import deckFile from "../data/drill-deck.json";
-import { AGGRESSIVE, shuffled, type DrillAction, type DrillDeckFile, type DrillSpot } from "./drill";
+import { AGGRESSIVE, betAmount, formatBb, shuffled, type DrillAction, type DrillDeckFile, type DrillSpot } from "./drill";
 
 // The "continuation bet" lesson's hands, taken from the Drill's pre-solved
 // deck (BB vs BTN single-raised pots, 100bb): the spots where the BTN raised
@@ -74,6 +74,75 @@ export function explainCbet(spot: DrillSpot): string {
   const sizeText = size ? ` When it bets, it mostly uses ${size}.` : "";
   const bullets = spot.analysis?.bullets ?? [];
   // The hand and the reason; the middle bullet is about the whole range.
+  const why = [bullets[0], bullets[2]].filter(Boolean).join(" ");
+  return `${mix}${sizeText}${why ? ` ${why}` : ""}`;
+}
+
+// --- the other flop spots in the deck ---------------------------------------------------------------
+
+/** What the solver does with a hand when it can fold, call or raise: the three shares. */
+export function facingBetShares(spot: DrillSpot): { fold: number; call: number; raise: number } {
+  return {
+    fold: spot.mix.fold ?? 0,
+    call: spot.mix.call ?? 0,
+    raise: spot.actions.filter((a) => AGGRESSIVE.has(a)).reduce((sum, a) => sum + (spot.mix[a] ?? 0), 0),
+  };
+}
+
+export type FacingAnswer = "fold" | "call" | "raise";
+
+/** The answer the solver gives at least CLEAR_MAJORITY of the time, or null for a genuinely mixed hand. */
+export function clearFacingAnswer(spot: DrillSpot): FacingAnswer | null {
+  const shares = facingBetShares(spot);
+  const best = (Object.keys(shares) as FacingAnswer[]).reduce((a, b) => (shares[b] > shares[a] ? b : a));
+  return shares[best] >= CLEAR_MAJORITY ? best : null;
+}
+
+const BET_PCT: Partial<Record<DrillAction, number>> = { bet_small: 25, bet_medium: 75, bet_large: 125 };
+
+/** "the BB bets 1.4bb (25% of the 5.5bb pot)". */
+export function villainBetText(spot: DrillSpot): string {
+  const pct = spot.facing ? BET_PCT[spot.facing] : undefined;
+  return `the BB bets ${formatBb(betAmount(spot))}bb${pct ? ` (${pct}% of the ${spot.potBb}bb pot)` : ""}`;
+}
+
+/** The deck's spots of one kind for the hero's seat, in a fixed order. */
+export function flopCandidates(situation: DrillSpot["situation"]): DrillSpot[] {
+  return deck.filter((s) => s.situation === situation).sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * `perAnswer` hands for each clear answer, mixed so neither is always right. Seeded: the same lesson every time.
+ * `answerOf` gives a spot's clear answer, or null when it is mixed (those are left out on purpose: a hand the
+ * solver splits near 50/50 has no one right answer to ask for).
+ */
+export function pickBy<A extends string>(
+  candidates: readonly DrillSpot[],
+  answerOf: (spot: DrillSpot) => A | null,
+  plan: readonly A[],
+  seed = 11,
+): DrillSpot[] {
+  const queues = new Map<A, DrillSpot[]>();
+  for (const spot of shuffled(candidates, seed)) {
+    const answer = answerOf(spot);
+    if (answer) queues.set(answer, [...(queues.get(answer) ?? []), spot]);
+  }
+  const out: DrillSpot[] = [];
+  for (const answer of plan) {
+    const next = queues.get(answer)?.shift();
+    if (next) out.push(next);
+  }
+  return out;
+}
+
+/** Why a facing-a-bet hand does what it does, in the solver's numbers. */
+export function explainFacingBet(spot: DrillSpot): string {
+  const s = facingBetShares(spot);
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const mix = `With this hand the solver folds ${pct(s.fold)} of the time, calls ${pct(s.call)} and raises ${pct(s.raise)}.`;
+  const size = s.raise >= CLEAR_MAJORITY ? favoriteSize(spot) : null;
+  const sizeText = size ? ` When it raises, it mostly uses ${size}.` : "";
+  const bullets = spot.analysis?.bullets ?? [];
   const why = [bullets[0], bullets[2]].filter(Boolean).join(" ");
   return `${mix}${sizeText}${why ? ` ${why}` : ""}`;
 }

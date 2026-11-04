@@ -40,3 +40,19 @@ export function cardsFor(label: string): [string, string] {
   if (label.length === 2) return [`${a}s`, `${b}h`];
   return label.endsWith("s") ? [`${a}s`, `${b}s`] : [`${a}s`, `${b}h`];
 }
+
+/** The open-or-fold explanation, from the range data. */
+export function explainOpen(seat: OpenSeat, hand: string): string {
+  const pct = openPercent(seat);
+  if (inOpenRange(seat, hand)) {
+    return `${hand} is in the ${seat} opening range, so it's a raise. The ${seat} opens about ${pct}% of hands.`;
+  }
+  const first = earliestOpeningSeat(hand);
+  const later = first ? ` It becomes an open from the ${first} onward, where the range is wider.` : " It's too weak to open from any seat.";
+  return `${hand} is not in the ${seat} opening range, so it's a fold. The ${seat} opens only about ${pct}% of hands.${later}`;
+}
+
+/** Every hand type the seat opens, as 169-type labels. */
+export function openHands(seat: OpenSeat): readonly string[] {
+  return RANGES[seat];
+}
