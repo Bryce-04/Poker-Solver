@@ -92,8 +92,9 @@ export function StrategyResult({
   );
 }
 
-/** The range's overall mix as one 34px stacked bar, labelled where it fits. */
-function FrequencyBar({ mix }: { mix: [string, number][] }) {
+/** The range's overall mix as one 34px stacked bar, labelled where it fits.
+ * Also the phone result's summary bar (phone/ResultStep). */
+export function FrequencyBar({ mix }: { mix: [string, number][] }) {
   return (
     <div
       className="strategy-result__bar"
@@ -113,8 +114,12 @@ function FrequencyBar({ mix }: { mix: [string, number][] }) {
   );
 }
 
-function HandPanel({
+/** One hand's strategy: its mix as bars, advice, "Why?" and the suit view.
+ * Desktop's side panel; on phones, the body of the hand sheet
+ * (phone/ResultStep), which shows the hand in its own title (`showHand`). */
+export function HandPanel({
   hand,
+  showHand = true,
   mix,
   combos,
   player,
@@ -126,6 +131,8 @@ function HandPanel({
   reasons,
 }: {
   hand: string | null;
+  /** Show the hand's name at the top (off when a sheet title already does). */
+  showHand?: boolean;
   mix: Record<string, number> | undefined;
   combos: number;
   player: Position;
@@ -152,7 +159,7 @@ function HandPanel({
   return (
     <aside className="hand-panel" aria-label="Selected hand">
       <div>
-        <p className="hand-panel__hand">{hand}</p>
+        {showHand && <p className="hand-panel__hand">{hand}</p>}
         {inRange && category && <p className="hand-panel__category">{category}</p>}
         {inRange && (
           <p className="hand-panel__combos tabular-nums">

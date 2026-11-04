@@ -1,0 +1,178 @@
+/* The phone Library (docs/mobile-redesign.md §6; values from
+   docs/mobile-redesign/mockup/library.html and account.html). Shared pieces
+   (.m-step, .m-note, .m-btn...) come from components/mobile/. */
+
+.m-lib__search {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font-size: 16px; /* 16px keeps iOS from zooming in on focus */
+}
+
+.m-lib__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.m-lib__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* :not(:disabled) to out-rank index.css's button:hover:not(:disabled). */
+.m-lib__card:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+
+.m-lib__card-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.m-lib__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-strong);
+}
+
+.m-lib__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.m-lib__chevron {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.m-lib__pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  background: var(--success-subtle);
+  color: var(--success-text);
+}
+
+.m-lib__pill[data-kind="postflop"] {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.m-lib__foot {
+  text-align: center;
+}
+
+/* Signed out, or nothing saved yet. */
+.m-lib__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 55svh;
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.m-lib__empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--accent-subtle);
+  color: var(--nav-active);
+}
+
+.m-lib__empty-text {
+  max-width: 290px;
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.m-lib__empty-button {
+  min-width: 200px;
+  margin-top: 6px;
+}
+
+/* The spot's sheet. */
+.m-lib__sheet-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.m-lib__preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.m-lib__mini {
+  flex: none;
+  width: 150px;
+}
+
+.m-lib__share {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-strong);
+}
+
+.m-lib__cards {
+  display: flex;
+  gap: 6px;
+}
+
+.m-lib__actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 10px;
+}
+
+.m-lib__danger {
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+
+.m-lib__danger:hover:not(:disabled) {
+  background: var(--danger-subtle);
+  color: var(--danger);
+}

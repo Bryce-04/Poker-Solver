@@ -1,62 +1,21 @@
+/* Phone and tablet shell (< 1024px; docs/mobile-redesign.md §3): the sticky
+   top bar (components/mobile/TopBar), the page in a column at most 560px
+   wide, and the fixed tab bar (components/mobile/TabBar), whose height the
+   page keeps clear of. The top bar covers the status bar and the tab bar the
+   gesture bar, so content never scrolls under either (§2). */
 .app {
+  --tab-bar-height: 64px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+
+.app__content {
+  flex: 1 0 auto;
   width: 100%;
-  max-width: 44rem;
+  max-width: 560px;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
-}
-
-.app__header {
-  margin-bottom: 1.75rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.app__title {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.app__logo {
-  width: 1.6rem;
-  height: 1.6rem;
-}
-
-.app__tagline {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin-top: 0.15rem;
-}
-
-@media (max-width: 480px) {
-  .app {
-    padding: 1.25rem 1rem 3rem;
-  }
-}
-
-.app__nav {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.75rem;
-}
-
-.app__nav a {
-  color: var(--text);
-  text-decoration: none;
-  font-size: 0.9rem;
-  padding-bottom: 0.25rem;
-  border-bottom: 2px solid transparent;
-}
-
-.app__nav a:hover {
-  color: var(--text-h);
-}
-
-.app__nav a.active {
-  color: var(--text-h);
-  border-bottom-color: var(--accent-border);
+  padding: 20px 16px calc(var(--tab-bar-height) + var(--safe-bottom) + 24px);
 }
 
 /* Desktop shell (>= 1024px; docs/desktop-redesign.md §4): sidebar on the

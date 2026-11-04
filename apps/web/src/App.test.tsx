@@ -5,7 +5,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import App from './App'
 import { listSpots } from './lib/api'
 
-// SavedSpotsPage calls listSpots() on mount -- mock the api module directly
+// The Library calls listSpots() on mount -- mock the api module directly
 // (same convention as SpotBuilder.test.tsx) rather than the transport
 // underneath it, so this test doesn't care whether that's fetch or
 // CapacitorHttp. POST/GET /spots is live (see docs/decisions.md); stub an
@@ -35,15 +35,15 @@ describe('<App />', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('renders the shell heading', () => {
+  it('titles the phone top bar after the current tab', () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: /poker solver/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
   })
 
   it('sends the default route to Solve', () => {
     render(<App />)
     expect(window.location.pathname).toBe('/solve')
-    expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
   })
 
   it('has exactly the four nav destinations', () => {
@@ -57,12 +57,12 @@ describe('<App />', () => {
     render(<App />)
 
     await user.click(screen.getByRole('link', { name: /^ranges$/i }))
-    // Pick mode by default: the button builder's position control.
-    expect(screen.getByLabelText(/your position/i)).toBeInTheDocument()
+    // Pick mode by default: the seat chips.
+    expect(screen.getByRole('group', { name: 'Your seat' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^type it$/i }))
     expect(window.location.search).toBe('?mode=type')
-    expect(screen.getByText(/describe the spot/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/type the spot/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /^hand history$/i }))
     expect(window.location.search).toBe('?mode=paste')
@@ -72,12 +72,12 @@ describe('<App />', () => {
     expect(window.location.search).toBe('')
 
     // Signed out (see the auth mock above), so Library shows its sign-in
-    // notice rather than fetching -- GET /spots requires sign-in.
+    // screen rather than fetching -- GET /spots requires sign-in.
     await user.click(screen.getByRole('link', { name: /^library$/i }))
-    expect(await screen.findByText(/not signed in/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /your saved spots live here/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: /^solve$/i }))
-    expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
   })
 
   it.each([
@@ -89,6 +89,87 @@ describe('<App />', () => {
     render(<App />)
     expect(window.location.pathname).toBe(pathname)
     expect(window.location.search).toBe(search)
+  })
+
+  describe('phone shell (docs/mobile-redesign.md §3)', () => {
+    it('opens the account sheet from the top bar, and closes it with Esc', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /^sign in$/i }))
+      const sheet = screen.getByRole('dialog', { name: 'Sign in' })
+      expect(within(sheet).getByLabelText(/email/i)).toHaveAttribute('autocomplete', 'email')
+      expect(within(sheet).getByText(/without an account/i)).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('opens the account sheet from the signed-out Library', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('link', { name: /^library$/i }))
+      await user.click(within(screen.getByRole('main')).getByRole('button', { name: /^sign in$/i }))
+      expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeInTheDocument()
+    })
+
+    it('has no inline sign-in form or tagline any more', () => {
+      render(<App />)
+      expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/manual hand builder/i)).not.toBeInTheDocument()
+    })
+
+    it('returns each tab to where it was left', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+      await user.click(screen.getByRole('button', { name: /^type it$/i }))
+      await user.click(screen.getByRole('link', { name: /^library$/i }))
+      expect(screen.getByRole('link', { name: /^ranges$/i })).toHaveAttribute('href', '/ranges?mode=type')
+      await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+      expect(window.location.search).toBe('?mode=type')
+    })
+
+    it('keeps the Solve setup across a tab switch', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      const player1 = () => within(screen.getByRole('group', { name: 'Player 1' }))
+      await user.click(player1().getByRole('button', { name: 'UTG' }))
+      await user.click(screen.getByRole('link', { name: /^library$/i }))
+      // Hidden, not unmounted, and its Start over is out of the top bar.
+      expect(screen.queryByRole('button', { name: /start over/i })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('link', { name: /^solve$/i }))
+      expect(player1().getByRole('button', { name: 'UTG' })).toHaveAttribute('aria-pressed', 'true')
+      await user.click(screen.getByRole('button', { name: /start over/i }))
+      expect(player1().getByRole('button', { name: 'BB' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('renders Solve and titles the tab at "/solve/" too (trailing slash)', () => {
+      window.history.pushState({}, '', '/solve/')
+      render(<App />)
+      expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: 'Player 1' })).toBeVisible()
+    })
+
+    it('Start over in the top bar clears Solve and goes back to step 1', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('button', { name: 'Call 1bb' }))
+      await user.click(screen.getByRole('button', { name: 'Check' }))
+      await user.click(screen.getByRole('button', { name: 'Next: the board' }))
+      expect(window.location.search).toBe('?step=board')
+      await user.click(screen.getByRole('button', { name: 'Start over' }))
+      expect(window.location.search).toBe('?step=hand')
+      expect(screen.getByText('BTN to act · facing 1bb')).toBeInTheDocument()
+    })
+
+    it("goes back to the last tab from the Drill's X", async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+      await user.click(screen.getByRole('link', { name: /^drill$/i }))
+      await user.click(screen.getByRole('link', { name: /exit the drill/i }))
+      expect(window.location.pathname).toBe('/ranges')
+    })
   })
 
   describe('at desktop width', () => {
@@ -115,6 +196,32 @@ describe('<App />', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
       // The phone header (and its tagline) isn't rendered at all.
       expect(screen.queryByText(/manual hand builder/i)).not.toBeInTheDocument()
+    })
+
+    it('starts Solve blank after leaving it, as before the phone keep-alive', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('button', { name: 'BTN raises…' }))
+      await user.click(screen.getByRole('button', { name: '2.5bb' }))
+      expect(screen.getByRole('button', { name: 'BB calls 1.5bb' })).toBeInTheDocument()
+      const nav = screen.getByRole('navigation', { name: 'Main' })
+      await user.click(within(nav).getByRole('link', { name: /^library/i }))
+      await user.click(within(nav).getByRole('link', { name: /^solve/i }))
+      expect(screen.queryByRole('button', { name: 'BB calls 1.5bb' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'BTN raises…' })).toBeInTheDocument()
+    })
+
+    it('renders Solve at "/solve/" too (trailing slash)', () => {
+      window.history.pushState({}, '', '/solve/')
+      render(<App />)
+      expect(screen.getByRole('button', { name: 'BTN raises…' })).toBeInTheDocument()
+    })
+
+    it('has no phone top bar, tab bar or account sheet', () => {
+      const { container } = render(<App />)
+      expect(container.querySelector('.top-bar, .tab-bar')).toBeNull()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('navigation', { name: 'Main' })).toHaveLength(1)
     })
 
     it('opens the sign-in form from the sidebar', async () => {

@@ -1,0 +1,41 @@
+/* docs/mobile-redesign.md §3.5; values from docs/mobile-redesign/mockup.
+   "m-chip", not "chip": DrillPage.css has a global .chip of its own. */
+.m-chip-group {
+  display: grid;
+  grid-template-columns: repeat(var(--chip-columns), minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-chip {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 1px solid var(--chip-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: 600 14px/1 var(--sans);
+  cursor: pointer;
+}
+
+.m-chip[aria-pressed="true"] {
+  background: var(--chip-selected);
+  border-color: var(--accent);
+}
+
+.m-chip:disabled {
+  opacity: 0.4;
+}
+
+/* :not(:disabled) to out-rank index.css's button:hover:not(:disabled). */
+@media (hover: hover) {
+  .m-chip:hover:not(:disabled) {
+    background: var(--surface);
+    border-color: var(--chip-border-hover);
+  }
+
+  .m-chip[aria-pressed="true"]:hover:not(:disabled) {
+    background: var(--chip-selected);
+    border-color: var(--accent);
+  }
+}

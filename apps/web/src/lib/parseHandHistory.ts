@@ -11,7 +11,7 @@ import { buildOpenSpot, buildVsRaiseSpot } from "./spot";
  *   - parseHandHistory: the original MVP. Only hands that reduce to one of
  *     the two shapes buildOpenSpot/buildVsRaiseSpot can represent --
  *     unopened (folds to hero) or hero facing exactly one uncontested raise,
- *     stopping at Hero's first action. Feeds ImportPage's preflop-chart
+ *     stopping at Hero's first action. Feeds the Ranges page's preflop-chart
  *     lookup, unchanged.
  *   - parseHandHistoryToPostflopSetup: fast-forwards through every street
  *     present in the paste (not just preflop) and hands back whatever

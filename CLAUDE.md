@@ -325,6 +325,144 @@ category labels and "Why?" (Phase 6).
   honesty note ("the percentages come from the solve; the explanation is a
   rule of thumb").
 
+**Mobile redesign (agreed 2026-11-03; all six phases, 0-5, done)**: `docs/mobile-redesign.md`
+is the spec for everything under 1024px except the Drill, with the design as
+clickable HTML plus screenshots in `docs/mobile-redesign/mockup/`. Read both
+before touching phone layout. Phases 0-5 are built in order as one commit each
+on the `mobile-redesign` branch, with a single PR at the end (not the spec's
+PR per phase; the team's call). Hard rule,
+the mirror of the desktop one: **desktop (>= 1024px) must not change**.
+**Phase 0 (status bar) is done**: `body` no longer pads by the top safe-area
+inset (that padding scrolled away, letting content slide under the Android
+status bar). The phone header (`.app__header`) is sticky with a solid
+background and pads itself by the top inset, under `@media (max-width: 1023px)`.
+Read insets as `--safe-top` / `--safe-right` / `--safe-bottom` / `--safe-left`
+(`index.css`), which prefer Capacitor's injected `--safe-area-inset-*` over
+`env()`: Capacitor 8's built-in SystemBars plugin sets those on Android (older
+WebViews report `env()` as 0), so no status-bar plugin is needed. Not yet
+confirmed on a real Android device.
+**Phase 1 (shell) is done**: under 1024px `App.tsx` renders `TopBar` (sticky,
+covers the status bar; page title, page actions, account button), the page in
+a column at most 560px wide, a fixed `TabBar` (covers the gesture bar), and
+`AccountSheet`. All of them are in `components/mobile/`, along with
+`BottomSheet`, `ChipGroup`, `ActionBar` and a shared `mobile.css` (`.m-btn`
+roles, `.icon-button`, `.m-label`). The old phone header and its inline sign-in
+form are gone. `body` pads by no top or bottom inset.
+- A page puts actions in the top bar with `<TopBarActions>` (a portal; nothing
+  on desktop). Solve's "Start over" is the first.
+- `useOpenAccountSheet()` (`lib/mobileShell.ts`) opens the account sheet. It's
+  null on desktop, where the sidebar has its own sign-in. A signed-out Save
+  opens it via `useReferenceChart.save()`, and so does the signed-out
+  Library's Sign in button.
+- `BottomSheet` pushes a history entry while open, so Android back / browser
+  back closes it first.
+- Tabs remember their route and scroll position. **Solve is kept mounted but
+  hidden** (`SolveKeepAlive` in `App.tsx`), so its setup survives a tab switch
+  and a trip into the Drill. The phone shell stays mounted under the Drill,
+  and the Drill's X (`/`) returns to the last tab. Route state (prefill, a
+  Library open) starts a fresh Solve. **Desktop keeps its old behavior on
+  purpose**: Solve unmounts when you leave, `/` goes to `/solve`.
+- Ranges and Library are remembered by URL only. When Phases 4 and 5 rebuild
+  them, keep their choices in the URL.
+- `SegmentedControl` under 1024px is now the mockup's 40px pill.
+- Sign-in logic lives in `lib/useSignInForm.ts`, shared with `AuthStatus`.
+- Nav icons are in `components/NavIcon`, shared with `Sidebar`.
+- New tokens: `--bar-bg`, `--nav-active`, `--chip-border`,
+  `--chip-border-hover`, `--chip-selected`, `--scrim`.
+- See `docs/decisions.md`.
+
+**Phase 2 (Solve steps) is done**: on phones Solve is four steps plus a
+result screen, in `pages/solve/phone/`. `SolvePhone` routes them, and there's
+one file per step: `HandStep`, `BoardStep`, `RangesStep`, `ReadyStep`, and
+`ResultStep` (Phase 3). All of them run over the same `useSolveSetup` as desktop.
+`SolvePage.tsx` is now only the layout switch.
+- **Steps are in the URL**: `/solve?step=hand|board|ranges|ready|result`, one
+  history entry each. With no `?step=`, Solve opens on the first step that
+  still needs something (`firstOpenStep`).
+- **Pure logic lives in `phone/phoneSteps.ts`**, tested on its own: step
+  blockers, raise names and presets, typed-board parsing, accuracy wording.
+- **Sheets**:
+  - Raise (presets, plus a stepper in 0.5bb steps).
+  - Starting stack.
+  - Paste a hand history (fills everything, then jumps to Ready).
+  - Card picker (rank, then suit).
+  - Hand weight (0 / 25 / 50 / 75 / 100%).
+- **Moving to a step from inside a sheet** replaces the sheet's history entry
+  (`onSheetEntry()` in `lib/mobileShell.ts`) instead of pushing past it.
+- **Shared with desktop**: desktop's error copy and range auto-load are now
+  `pages/solve/SolveProblem.tsx` and `useAutoLoadRanges.ts`.
+- **`RangeGrid`'s optional `mode` prop** (`"tap"`, which calls `onCellTap`, or
+  `"paint"`, which writes `brush`) is the phone editor. Leave `mode` unset
+  everywhere else.
+- **`SegmentedControl` options** take an optional `detail`, shown as a
+  second line.
+- **`useSolveSetup.cancelSolve()`** drops the running solve's result. The
+  server still finishes it.
+- The Solve tab shows a dot while a solve runs and until its result is
+  opened.
+- Phone chips use **`m-chip`**, never `chip`: `DrillPage.css` owns a global
+  `.chip`.
+- `useSolveSetup`'s redo (`goForward`) has no UI any more and is a deletion
+  candidate.
+- Screenshot runs should build with `VITE_API_BASE_URL` pointing at a dead
+  address. Production builds call the deployed API.
+
+**Phase 3 (Solve result) is done**: `pages/solve/phone/ResultStep.tsx`.
+- **Layout**: the board with an accuracy pill, the headline and mix, the
+  strategy chart, Keep exploring pills, and a collapsed "About this solve".
+- **Hand sheet**: tapping a hand opens desktop's `HandPanel` in a sheet.
+  `StrategyResult.tsx` exports `HandPanel` and `FrequencyBar`, and
+  `HandPanel` takes `showHand={false}` when the sheet's title shows the hand.
+  Its phone styles live under `.m-hand-sheet`.
+- **Top bar**: a page sets a title with a back arrow by rendering
+  `<TopBarTitle>` (`TopBarTitleContext`). The result's back arrow goes to
+  Ready. Save spot replaces Start over there; it saves the setup, and
+  signed out it opens the account sheet.
+- **Keep exploring** uses desktop's `exploreOptions`. It solves again on
+  Ready, or goes to the board for the next card.
+- **The strategy chart scrolls on phones**: `.m-result__grid` undoes
+  `RangeGrid`'s `touch-action: none` there.
+
+**Phase 4 (Ranges tab) is done**: on phones `/ranges` is
+`pages/ranges/RangesPhone.tsx`, and `RangesPage.tsx` only picks the layout.
+- **One page, three modes**: Pick, Type it, or Hand history. The chart follows
+  the spot, with no "get chart" button.
+- **Editing**: the range editor, then Save (a name sheet, or the account sheet
+  when signed out) and "Solve a flop from here".
+- **The old Builder / Type in / Import pages and `SpotBuilder.tsx` are
+  deleted.** `SpotBuilder.css` stays, because its classes are shared across
+  the app.
+- **Shared with desktop**: Pick's logic, the chart title, the debounced
+  auto-load and the Library-opened chart now live in `lib/rangesSpot.ts`, and
+  the no-chart and error messages in `pages/ranges/ChartProblem.tsx`. Both
+  layouts use them.
+- **One phone range editor**: `components/mobile/RangeEditor.tsx` (Tap / Paint,
+  brush, chart, hand-weight sheet), used by Solve's ranges step and Ranges.
+- **Choices in the URL**: Pick's are `seat` / `before` / `raiser` / `stack`
+  (replace, not push), and the typed phrase is `text`. Switching mode keeps the
+  rest of the query. A pasted hand history isn't kept.
+- **Shared CSS**: page building blocks (`.m-step`, `.m-section`, `.m-note`,
+  `.m-field`, `.m-card`, `.m-link`, `.m-pills`...) moved from Solve's
+  `phone.css` to `components/mobile/mobile.css`. Use them on new phone pages.
+- `ActionBar` takes a `backLabel`, so its secondary button can say something
+  other than "Back" ("Save").
+
+**Phase 5 (Library) is done**: on phones `/library` is
+`pages/library/LibraryPhone.tsx`: search, the All / Preflop / Postflop filter,
+and spot cards. A card opens a sheet with a preview, Open in Ranges / Solve,
+and Duplicate / Rename / Delete (delete asks first).
+- Signed out, the page offers Sign in, which opens the account sheet.
+- **Opening a saved spot works on phones now.**
+- **Shared with desktop**: the data and actions live in
+  `pages/library/useLibrary.ts`, used by both layouts. Each action returns
+  `{ ok, spot? }` or the message to show.
+- `SavedSpotsPage` is deleted, and its test cases moved to
+  `LibraryPhone.test.tsx`.
+- **What's left for the redesign**: real-device checks (status and gesture
+  bars, Android back, the keyboard over inputs) and the single PR. These
+  optional extras aren't done: swipe-down to close a sheet, haptics, and hiding
+  the tab bar while the keyboard is open.
+
 ## Commands
 
 This is a pnpm workspace (`apps/*`, `packages/*`) plus two standalone

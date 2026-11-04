@@ -1,0 +1,626 @@
+/* The phone Solve flow's own pieces (docs/mobile-redesign.md §4). Values from
+   docs/mobile-redesign/mockup/solve-*.html; colors are tokens from index.css.
+   Only rendered under 1024px. Shared page building blocks (.m-step, .m-note,
+   .m-field...) are in components/mobile/mobile.css; the range editor's in
+   components/mobile/RangeEditor.css. */
+
+/* --- Step 1: the action card --- */
+
+.m-actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.m-actions > li + li {
+  border-top: 1px solid var(--divider);
+}
+
+.m-actions__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--text-strong);
+}
+
+.m-actions__pot {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-actions__turn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--accent-subtle);
+}
+
+.m-actions__actor {
+  font-weight: 650;
+  color: var(--text-strong);
+}
+
+.m-actions__buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-actions__done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  color: var(--text-strong);
+}
+
+.m-actions__done svg {
+  flex: none;
+  color: var(--range-in);
+}
+
+.m-actions__folded {
+  padding: 14px;
+  font-size: 14px;
+  color: var(--warning);
+}
+
+/* --- Raise sheet --- */
+
+.m-raise__presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-raise__preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+}
+
+.m-raise__sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m-raise__stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.m-raise__step {
+  border: 1px solid var(--border-strong);
+}
+
+.m-raise__amount {
+  flex: 1;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 750;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-sheet__buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.m-sheet__cancel {
+  flex: 0 0 110px;
+}
+
+.m-sheet__confirm {
+  flex: 1;
+}
+
+.m-sheet__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- Step 2: board slots and the card sheet --- */
+
+.m-slots {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.m-slots__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.m-slots__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.m-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 62px;
+  max-width: calc((100vw - 32px - 32px) / 5);
+  height: 88px;
+  padding: 0;
+  border: 2px dashed var(--border-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 750 24px/1 var(--sans);
+  cursor: pointer;
+}
+
+.m-slot:hover:not(:disabled) {
+  background: transparent;
+}
+
+.m-slot[data-filled] {
+  border: 2px solid transparent;
+  background: var(--card-face);
+  color: var(--card-ink);
+}
+
+.m-slot[data-filled]:hover:not(:disabled) {
+  background: var(--card-face);
+}
+
+.m-slot[data-red] {
+  color: var(--card-red);
+}
+
+.m-slot[data-picking] {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.m-slot:disabled {
+  opacity: 0.35;
+}
+
+.m-slot__suit {
+  font-size: 20px;
+}
+
+.m-ranks {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.m-ranks .m-chip {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.m-suits {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-suit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 64px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: var(--card-face);
+  color: var(--card-ink);
+  font: 700 28px/1 var(--sans);
+  cursor: pointer;
+}
+
+.m-suit[data-red] {
+  color: var(--card-red);
+}
+
+.m-suit:hover:not(:disabled) {
+  background: var(--card-face);
+  border-color: var(--accent);
+}
+
+.m-suit:disabled {
+  opacity: 0.3;
+}
+
+.m-suit__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --- Step 4: summary, solving, done --- */
+
+.m-summary__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.m-summary__row + .m-summary__row {
+  border-top: 1px solid var(--divider);
+}
+
+.m-summary__row dd {
+  margin: 2px 0 0;
+  color: var(--text-strong);
+}
+
+.m-summary__row .m-link {
+  align-self: center;
+}
+
+.m-summary__row dd.m-summary__cards {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.m-mini-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 50px;
+  border-radius: 6px;
+  background: var(--card-face);
+  color: var(--card-ink);
+  font: 750 15px/1 var(--sans);
+}
+
+.m-mini-card[data-red] {
+  color: var(--card-red);
+}
+
+.m-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 50svh;
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.m-status__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--success-subtle);
+  color: var(--range-in);
+}
+
+/* No progress comes back from the API, so the bar moves without claiming a
+   percentage. */
+.m-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--range-empty);
+  overflow: hidden;
+}
+
+.m-progress__bar {
+  display: block;
+  width: 35%;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  animation: m-progress-slide 1.6s ease-in-out infinite;
+}
+
+@keyframes m-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-progress__bar {
+    width: 100%;
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* --- Result (§4.5; docs/mobile-redesign/mockup/solve-result.html) --- */
+
+.m-result__strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.m-result__cards {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.m-mini-card--small {
+  width: 26px;
+  height: 36px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.m-result__spot {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.m-result__accuracy {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.m-result__accuracy[data-tier="very"] {
+  background: var(--success-subtle);
+  color: var(--success-text);
+}
+
+.m-result__accuracy[data-tier="rough"] {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.m-result__saved {
+  margin-top: -8px;
+}
+
+.m-result__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.m-result__headline {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-strong);
+}
+
+.m-result__line {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* Desktop's FrequencyBar, at the mockup's 28px; the words stay in its
+   accessible label and the legend below, not on the bar. */
+.m-result__summary .strategy-result__bar {
+  display: flex;
+  height: 28px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.m-result__summary .strategy-result__segment {
+  font-size: 0;
+}
+
+.m-result__legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.m-result__legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.m-result__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.m-result__share {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The strategy chart, styled like the ranges step's (§4.3), and scrollable
+   over: it's read-only here, so it never needs the drag. */
+.m-result__grid .range-grid {
+  gap: 2px;
+  width: auto;
+  margin: 0 -8px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: 10px;
+  touch-action: manipulation;
+}
+
+.m-result__grid .range-grid__cell {
+  min-width: 0;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  box-shadow: none;
+}
+
+.m-result__grid .strategy-grid__label-chip {
+  padding: 0;
+}
+
+.m-result__grid .range-grid__cell[aria-pressed="true"] {
+  outline: 2px solid var(--text-strong);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.m-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--nav-active);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.m-details ul {
+  margin: 6px 0 0;
+  padding-left: 1.1rem;
+}
+
+/* The hand sheet: desktop's HandPanel (StrategyResult.tsx), at phone sizes. */
+.m-hand-sheet .hand-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.m-hand-sheet .hand-panel p {
+  margin: 0;
+}
+
+.m-hand-sheet .hand-panel__category {
+  margin-top: -10px;
+  color: var(--nav-active);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.m-hand-sheet .hand-panel__combos {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-hand-sheet .hand-panel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m-hand-sheet .hand-panel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m-hand-sheet .hand-panel__row-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.m-hand-sheet .hand-panel__row-head .tabular-nums {
+  font-weight: 700;
+}
+
+.m-hand-sheet .hand-panel__track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--range-empty);
+  overflow: hidden;
+}
+
+.m-hand-sheet .hand-panel__fill {
+  display: block;
+  height: 100%;
+}
+
+.m-hand-sheet .hand-panel__advice {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.m-hand-sheet .hand-panel__why summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--nav-active);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.m-hand-sheet .hand-panel__why ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 14px;
+}
+
+.m-hand-sheet .hand-panel__why-note {
+  padding-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-hand-sheet .hand-panel__out {
+  font-size: 14px;
+}

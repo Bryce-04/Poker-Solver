@@ -1,93 +1,36 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
 import { PageHeader } from "../../components/PageHeader/PageHeader";
 import { SegmentedControl } from "../../components/SegmentedControl/SegmentedControl";
 import { MiniRange } from "../../components/MiniRange/MiniRange";
 import { PlayingCard } from "../../components/PlayingCard/PlayingCard";
-import { deleteSpot, listSpots, renameSpot, saveSpot } from "../../lib/api";
-import { useAuth } from "../../lib/auth";
 import { PAGE_HEADERS } from "../../lib/navigation";
 import { indexRange, totalCombos } from "../../lib/rangeCombos";
 import { boardText, displayName, shortSavedAt, spotKind } from "../../lib/spotText";
+import { LIBRARY_FILTERS as FILTERS, useLibrary } from "./useLibrary";
 import "../../components/SpotBuilder/SpotBuilder.css";
 import "./LibraryWorkspace.css";
 
-type ListState =
-  | { kind: "loading" }
-  | { kind: "ok"; spots: Spot[] }
-  | { kind: "network-error" }
-  | { kind: "error"; status: number };
-
-type Filter = "all" | "preflop" | "postflop";
-
 type PanelMode = { kind: "view" } | { kind: "rename"; draft: string } | { kind: "confirm-delete" };
 
-const FILTERS = [
-  { value: "all", label: "All" },
-  { value: "preflop", label: "Preflop" },
-  { value: "postflop", label: "Postflop" },
-] as const;
-
 const TOTAL_COMBOS = 1326;
-
-function matches(spot: Spot, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (q === "") return true;
-  const board = spot.board ?? [];
-  return [displayName(spot), spot.positions_in_hand.join(" "), board.join(" "), boardText(board)]
-    .join(" ")
-    .toLowerCase()
-    .includes(q);
-}
 
 /**
  * Desktop Library (docs/desktop-redesign.md §6.4): the signed-in user's saved
  * spots as a searchable, filterable table, a preview of the selected one, and
  * open / rename / duplicate / delete. Opening hands the spot to Ranges (a
- * preflop chart) or Solve (a setup with a board) as route state. Phones keep
- * the original list (SavedSpotsPage), unchanged.
+ * preflop chart) or Solve (a setup with a board) as route state. The data and
+ * actions are useLibrary's, shared with the phone page (LibraryPhone).
  */
 export function LibraryWorkspace() {
-  const auth = useAuth();
-  const navigate = useNavigate();
-  const signedInAs = auth.status === "signed-in" ? (auth.email ?? "") : null;
-  // Tagged with the account it was fetched for, as SavedSpotsPage does, so a
-  // previous account's list never shows for a new one.
-  const [fetched, setFetched] = useState<{ account: string; state: ListState } | null>(null);
-  const state: ListState =
-    fetched !== null && fetched.account === signedInAs ? fetched.state : { kind: "loading" };
+  const library = useLibrary();
+  const { auth, state, spots, visible, query, setQuery, filter, setFilter, busy, open } = library;
 
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelMode>({ kind: "view" });
-  const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (signedInAs === null) return;
-    let cancelled = false;
-    listSpots().then((result) => {
-      if (cancelled) return;
-      setFetched({
-        account: signedInAs,
-        state: result.kind === "ok" ? { kind: "ok", spots: result.spots } : result,
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [signedInAs]);
-
-  function updateSpots(change: (spots: Spot[]) => Spot[]) {
-    setFetched((prev) =>
-      prev && prev.state.kind === "ok" ? { ...prev, state: { kind: "ok", spots: change(prev.state.spots) } } : prev,
-    );
-  }
-
-  const spots = state.kind === "ok" ? state.spots : [];
-  const visible = spots.filter((s) => (filter === "all" || spotKind(s) === filter) && matches(s, query));
   const selected = visible.find((s) => s.id === selectedId) ?? visible[0];
 
   function select(spot: Spot, mode: PanelMode = { kind: "view" }) {
@@ -96,53 +39,26 @@ export function LibraryWorkspace() {
     setNotice(null);
   }
 
-  function open(spot: Spot) {
-    navigate(spotKind(spot) === "preflop" ? "/ranges" : "/solve", { state: { spot } });
-  }
-
   async function rename(spot: Spot, name: string) {
-    if (!spot.id) return;
-    setBusy(true);
-    const result = await renameSpot(spot.id, name);
-    setBusy(false);
-    if (result.kind === "renamed") {
-      updateSpots((list) => list.map((s) => (s.id === spot.id ? result.spot : s)));
-      setPanel({ kind: "view" });
-    } else if (result.kind === "not-found") {
-      updateSpots((list) => list.filter((s) => s.id !== spot.id));
-      setNotice("That spot was already deleted.");
-    } else if (result.kind === "invalid") {
-      setNotice("Names can be 1 to 120 characters.");
-    } else {
-      setNotice("Couldn't rename it. Check your connection and try again.");
-    }
+    const result = await library.rename(spot, name);
+    if (result.ok) setPanel({ kind: "view" });
+    else setNotice(result.notice);
   }
 
   async function remove(spot: Spot) {
-    if (!spot.id) return;
-    setBusy(true);
-    const result = await deleteSpot(spot.id);
-    setBusy(false);
-    if (result.kind === "deleted" || result.kind === "not-found") {
-      updateSpots((list) => list.filter((s) => s.id !== spot.id));
+    const result = await library.remove(spot);
+    if (result.ok) {
       setPanel({ kind: "view" });
       setSelectedId(null);
     } else {
-      setNotice("Couldn't delete it. Check your connection and try again.");
+      setNotice(result.notice);
     }
   }
 
   async function duplicate(spot: Spot) {
-    setBusy(true);
-    // The server assigns the copy its own id, owner and date.
-    const result = await saveSpot({ ...spot, name: `${displayName(spot)} (copy)`.slice(0, 120) });
-    setBusy(false);
-    if (result.kind === "saved") {
-      updateSpots((list) => [result.spot, ...list]);
-      select(result.spot);
-    } else {
-      setNotice("Couldn't duplicate it. Check your connection and try again.");
-    }
+    const result = await library.duplicate(spot);
+    if (!result.ok) setNotice(result.notice);
+    else if (result.spot) select(result.spot);
   }
 
   const header = PAGE_HEADERS["/library"];

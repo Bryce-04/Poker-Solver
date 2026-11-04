@@ -31,6 +31,19 @@ export interface RangeGridProps {
   /** The "N combos · X% of hands" line under the grid. A page that shows
    * those numbers itself (Ranges' stats card) turns it off. */
   showSummary?: boolean;
+  /**
+   * The phone ranges editor (docs/mobile-redesign.md §4.3). Left out, the
+   * grid behaves as it always has (tap toggles, drag paints, its own
+   * toolbar). Set, the page draws its own controls instead of the toolbar:
+   * - "tap": a tap calls `onCellTap` (to open a hand sheet) and edits
+   *   nothing itself; the page scrolls normally over the grid.
+   * - "paint": dragging writes `brush` (0 erases) to every hand it crosses,
+   *   and the grid stops the page scrolling under the finger.
+   */
+  mode?: "tap" | "paint";
+  onCellTap?: (hand: string) => void;
+  /** The weight paint mode writes, 0 to 1. Defaults to 1. */
+  brush?: number;
 }
 
 // Preset brush frequencies for weighted selection. Painting writes the
@@ -64,6 +77,9 @@ export function RangeGrid({
   deadCards = [],
   reset,
   showSummary = true,
+  mode,
+  onCellTap,
+  brush: paintBrush = 1,
 }: RangeGridProps) {
   const [brush, setBrush] = useState<number>(1);
   const [focus, setFocus] = useState<[number, number]>([0, 0]);
@@ -100,6 +116,14 @@ export function RangeGrid({
   }
 
   function toggleHand(hand: string): void {
+    if (mode === "tap") {
+      onCellTap?.(hand);
+      return;
+    }
+    if (mode === "paint") {
+      writeHand(hand, paintBrush);
+      return;
+    }
     if (suitsMode) {
       setSelectedHand(hand);
       return;
@@ -109,14 +133,14 @@ export function RangeGrid({
 
   function paint(hand: string): void {
     if (paintRef.current == null) return;
-    const target = paintRef.current === "fill" ? brush : 0;
+    const target = mode === "paint" ? paintBrush : paintRef.current === "fill" ? brush : 0;
     if (weightOf(hand) === target) return;
     writeHand(hand, target);
   }
 
   function onCellPointerDown(e: PointerEvent<HTMLButtonElement>, hand: string): void {
     // Left button only; e.button can be 0 or undefined for the primary press.
-    if (readOnly || (e.button && e.button !== 0)) return;
+    if (readOnly || mode === "tap" || (e.button && e.button !== 0)) return;
     if (suitsMode) {
       setSelectedHand(hand);
       return;
@@ -213,7 +237,7 @@ export function RangeGrid({
 
   return (
     <div className="range-grid-wrap">
-      {!readOnly && (
+      {!readOnly && !mode && (
         <div className="range-grid__brushes" role="group" aria-label="Brush weight">
           {/* The label and the two wrapper spans only shape the desktop
               toolbar (RangeGrid.css); under 1024px the label is hidden and
@@ -267,6 +291,7 @@ export function RangeGrid({
         role="grid"
         aria-label="Starting hand range"
         aria-readonly={readOnly || undefined}
+        data-mode={mode}
         onPointerMove={onGridPointerMove}
         onPointerUp={endPaint}
         onPointerLeave={endPaint}
@@ -294,6 +319,7 @@ export function RangeGrid({
                   aria-pressed={weight > 0}
                   onFocus={() => setFocus([r, c])}
                   onPointerDown={(e) => onCellPointerDown(e, hand)}
+                  onClick={mode === "tap" ? () => onCellTap?.(hand) : undefined}
                 />
               );
             })}
@@ -301,7 +327,7 @@ export function RangeGrid({
         ))}
       </div>
 
-      {!readOnly && suitsMode && (
+      {!readOnly && !mode && suitsMode && (
         selectedHand ? (
           <ComboEditor
             hand={selectedHand}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { HandRange, Position, Spot, Street } from "@poker-solver/schema";
 import { assignPostflopSeats } from "../../lib/positions";
@@ -81,6 +81,9 @@ function streetForBoardLength(length: number): Street {
   if (length === 4) return "turn";
   return "river";
 }
+
+/** Wall-clock milliseconds, for timing a solve (called from handlers only). */
+const now = () => performance.now();
 
 const EMPTY_STREETS: Record<Street, BuilderAction[]> = {
   preflop: [],
@@ -226,6 +229,20 @@ export function useSolveSetup(prefill?: SolvePrefill, savedSpot?: Spot) {
   const canSubmit =
     positionsAreValid && setupIsReady && rangesAreValid && board.kind === "ok";
 
+  // Each solve's number; a response is only applied if no newer solve or
+  // cancel has happened since it started.
+  const solveRun = useRef(0);
+
+  /**
+   * Stop waiting for the running solve (the phone's Cancel). The request
+   * can't be aborted on the server, which finishes it anyway (and answers
+   * "busy" to a new solve until then); its result is just ignored here.
+   */
+  function cancelSolve() {
+    solveRun.current++;
+    setOutcome(lastSolved ?? { kind: "idle" });
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     await solve();
@@ -261,16 +278,19 @@ export function useSolveSetup(prefill?: SolvePrefill, savedSpot?: Spot) {
       ranges: { [oopPosition]: oopRange, [ipPosition]: ipRange },
     };
 
+    const run = ++solveRun.current;
     setOutcome({ kind: "loading" });
-    const started = performance.now();
+    const started = now();
     const result = await solveSpot(spot);
+    // Cancelled (cancelSolve), or overtaken by a newer solve: drop it.
+    if (run !== solveRun.current) return false;
     switch (result.kind) {
       case "solved": {
         const solved = {
           kind: "solved" as const,
           data: result.data,
           range: result.data.position === oopPosition ? oopRange : ipRange,
-          elapsedMs: performance.now() - started,
+          elapsedMs: now() - started,
           spot,
         };
         setOutcome(solved);
@@ -612,6 +632,7 @@ export function useSolveSetup(prefill?: SolvePrefill, savedSpot?: Spot) {
 
   return {
     solve,
+    cancelSolve,
     loadedRanges,
     preflopClosed,
     decisionPosition,

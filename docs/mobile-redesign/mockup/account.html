@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Signed out · account sheet</title>
+<!-- Design mockup for docs/mobile-redesign.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#0d0d11}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.topbar{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:#17171e;border-bottom:1px solid #2a2a34}
+.ttl{flex:1;font-size:18px;font-weight:700;color:#f4f3f8;letter-spacing:-.01em}
+.iconbtn{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#b7b5c3;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;font:inherit;flex:none}
+.iconbtn:hover{background:#24242e;color:#f4f3f8}
+.tabbar{height:64px;flex:none;display:flex;background:#17171e;border-top:1px solid #2a2a34}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:#8a8899;text-decoration:none}
+.tab:hover{color:#f4f3f8}
+.tab[aria-current=page]{color:#c4b5fd}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:8px 18px;border-radius:12px;font:650 15px/1.25 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;border:1px solid transparent;box-sizing:border-box}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.btn-primary:hover{background:#c4b5fd;color:#1a1030}
+.btn-ghost{background:transparent;color:#c4b5fd}
+.seg{display:flex;padding:3px;gap:3px;background:#0f0f14;border:1px solid #2f2f3a;border-radius:12px}
+.seg-item{flex:1 1 0;min-height:40px;padding:0 6px;border:0;border-radius:9px;background:transparent;color:#b7b5c3;font:600 14px/1.2 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.seg-item[aria-pressed=true]{background:#2c2c38;color:#f4f3f8;box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;justify-content:flex-end;z-index:5}
+.sheet{background:#1b1b23;border-radius:20px 20px 0 0;padding:8px 16px 24px;border-top:1px solid #34343f;display:flex;flex-direction:column;gap:14px}
+.handle{width:40px;height:4px;border-radius:2px;background:#55546a;margin:4px auto 0}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+input{width:100%;font:inherit;color:#f4f3f8;background:#131318;border:1px solid #43424f;border-radius:12px;padding:0 14px;min-height:50px;box-sizing:border-box}
+</style>
+</head>
+<body>
+<div id="app" style="width:390px;margin:0 auto"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #131318; color: #b7b5c3; font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif">
+
+  <header class="topbar">
+    <span class="ttl">Library</span>
+    <button type="button" class="iconbtn" aria-label="Sign in" onClick="{{open}}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg></button>
+  </header>
+
+  <main style="flex: 1; padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center">
+    <span aria-hidden="true" style="width: 64px; height: 64px; border-radius: 50%; background: rgba(167,139,250,.14); color: #c4b5fd; display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg></span>
+    <h1 style="margin: 0; font-size: 22px; color: #f4f3f8">Your saved spots live here</h1>
+    <p style="margin: 0; font-size: 15px; max-width: 290px">Sign in to save charts and solves and open them on any device.</p>
+    <button type="button" class="btn btn-primary" onClick="{{open}}" style="margin-top: 6px; min-width: 200px">Sign in</button>
+  </main>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="solve-1-hand.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Solve</a>
+    <a class="tab" href="ranges.html"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Ranges</a>
+    <a class="tab" href="library.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>Library</a>
+    <a class="tab" href="#drill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>Drill</a>
+  </nav>
+
+  <sc-if value="{{isOpen}}" hint-placeholder-val="{{ true }}">
+    <div class="scrim">
+      <section class="sheet" role="dialog" aria-label="Account">
+        <span class="handle" aria-hidden="true"></span>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <h2 style="margin: 0; font-size: 20px; color: #f4f3f8">{{heading}}</h2>
+          <button type="button" class="iconbtn" aria-label="Close" onClick="{{close}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <div class="seg" role="group" aria-label="Sign in or create an account">
+          <sc-for list="{{tabs}}" as="t" hint-placeholder-count="2"><button type="button" class="seg-item" aria-pressed="{{t.pressed}}" onClick="{{t.pick}}">{{t.label}}</button></sc-for>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px">Email<input type="email" placeholder="you@example.com" autocomplete="email"></label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px">Password<input type="password" placeholder="At least 8 characters" autocomplete="current-password"></label>
+        <button type="button" class="btn btn-primary">{{cta}}</button>
+        <p style="margin: 0; font-size: 12px; color: #8a8899; text-align: center">You can use Solve, Ranges and the Drill without an account.</p>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { open: true, mode: 'in' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    return {
+      isOpen: st.open,
+      heading: st.mode === 'in' ? 'Sign in' : 'Create an account',
+      cta: st.mode === 'in' ? 'Sign in' : 'Create account',
+      tabs: [['in', 'Sign in'], ['up', 'Create account']].map(function (t) {
+        return { label: t[1], pressed: String(st.mode === t[0]), pick: function () { self.setState({ mode: t[0] }); } };
+      }),
+      open: function () { self.setState({ open: true }); },
+      close: function () { self.setState({ open: false }); }
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 {
- "worstExploitabilityPct": 0.481,
+ "worstExploitabilityPct": 0.492,
  "decks": [
   {
    "id": "bb-vs-btn-srp-flop",
@@ -30,16 +30,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.185,
-      "bet_small": 0.322,
-      "bet_medium": 0.427,
-      "bet_large": 0.066,
+      "check": 0.055,
+      "bet_small": 0.421,
+      "bet_medium": 0.467,
+      "bet_large": 0.057,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have a gutshot on a dry ace-high board: about 29% equity against BTN's range, stronger than 23% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 32% of its range and checks 68%.",
+       "The two ranges are about even on this board, and BB bets 31% of its range and checks 69%.",
        "Betting is the main play as a semi-bluff: a bet can fold out better hands, and if called the draw can still improve (about 4 outs)."
       ],
       "facts": {
@@ -79,18 +79,18 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.143,
-      "call": 0.756,
-      "bet_small": 0.002,
-      "bet_medium": 0.049,
-      "bet_large": 0.046,
-      "all_in": 0.005
+      "fold": 0.233,
+      "call": 0.728,
+      "bet_small": 0.0,
+      "bet_medium": 0.009,
+      "bet_large": 0.03,
+      "all_in": 0.0
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
        "You have five high and a backdoor flush draw on a dry king-high board: about 22% equity against BB's range, stronger than 2% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 4%, calls 62% and raises 33%.",
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 8%, calls 58% and raises 34%.",
        "Calling is the main play because your 22% equity is above the 17% the price demands. The bet is small, which gives a good price, so even weak hands continue."
       ],
       "facts": {
@@ -129,18 +129,18 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.53,
+      "check": 0.45,
       "bet_small": 0.0,
-      "bet_medium": 0.127,
-      "bet_large": 0.342,
+      "bet_medium": 0.164,
+      "bet_large": 0.386,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have a gutshot (plus two overcards to the board) on a wet nine-high (connected, two-tone) board: about 51% equity against BB's range, stronger than 59% of the hands BTN can have here.",
        "The two ranges are about even on this board, and BTN bets 48% of its range and checks 52%.",
-       "Checking is the slight favorite: it takes a free card to improve (about 4 outs) without putting more money in against a range that has the stronger hands.",
-       "This one is close: the solver splits checking 53% and betting 47% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "Betting is the slight favorite as a semi-bluff: a bet can fold out better hands, and if called the draw can still improve (about 4 outs).",
+       "This one is close: the solver splits betting 55% and checking 45% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "a gutshot",
@@ -178,16 +178,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.104,
+      "check": 0.141,
       "bet_small": 0.0,
-      "bet_medium": 0.359,
-      "bet_large": 0.537,
+      "bet_medium": 0.336,
+      "bet_large": 0.523,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have queen high (two overcards to the board) on a dry eight-high board: about 29% equity against BB's range, stronger than 3% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 53% of its range and checks 47%.",
+       "The two ranges are about even on this board, and BTN bets 52% of its range and checks 48%.",
        "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands, and two overcards give it extra ways to win."
       ],
       "facts": {
@@ -225,8 +225,8 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.557,
-      "call": 0.443,
+      "fold": 0.548,
+      "call": 0.452,
       "bet_small": 0.0,
       "bet_medium": 0.0,
       "bet_large": 0.0,
@@ -238,7 +238,7 @@
        "You have ace high (two overcards to the board) on a wet ten-high (two-tone) board: about 46% equity against BB's range, stronger than 49% of the hands BTN can have here.",
        "BB bet 125% of the pot, so calling needs about 36% equity to break even. Across its whole range BTN folds 45%, calls 42% and raises 12%.",
        "Folding is the slight favorite even though raw equity (46%) is just above the 36% needed: a hand like this rarely realizes all of that equity, and it has little to gain from raising.",
-       "This one is close: the solver splits folding 56% and calling 44% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits folding 55% and calling 45% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "ace high",
@@ -274,16 +274,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.351,
+      "check": 0.329,
       "bet_small": 0.0,
-      "bet_medium": 0.403,
-      "bet_large": 0.245,
+      "bet_medium": 0.372,
+      "bet_large": 0.3,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have queen high and a backdoor flush draw on a paired ten-high board: about 28% equity against BB's range, stronger than 11% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 52% of its range and checks 48%.",
+       "The two ranges are about even on this board, and BTN bets 51% of its range and checks 49%.",
        "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands."
       ],
       "facts": {
@@ -322,16 +322,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.712,
-      "bet_small": 0.276,
-      "bet_medium": 0.006,
-      "bet_large": 0.006,
+      "check": 0.699,
+      "bet_small": 0.298,
+      "bet_medium": 0.001,
+      "bet_large": 0.001,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have ace high (two overcards to the board) on a wet ten-high (two-tone) board: about 46% equity against BTN's range, stronger than 45% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 40% of its range and checks 60%.",
+       "The two ranges are about even on this board, and BB bets 39% of its range and checks 61%.",
        "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
@@ -369,20 +369,20 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.415,
-      "call": 0.045,
+      "fold": 0.493,
+      "call": 0.008,
       "bet_small": 0.0,
-      "bet_medium": 0.351,
-      "bet_large": 0.189,
+      "bet_medium": 0.409,
+      "bet_large": 0.09,
       "all_in": 0.0
      },
      "facing": "bet_medium",
      "analysis": {
       "bullets": [
        "You have jack high and a backdoor flush draw (plus two overcards to the board) on a dry seven-high board: about 28% equity against BB's range, stronger than 3% of the hands BTN can have here.",
-       "BB bet 75% of the pot, so calling needs about 30% equity to break even. Across its whole range BTN folds 32%, calls 49% and raises 19%.",
+       "BB bet 75% of the pot, so calling needs about 30% equity to break even. Across its whole range BTN folds 33%, calls 49% and raises 19%.",
        "Raising is the slight favorite as a bluff: the hand can't win at showdown often, but it makes better hands fold.",
-       "This one is close: the solver splits raising 54% and folding 42% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This is essentially a coin flip: the solver splits raising 50% and folding 49% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "jack high",
@@ -421,11 +421,11 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.695,
-      "call": 0.29,
-      "bet_small": 0.01,
-      "bet_medium": 0.003,
-      "bet_large": 0.002,
+      "fold": 0.689,
+      "call": 0.286,
+      "bet_small": 0.018,
+      "bet_medium": 0.005,
+      "bet_large": 0.001,
       "all_in": 0.0
      },
      "facing": "bet_small",
@@ -469,10 +469,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.46,
-      "bet_small": 0.188,
-      "bet_medium": 0.3,
-      "bet_large": 0.053,
+      "check": 0.483,
+      "bet_small": 0.195,
+      "bet_medium": 0.29,
+      "bet_large": 0.032,
       "all_in": 0.0
      },
      "analysis": {
@@ -480,7 +480,7 @@
        "You have two pair on a wet nine-high (connected, two-tone) board: about 77% equity against BTN's range, stronger than 96% of the hands BB can have here.",
        "The two ranges are about even on this board, and BB bets 38% of its range and checks 62%.",
        "Betting is the slight favorite for value: worse hands can still call, so a bet gets paid.",
-       "This one is close: the solver splits betting 54% and checking 46% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This is essentially a coin flip: the solver splits betting 52% and checking 48% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "two pair",
@@ -493,7 +493,7 @@
      }
     },
     {
-     "id": "Ah8c3s-facing_bet-As3h",
+     "id": "Ah8c3s-facing_bet-Ac9h",
      "board": [
       "Ah",
       "8c",
@@ -505,8 +505,8 @@
      "potBb": 5.5,
      "stackBb": 97.5,
      "hand": [
-      "As",
-      "3h"
+      "Ac",
+      "9h"
      ],
      "actions": [
       "fold",
@@ -518,25 +518,25 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.0,
-      "bet_small": 0.361,
-      "bet_medium": 0.571,
-      "bet_large": 0.066,
-      "all_in": 0.002
+      "call": 0.026,
+      "bet_small": 0.506,
+      "bet_medium": 0.466,
+      "bet_large": 0.001,
+      "all_in": 0.0
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
-       "You have two pair on a dry ace-high board: about 88% equity against BB's range, stronger than 95% of the hands BTN can have here.",
+       "You have top pair on a dry ace-high board: about 81% equity against BB's range, stronger than 82% of the hands BTN can have here.",
        "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 14%, calls 57% and raises 29%.",
        "Raising is the main play: this is a value hand, and worse hands can still call."
       ],
       "facts": {
-       "hand": "two pair",
+       "hand": "top pair",
        "draws": [],
        "board": "dry ace-high",
-       "equityPct": 88,
-       "rangePercentile": 95,
+       "equityPct": 81,
+       "rangePercentile": 82,
        "rangeEquityPct": 52
       }
      }
@@ -565,16 +565,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.112,
-      "bet_small": 0.209,
-      "bet_medium": 0.669,
+      "check": 0.162,
+      "bet_small": 0.194,
+      "bet_medium": 0.634,
       "bet_large": 0.01,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have a pocket pair just under the top card on a dry king-high board: about 61% equity against BB's range, stronger than 65% of the hands BTN can have here.",
-       "BTN's range is stronger here (52% equity), and BTN bets 54% of its range and checks 46%.",
+       "BTN's range is stronger here (52% equity), and BTN bets 53% of its range and checks 47%.",
        "Betting is the main play for thin value and protection: worse pairs and draws can call, and a bet makes them pay to see a card."
       ],
       "facts": {
@@ -612,11 +612,11 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.008,
-      "call": 0.989,
+      "fold": 0.003,
+      "call": 0.996,
       "bet_small": 0.0,
-      "bet_medium": 0.001,
-      "bet_large": 0.002,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
       "all_in": 0.0
      },
      "facing": "bet_large",
@@ -660,11 +660,11 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.001,
-      "bet_small": 0.39,
-      "bet_medium": 0.474,
-      "bet_large": 0.123,
-      "all_in": 0.012
+      "check": 0.0,
+      "bet_small": 0.371,
+      "bet_medium": 0.516,
+      "bet_large": 0.105,
+      "all_in": 0.008
      },
      "analysis": {
       "bullets": [
@@ -708,16 +708,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.256,
-      "bet_small": 0.298,
-      "bet_medium": 0.271,
-      "bet_large": 0.174,
+      "check": 0.326,
+      "bet_small": 0.281,
+      "bet_medium": 0.208,
+      "bet_large": 0.185,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have an overpair on a dry seven-high board: about 73% equity against BTN's range, stronger than 91% of the hands BB can have here.",
-       "BTN's range is stronger here (52% equity), and BB bets 33% of its range and checks 67%.",
+       "BTN's range is stronger here (52% equity), and BB bets 34% of its range and checks 66%.",
        "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
@@ -754,10 +754,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.375,
-      "bet_small": 0.323,
-      "bet_medium": 0.291,
-      "bet_large": 0.011,
+      "check": 0.366,
+      "bet_small": 0.33,
+      "bet_medium": 0.301,
+      "bet_large": 0.004,
       "all_in": 0.0
      },
      "analysis": {
@@ -802,10 +802,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.003,
+      "check": 0.001,
       "bet_small": 0.0,
-      "bet_medium": 0.39,
-      "bet_large": 0.607,
+      "bet_medium": 0.437,
+      "bet_large": 0.563,
       "all_in": 0.0
      },
      "analysis": {
@@ -850,10 +850,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.253,
-      "bet_small": 0.109,
-      "bet_medium": 0.339,
-      "bet_large": 0.299,
+      "check": 0.268,
+      "bet_small": 0.097,
+      "bet_medium": 0.34,
+      "bet_large": 0.296,
       "all_in": 0.0
      },
      "analysis": {
@@ -898,10 +898,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.199,
-      "bet_small": 0.001,
-      "bet_medium": 0.589,
-      "bet_large": 0.211,
+      "check": 0.196,
+      "bet_small": 0.0,
+      "bet_medium": 0.62,
+      "bet_large": 0.184,
       "all_in": 0.0
      },
      "analysis": {
@@ -948,9 +948,9 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.092,
-      "bet_small": 0.383,
-      "bet_medium": 0.521,
+      "call": 0.132,
+      "bet_small": 0.392,
+      "bet_medium": 0.472,
       "bet_large": 0.004,
       "all_in": 0.0
      },
@@ -958,7 +958,7 @@
      "analysis": {
       "bullets": [
        "You have top pair on a dry king-high board: about 78% equity against BB's range, stronger than 77% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 4%, calls 62% and raises 33%.",
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 8%, calls 58% and raises 34%.",
        "Raising is the main play: this is a value hand, and worse hands can still call."
       ],
       "facts": {
@@ -995,16 +995,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.982,
+      "check": 0.997,
       "bet_small": 0.0,
-      "bet_medium": 0.012,
-      "bet_large": 0.005,
+      "bet_medium": 0.002,
+      "bet_large": 0.002,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have king high (two overcards to the board) on a dry seven-high board: about 37% equity against BB's range, stronger than 20% of the hands BTN can have here.",
-       "BTN's range is stronger here (52% equity), and BTN bets 53% of its range and checks 47%.",
+       "BTN's range is stronger here (52% equity), and BTN bets 52% of its range and checks 48%.",
        "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
@@ -1042,18 +1042,18 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.001,
-      "call": 0.973,
+      "fold": 0.0,
+      "call": 0.979,
       "bet_small": 0.0,
-      "bet_medium": 0.021,
-      "bet_large": 0.005,
+      "bet_medium": 0.019,
+      "bet_large": 0.002,
       "all_in": 0.0
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
        "You have king high on a wet queen-high (two-tone) board: about 34% equity against BB's range, stronger than 21% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 4%, calls 65% and raises 32%.",
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 3%, calls 65% and raises 32%.",
        "Calling is the main play because your 34% equity is above the 17% the price demands. The bet is small, which gives a good price, so even weak hands continue."
       ],
       "facts": {
@@ -1090,10 +1090,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.418,
-      "bet_small": 0.315,
-      "bet_medium": 0.213,
-      "bet_large": 0.054,
+      "check": 0.426,
+      "bet_small": 0.313,
+      "bet_medium": 0.224,
+      "bet_large": 0.037,
       "all_in": 0.0
      },
      "analysis": {
@@ -1101,7 +1101,7 @@
        "You have a nut flush draw on a wet queen-high (two-tone) board: about 66% equity against BTN's range, stronger than 78% of the hands BB can have here.",
        "The two ranges are about even on this board, and BB bets 35% of its range and checks 65%.",
        "Betting is the slight favorite for value: worse hands can still call, so a bet gets paid.",
-       "This one is close: the solver splits betting 58% and checking 42% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits betting 57% and checking 43% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "a nut flush draw",
@@ -1139,10 +1139,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.345,
-      "bet_small": 0.272,
-      "bet_medium": 0.255,
-      "bet_large": 0.128,
+      "check": 0.365,
+      "bet_small": 0.273,
+      "bet_medium": 0.238,
+      "bet_large": 0.124,
       "all_in": 0.0
      },
      "analysis": {
@@ -1186,8 +1186,8 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.001,
-      "call": 0.997,
+      "fold": 0.0,
+      "call": 0.999,
       "bet_small": 0.0,
       "bet_medium": 0.0,
       "bet_large": 0.001,
@@ -1197,7 +1197,7 @@
      "analysis": {
       "bullets": [
        "You have a gutshot and a backdoor flush draw on a dry queen-high board: about 31% equity against BB's range, stronger than 18% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 6%, calls 64% and raises 30%.",
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 7%, calls 64% and raises 30%.",
        "Calling is the main play because your 31% equity is above the 17% the price demands. The bet is small, which gives a good price, so even weak hands continue."
       ],
       "facts": {
@@ -1239,14 +1239,14 @@
      "mix": {
       "check": 0.0,
       "bet_small": 0.0,
-      "bet_medium": 0.052,
-      "bet_large": 0.947,
+      "bet_medium": 0.077,
+      "bet_large": 0.922,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have top pair (a strong kicker) on a dry eight-high board: about 70% equity against BB's range, stronger than 84% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 53% of its range and checks 47%.",
+       "The two ranges are about even on this board, and BTN bets 52% of its range and checks 48%.",
        "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
@@ -1283,10 +1283,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.193,
-      "bet_small": 0.105,
-      "bet_medium": 0.288,
-      "bet_large": 0.414,
+      "check": 0.183,
+      "bet_small": 0.064,
+      "bet_medium": 0.318,
+      "bet_large": 0.436,
       "all_in": 0.0
      },
      "analysis": {
@@ -1332,18 +1332,18 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.963,
-      "call": 0.028,
+      "fold": 0.987,
+      "call": 0.012,
       "bet_small": 0.0,
-      "bet_medium": 0.005,
-      "bet_large": 0.004,
+      "bet_medium": 0.0,
+      "bet_large": 0.0,
       "all_in": 0.0
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
        "You have jack high and a backdoor flush draw on a dry ace-high board: about 20% equity against BB's range, stronger than 11% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 18%, calls 55% and raises 28%.",
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 19%, calls 54% and raises 27%.",
        "Folding is the main play even though raw equity (20%) is just above the 17% needed: a hand like this rarely realizes all of that equity, and it has little to gain from raising."
       ],
       "facts": {
@@ -1383,10 +1383,10 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.571,
-      "call": 0.428,
+      "fold": 0.566,
+      "call": 0.433,
       "bet_small": 0.0,
-      "bet_medium": 0.001,
+      "bet_medium": 0.0,
       "bet_large": 0.0,
       "all_in": 0.0
      },
@@ -1394,7 +1394,7 @@
      "analysis": {
       "bullets": [
        "You have king high (two overcards to the board) on a dry seven-high board: about 38% equity against BB's range, stronger than 26% of the hands BTN can have here.",
-       "BB bet 75% of the pot, so calling needs about 30% equity to break even. Across its whole range BTN folds 32%, calls 49% and raises 19%.",
+       "BB bet 75% of the pot, so calling needs about 30% equity to break even. Across its whole range BTN folds 33%, calls 49% and raises 19%.",
        "Folding is the slight favorite even though raw equity (38%) is just above the 30% needed: a hand like this rarely realizes all of that equity, and it has little to gain from raising.",
        "This one is close: the solver splits folding 57% and calling 43% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
@@ -1432,16 +1432,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.997,
+      "check": 0.999,
       "bet_small": 0.001,
-      "bet_medium": 0.002,
+      "bet_medium": 0.0,
       "bet_large": 0.0,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have queen high on a dry king-high board: about 25% equity against BTN's range, stronger than 18% of the hands BB can have here.",
-       "BTN's range is stronger here (52% equity), and BB bets 29% of its range and checks 71%.",
+       "BTN's range is stronger here (52% equity), and BB bets 28% of its range and checks 72%.",
        "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
@@ -1482,15 +1482,15 @@
       "fold": 0.0,
       "call": 0.0,
       "bet_small": 0.001,
-      "bet_medium": 0.635,
-      "bet_large": 0.172,
-      "all_in": 0.191
+      "bet_medium": 0.647,
+      "bet_large": 0.177,
+      "all_in": 0.174
      },
      "facing": "bet_large",
      "analysis": {
       "bullets": [
        "You have a set on a dry eight-high board: about 94% equity against BB's range, stronger than 99% of the hands BTN can have here.",
-       "BB bet 125% of the pot, so calling needs about 36% equity to break even. Across its whole range BTN folds 39%, calls 47% and raises 13%.",
+       "BB bet 125% of the pot, so calling needs about 36% equity to break even. Across its whole range BTN folds 39%, calls 48% and raises 13%.",
        "Raising is the main play: this is a value hand, and worse hands can still call."
       ],
       "facts": {
@@ -1527,18 +1527,18 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.534,
-      "bet_small": 0.203,
-      "bet_medium": 0.262,
+      "check": 0.57,
+      "bet_small": 0.196,
+      "bet_medium": 0.234,
       "bet_large": 0.0,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have second pair on a dry king-high board: about 63% equity against BTN's range, stronger than 74% of the hands BB can have here.",
-       "BTN's range is stronger here (52% equity), and BB bets 29% of its range and checks 71%.",
+       "BTN's range is stronger here (52% equity), and BB bets 28% of its range and checks 72%.",
        "Checking is the slight favorite for pot control: there is some showdown value to protect, but not enough to build the pot against better hands.",
-       "This one is close: the solver splits checking 53% and betting 47% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits checking 57% and betting 43% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "second pair",
@@ -1577,10 +1577,10 @@
      "mix": {
       "fold": 0.0,
       "call": 0.0,
-      "bet_small": 0.001,
-      "bet_medium": 0.479,
-      "bet_large": 0.238,
-      "all_in": 0.282
+      "bet_small": 0.0,
+      "bet_medium": 0.541,
+      "bet_large": 0.268,
+      "all_in": 0.191
      },
      "facing": "bet_small",
      "analysis": {
@@ -1627,10 +1627,10 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.261,
-      "bet_small": 0.122,
-      "bet_medium": 0.237,
-      "bet_large": 0.38,
+      "call": 0.304,
+      "bet_small": 0.133,
+      "bet_medium": 0.221,
+      "bet_large": 0.342,
       "all_in": 0.0
      },
      "facing": "bet_small",
@@ -1678,17 +1678,17 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.2,
-      "bet_small": 0.305,
-      "bet_medium": 0.468,
-      "bet_large": 0.028,
+      "call": 0.221,
+      "bet_small": 0.299,
+      "bet_medium": 0.463,
+      "bet_large": 0.016,
       "all_in": 0.0
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
        "You have top pair and a backdoor flush draw on a dry queen-high board: about 72% equity against BB's range, stronger than 82% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 6%, calls 64% and raises 30%.",
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 7%, calls 64% and raises 30%.",
        "Raising is the main play: this is a value hand, and worse hands can still call."
       ],
       "facts": {
@@ -1727,10 +1727,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.37,
-      "bet_small": 0.097,
-      "bet_medium": 0.244,
-      "bet_large": 0.288,
+      "check": 0.363,
+      "bet_small": 0.102,
+      "bet_medium": 0.229,
+      "bet_large": 0.306,
       "all_in": 0.0
      },
      "analysis": {
@@ -1773,8 +1773,8 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.515,
-      "bet_small": 0.485,
+      "check": 0.507,
+      "bet_small": 0.493,
       "bet_medium": 0.0,
       "bet_large": 0.0,
       "all_in": 0.0
@@ -1782,7 +1782,7 @@
      "analysis": {
       "bullets": [
        "You have a pocket pair under the board on a dry queen-high board: about 43% equity against BTN's range, stronger than 40% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 40% of its range and checks 60%.",
+       "The two ranges are about even on this board, and BB bets 39% of its range and checks 61%.",
        "Checking is the slight favorite for pot control: there is some showdown value to protect, but not enough to build the pot against better hands.",
        "This is essentially a coin flip: the solver splits checking 51% and betting 49% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
@@ -1822,10 +1822,10 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.242,
+      "call": 0.238,
       "bet_small": 0.0,
-      "bet_medium": 0.347,
-      "bet_large": 0.411,
+      "bet_medium": 0.348,
+      "bet_large": 0.414,
       "all_in": 0.0
      },
      "facing": "bet_small",
@@ -1869,16 +1869,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.004,
-      "bet_small": 0.011,
-      "bet_medium": 0.698,
-      "bet_large": 0.287,
+      "check": 0.001,
+      "bet_small": 0.015,
+      "bet_medium": 0.694,
+      "bet_large": 0.29,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have top pair on a dry ace-high board: about 72% equity against BB's range, stronger than 79% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 47% of its range and checks 53%.",
+       "The two ranges are about even on this board, and BTN bets 45% of its range and checks 55%.",
        "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
@@ -1915,16 +1915,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.962,
-      "bet_small": 0.001,
-      "bet_medium": 0.027,
-      "bet_large": 0.009,
+      "check": 0.955,
+      "bet_small": 0.0,
+      "bet_medium": 0.006,
+      "bet_large": 0.039,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have queen high and a backdoor flush draw (plus two overcards to the board) on a dry seven-high board: about 31% equity against BTN's range, stronger than 18% of the hands BB can have here.",
-       "BTN's range is stronger here (52% equity), and BB bets 33% of its range and checks 67%.",
+       "BTN's range is stronger here (52% equity), and BB bets 34% of its range and checks 66%.",
        "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
@@ -2012,16 +2012,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.375,
-      "bet_small": 0.208,
-      "bet_medium": 0.215,
-      "bet_large": 0.201,
+      "check": 0.378,
+      "bet_small": 0.191,
+      "bet_medium": 0.222,
+      "bet_large": 0.21,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have top pair (a strong kicker) on a wet ten-high (two-tone) board: about 72% equity against BTN's range, stronger than 85% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 40% of its range and checks 60%.",
+       "The two ranges are about even on this board, and BB bets 39% of its range and checks 61%.",
        "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
@@ -2059,11 +2059,11 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.562,
-      "call": 0.383,
-      "bet_small": 0.0,
-      "bet_medium": 0.053,
-      "bet_large": 0.002,
+      "fold": 0.568,
+      "call": 0.376,
+      "bet_small": 0.001,
+      "bet_medium": 0.054,
+      "bet_large": 0.001,
       "all_in": 0.0
      },
      "facing": "bet_small",
@@ -2072,7 +2072,7 @@
        "You have ace high on a monotone king-high board: about 26% equity against BB's range, stronger than 13% of the hands BTN can have here.",
        "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 18%, calls 51% and raises 31%.",
        "Folding is the slight favorite even though raw equity (26%) is just above the 17% needed: a hand like this rarely realizes all of that equity, and it has little to gain from raising.",
-       "This one is close: the solver splits folding 56% and calling 38% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits folding 57% and calling 38% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "ace high",
@@ -2108,16 +2108,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.173,
-      "bet_small": 0.001,
-      "bet_medium": 0.351,
-      "bet_large": 0.474,
+      "check": 0.066,
+      "bet_small": 0.0,
+      "bet_medium": 0.201,
+      "bet_large": 0.733,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have queen high (two overcards to the board) on a paired ten-high board: about 32% equity against BB's range, stronger than 22% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 52% of its range and checks 48%.",
+       "The two ranges are about even on this board, and BTN bets 51% of its range and checks 49%.",
        "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands, and two overcards give it extra ways to win."
       ],
       "facts": {
@@ -2154,10 +2154,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.143,
-      "bet_small": 0.043,
-      "bet_medium": 0.793,
-      "bet_large": 0.021,
+      "check": 0.083,
+      "bet_small": 0.003,
+      "bet_medium": 0.906,
+      "bet_large": 0.008,
       "all_in": 0.0
      },
      "analysis": {
@@ -2202,16 +2202,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.002,
-      "bet_small": 0.001,
-      "bet_medium": 0.912,
-      "bet_large": 0.085,
+      "check": 0.0,
+      "bet_small": 0.0,
+      "bet_medium": 0.896,
+      "bet_large": 0.103,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have seven high and a backdoor flush draw on a dry ace-high board: about 21% equity against BB's range, stronger than 4% of the hands BTN can have here.",
-       "BTN's range is stronger here (52% equity), and BTN bets 53% of its range and checks 47%.",
+       "BTN's range is stronger here (52% equity), and BTN bets 52% of its range and checks 48%.",
        "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands."
       ],
       "facts": {
@@ -2227,7 +2227,7 @@
      }
     },
     {
-     "id": "AcKd9h-first_to_act-AdTh",
+     "id": "AcKd9h-first_to_act-Ah9s",
      "board": [
       "Ac",
       "Kd",
@@ -2239,8 +2239,8 @@
      "potBb": 5.5,
      "stackBb": 97.5,
      "hand": [
-      "Ad",
-      "Th"
+      "Ah",
+      "9s"
      ],
      "actions": [
       "check",
@@ -2250,25 +2250,24 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.599,
-      "bet_small": 0.161,
-      "bet_medium": 0.119,
-      "bet_large": 0.122,
+      "check": 0.234,
+      "bet_small": 0.038,
+      "bet_medium": 0.491,
+      "bet_large": 0.237,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
-       "You have top pair on a dry ace-high board: about 76% equity against BTN's range, stronger than 86% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 32% of its range and checks 68%.",
-       "Checking is the slight favorite even with a strong hand: this board is one where checking is common, and checking some strong hands keeps the check range protected and lets weaker hands keep calling or bluffing.",
-       "This one is close: the solver splits checking 60% and betting 40% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "You have two pair on a dry ace-high board: about 87% equity against BTN's range, stronger than 95% of the hands BB can have here.",
+       "The two ranges are about even on this board, and BB bets 31% of its range and checks 69%.",
+       "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
-       "hand": "top pair",
+       "hand": "two pair",
        "draws": [],
        "board": "dry ace-high",
-       "equityPct": 76,
-       "rangePercentile": 86,
+       "equityPct": 87,
+       "rangePercentile": 95,
        "rangeEquityPct": 49
       }
      }
@@ -2298,20 +2297,19 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.008,
-      "call": 0.432,
+      "fold": 0.002,
+      "call": 0.396,
       "bet_small": 0.0,
-      "bet_medium": 0.221,
-      "bet_large": 0.335,
+      "bet_medium": 0.244,
+      "bet_large": 0.353,
       "all_in": 0.004
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
        "You have a gutshot on a dry ace-high board: about 30% equity against BB's range, stronger than 25% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 18%, calls 55% and raises 28%.",
-       "Raising is the slight favorite as a semi-bluff: if called it can still improve (about 4 outs), and the raise can fold out better hands.",
-       "This one is close: the solver splits raising 56% and calling 43% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 19%, calls 54% and raises 27%.",
+       "Raising is the main play as a semi-bluff: if called it can still improve (about 4 outs), and the raise can fold out better hands."
       ],
       "facts": {
        "hand": "a gutshot",
@@ -2326,7 +2324,7 @@
      }
     },
     {
-     "id": "Td5h5c-first_to_act-AsKc",
+     "id": "Td5h5c-first_to_act-AhTh",
      "board": [
       "Td",
       "5h",
@@ -2338,8 +2336,8 @@
      "potBb": 5.5,
      "stackBb": 97.5,
      "hand": [
-      "As",
-      "Kc"
+      "Ah",
+      "Th"
      ],
      "actions": [
       "check",
@@ -2349,24 +2347,24 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.352,
-      "bet_small": 0.248,
-      "bet_medium": 0.251,
-      "bet_large": 0.149,
+      "check": 0.273,
+      "bet_small": 0.172,
+      "bet_medium": 0.355,
+      "bet_large": 0.2,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
-       "You have ace high (two overcards to the board) on a paired ten-high board: about 59% equity against BTN's range, stronger than 71% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 36% of its range and checks 64%.",
-       "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands, and two overcards give it extra ways to win."
+       "You have two pair on a paired ten-high board: about 81% equity against BTN's range, stronger than 93% of the hands BB can have here.",
+       "The two ranges are about even on this board, and BB bets 34% of its range and checks 66%.",
+       "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
-       "hand": "ace high",
+       "hand": "two pair",
        "draws": [],
        "board": "paired ten-high",
-       "equityPct": 59,
-       "rangePercentile": 71,
+       "equityPct": 81,
+       "rangePercentile": 93,
        "rangeEquityPct": 50
       }
      }
@@ -2395,16 +2393,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.974,
+      "check": 0.985,
       "bet_small": 0.0,
-      "bet_medium": 0.005,
-      "bet_large": 0.021,
+      "bet_medium": 0.0,
+      "bet_large": 0.014,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have king high on a wet queen-high (two-tone) board: about 32% equity against BB's range, stronger than 21% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 50% of its range and checks 50%.",
+       "The two ranges are about even on this board, and BTN bets 49% of its range and checks 51%.",
        "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
@@ -2443,11 +2441,11 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.945,
+      "call": 0.972,
       "bet_small": 0.0,
-      "bet_medium": 0.002,
-      "bet_large": 0.004,
-      "all_in": 0.049
+      "bet_medium": 0.0,
+      "bet_large": 0.002,
+      "all_in": 0.025
      },
      "facing": "bet_medium",
      "analysis": {
@@ -2492,10 +2490,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.446,
-      "bet_small": 0.021,
-      "bet_medium": 0.253,
-      "bet_large": 0.279,
+      "check": 0.441,
+      "bet_small": 0.033,
+      "bet_medium": 0.25,
+      "bet_large": 0.277,
       "all_in": 0.0
      },
      "analysis": {
@@ -2503,7 +2501,7 @@
        "You have ten high on a monotone king-high board: about 15% equity against BB's range, stronger than 7% of the hands BTN can have here.",
        "The two ranges are about even on this board, and BTN bets 45% of its range and checks 55%.",
        "Betting is the slight favorite as a bluff: there is little showdown value, so the bet wins by folding out better hands.",
-       "This one is close: the solver splits betting 55% and checking 45% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits betting 56% and checking 44% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "ten high",
@@ -2539,10 +2537,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.501,
-      "bet_small": 0.058,
-      "bet_medium": 0.226,
-      "bet_large": 0.215,
+      "check": 0.544,
+      "bet_small": 0.03,
+      "bet_medium": 0.22,
+      "bet_large": 0.206,
       "all_in": 0.0
      },
      "analysis": {
@@ -2550,7 +2548,7 @@
        "You have a gutshot and a backdoor flush draw (plus two overcards to the board) on a wet ten-high (two-tone) board: about 42% equity against BB's range, stronger than 40% of the hands BTN can have here.",
        "The two ranges are about even on this board, and BTN bets 47% of its range and checks 53%.",
        "Checking is the slight favorite: it takes a free card to improve (about 4 outs) without putting more money in against a range that has the stronger hands.",
-       "This is essentially a coin flip: the solver splits checking 50% and betting 50% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits checking 54% and betting 46% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "a gutshot",
@@ -2590,11 +2588,11 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.569,
-      "call": 0.409,
+      "fold": 0.547,
+      "call": 0.434,
       "bet_small": 0.0,
-      "bet_medium": 0.011,
-      "bet_large": 0.01,
+      "bet_medium": 0.013,
+      "bet_large": 0.006,
       "all_in": 0.0
      },
      "facing": "bet_medium",
@@ -2603,7 +2601,7 @@
        "You have ace high on a wet jack-high (two-tone) board: about 36% equity against BB's range, stronger than 29% of the hands BTN can have here.",
        "BB bet 75% of the pot, so calling needs about 30% equity to break even. Across its whole range BTN folds 36%, calls 48% and raises 16%.",
        "Folding is the slight favorite even though raw equity (36%) is just above the 30% needed: a hand like this rarely realizes all of that equity, and it has little to gain from raising.",
-       "This one is close: the solver splits folding 57% and calling 41% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits folding 55% and calling 43% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "ace high",
@@ -2641,17 +2639,17 @@
      ],
      "mix": {
       "fold": 0.0,
-      "call": 0.001,
+      "call": 0.0,
       "bet_small": 0.0,
-      "bet_medium": 0.84,
-      "bet_large": 0.103,
-      "all_in": 0.056
+      "bet_medium": 0.81,
+      "bet_large": 0.11,
+      "all_in": 0.08
      },
      "facing": "bet_large",
      "analysis": {
       "bullets": [
        "You have an overpair on a dry eight-high board: about 78% equity against BB's range, stronger than 94% of the hands BTN can have here.",
-       "BB bet 125% of the pot, so calling needs about 36% equity to break even. Across its whole range BTN folds 39%, calls 47% and raises 13%.",
+       "BB bet 125% of the pot, so calling needs about 36% equity to break even. Across its whole range BTN folds 39%, calls 48% and raises 13%.",
        "Raising is the main play: this is a value hand, and worse hands can still call."
       ],
       "facts": {
@@ -2688,16 +2686,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.001,
-      "bet_small": 0.16,
-      "bet_medium": 0.505,
-      "bet_large": 0.334,
+      "check": 0.0,
+      "bet_small": 0.141,
+      "bet_medium": 0.606,
+      "bet_large": 0.253,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have top pair on a dry ace-high board: about 82% equity against BB's range, stronger than 84% of the hands BTN can have here.",
-       "BTN's range is stronger here (52% equity), and BTN bets 53% of its range and checks 47%.",
+       "BTN's range is stronger here (52% equity), and BTN bets 52% of its range and checks 48%.",
        "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
@@ -2734,16 +2732,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.973,
-      "bet_small": 0.024,
+      "check": 0.94,
+      "bet_small": 0.057,
       "bet_medium": 0.001,
-      "bet_large": 0.002,
+      "bet_large": 0.001,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have queen high on a dry king-high board: about 34% equity against BB's range, stronger than 23% of the hands BTN can have here.",
-       "BTN's range is stronger here (52% equity), and BTN bets 54% of its range and checks 46%.",
+       "BTN's range is stronger here (52% equity), and BTN bets 53% of its range and checks 47%.",
        "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
@@ -2757,7 +2755,7 @@
      }
     },
     {
-     "id": "Jc9d4d-first_to_act-Js9c",
+     "id": "Jc9d4d-first_to_act-KhJh",
      "board": [
       "Jc",
       "9d",
@@ -2769,8 +2767,8 @@
      "potBb": 5.5,
      "stackBb": 97.5,
      "hand": [
-      "Js",
-      "9c"
+      "Kh",
+      "Jh"
      ],
      "actions": [
       "check",
@@ -2780,24 +2778,24 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.275,
-      "bet_small": 0.267,
-      "bet_medium": 0.29,
-      "bet_large": 0.169,
+      "check": 0.297,
+      "bet_small": 0.283,
+      "bet_medium": 0.258,
+      "bet_large": 0.162,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
-       "You have two pair on a wet jack-high (two-tone) board: about 85% equity against BTN's range, stronger than 97% of the hands BB can have here.",
+       "You have top pair (a strong kicker) on a wet jack-high (two-tone) board: about 75% equity against BTN's range, stronger than 86% of the hands BB can have here.",
        "BB's range is stronger here (52% equity), and BB bets 44% of its range and checks 56%.",
        "Betting is the main play for value: worse hands can still call, so a bet gets paid."
       ],
       "facts": {
-       "hand": "two pair",
+       "hand": "top pair",
        "draws": [],
        "board": "wet jack-high (two-tone)",
-       "equityPct": 85,
-       "rangePercentile": 97,
+       "equityPct": 75,
+       "rangePercentile": 86,
        "rangeEquityPct": 52
       }
      }
@@ -2826,16 +2824,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.652,
-      "bet_small": 0.037,
-      "bet_medium": 0.295,
-      "bet_large": 0.016,
+      "check": 0.636,
+      "bet_small": 0.042,
+      "bet_medium": 0.302,
+      "bet_large": 0.02,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have two pair on a paired ten-high board: about 74% equity against BTN's range, stronger than 81% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 36% of its range and checks 64%.",
+       "The two ranges are about even on this board, and BB bets 34% of its range and checks 66%.",
        "Checking is the main play even with a strong hand: this board is one where checking is common, and checking some strong hands keeps the check range protected and lets weaker hands keep calling or bluffing."
       ],
       "facts": {
@@ -2872,8 +2870,8 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.032,
-      "bet_small": 0.968,
+      "check": 0.211,
+      "bet_small": 0.789,
       "bet_medium": 0.0,
       "bet_large": 0.0,
       "all_in": 0.0
@@ -2881,7 +2879,7 @@
      "analysis": {
       "bullets": [
        "You have king high on a dry ace-high board: about 40% equity against BTN's range, stronger than 49% of the hands BB can have here.",
-       "BTN's range is stronger here (52% equity), and BB bets 41% of its range and checks 59%.",
+       "BTN's range is stronger here (52% equity), and BB bets 39% of its range and checks 61%.",
        "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands."
       ],
       "facts": {
@@ -2919,20 +2917,20 @@
       "all_in"
      ],
      "mix": {
-      "fold": 0.499,
-      "call": 0.497,
+      "fold": 0.497,
+      "call": 0.502,
       "bet_small": 0.0,
-      "bet_medium": 0.003,
-      "bet_large": 0.001,
+      "bet_medium": 0.001,
+      "bet_large": 0.0,
       "all_in": 0.0
      },
      "facing": "bet_small",
      "analysis": {
       "bullets": [
        "You have ten high on a wet queen-high (two-tone) board: about 19% equity against BB's range, stronger than 3% of the hands BTN can have here.",
-       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 4%, calls 65% and raises 32%.",
-       "Folding is the slight favorite even though raw equity (19%) is just above the 17% needed: a hand like this rarely realizes all of that equity, and it has little to gain from raising.",
-       "This is essentially a coin flip: the solver splits folding 50% and calling 50% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "BB bet 25% of the pot, so calling needs about 17% equity to break even. Across its whole range BTN folds 3%, calls 65% and raises 32%.",
+       "Calling is the slight favorite because your 19% equity is above the 17% the price demands. The bet is small, which gives a good price, so even weak hands continue.",
+       "This is essentially a coin flip: the solver splits calling 50% and folding 50% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "ten high",
@@ -2969,9 +2967,9 @@
      ],
      "mix": {
       "check": 0.25,
-      "bet_small": 0.165,
-      "bet_medium": 0.568,
-      "bet_large": 0.016,
+      "bet_small": 0.189,
+      "bet_medium": 0.542,
+      "bet_large": 0.019,
       "all_in": 0.0
      },
      "analysis": {
@@ -2991,7 +2989,7 @@
      }
     },
     {
-     "id": "7c6d2s-facing_check-JhJs",
+     "id": "7c6d2s-facing_check-KsTd",
      "board": [
       "7c",
       "6d",
@@ -3003,8 +3001,8 @@
      "potBb": 5.5,
      "stackBb": 97.5,
      "hand": [
-      "Jh",
-      "Js"
+      "Ks",
+      "Td"
      ],
      "actions": [
       "check",
@@ -3014,24 +3012,24 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.0,
-      "bet_small": 0.001,
-      "bet_medium": 0.588,
-      "bet_large": 0.41,
+      "check": 0.698,
+      "bet_small": 0.0,
+      "bet_medium": 0.133,
+      "bet_large": 0.17,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
-       "You have an overpair on a dry seven-high board: about 77% equity against BB's range, stronger than 93% of the hands BTN can have here.",
-       "BTN's range is stronger here (52% equity), and BTN bets 53% of its range and checks 47%.",
-       "Betting is the main play for value: worse hands can still call, so a bet gets paid."
+       "You have king high (two overcards to the board) on a dry seven-high board: about 39% equity against BB's range, stronger than 28% of the hands BTN can have here.",
+       "BTN's range is stronger here (52% equity), and BTN bets 52% of its range and checks 48%.",
+       "Checking is the main play: there is not enough equity to bet for value, and the hand does not make a strong bluff, so it gives up cheaply."
       ],
       "facts": {
-       "hand": "an overpair",
+       "hand": "king high",
        "draws": [],
        "board": "dry seven-high",
-       "equityPct": 77,
-       "rangePercentile": 93,
+       "equityPct": 39,
+       "rangePercentile": 28,
        "rangeEquityPct": 52
       }
      }
@@ -3060,16 +3058,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.348,
-      "bet_small": 0.079,
-      "bet_medium": 0.451,
-      "bet_large": 0.122,
+      "check": 0.392,
+      "bet_small": 0.069,
+      "bet_medium": 0.442,
+      "bet_large": 0.097,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have a pocket pair just under the top card on a wet queen-high (two-tone) board: about 61% equity against BB's range, stronger than 75% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 50% of its range and checks 50%.",
+       "The two ranges are about even on this board, and BTN bets 49% of its range and checks 51%.",
        "Betting is the main play for thin value and protection: worse pairs and draws can call, and a bet makes them pay to see a card."
       ],
       "facts": {
@@ -3106,10 +3104,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.414,
-      "bet_small": 0.39,
-      "bet_medium": 0.193,
-      "bet_large": 0.003,
+      "check": 0.416,
+      "bet_small": 0.399,
+      "bet_medium": 0.185,
+      "bet_large": 0.001,
       "all_in": 0.0
      },
      "analysis": {
@@ -3117,7 +3115,7 @@
        "You have second pair on a wet jack-high (two-tone) board: about 64% equity against BTN's range, stronger than 69% of the hands BB can have here.",
        "BB's range is stronger here (52% equity), and BB bets 44% of its range and checks 56%.",
        "Betting is the slight favorite for thin value and protection: worse pairs and draws can call, and a bet makes them pay to see a card.",
-       "This one is close: the solver splits betting 59% and checking 41% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits betting 58% and checking 42% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "second pair",
@@ -3153,18 +3151,18 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.44,
-      "bet_small": 0.088,
-      "bet_medium": 0.385,
-      "bet_large": 0.087,
+      "check": 0.448,
+      "bet_small": 0.075,
+      "bet_medium": 0.391,
+      "bet_large": 0.086,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have top pair on a dry queen-high board: about 71% equity against BTN's range, stronger than 77% of the hands BB can have here.",
-       "The two ranges are about even on this board, and BB bets 40% of its range and checks 60%.",
+       "The two ranges are about even on this board, and BB bets 39% of its range and checks 61%.",
        "Betting is the slight favorite for value: worse hands can still call, so a bet gets paid.",
-       "This one is close: the solver splits betting 56% and checking 44% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits betting 55% and checking 45% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "top pair",
@@ -3200,10 +3198,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.314,
-      "bet_small": 0.023,
-      "bet_medium": 0.335,
-      "bet_large": 0.327,
+      "check": 0.281,
+      "bet_small": 0.015,
+      "bet_medium": 0.361,
+      "bet_large": 0.344,
       "all_in": 0.0
      },
      "analysis": {
@@ -3246,18 +3244,18 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.464,
-      "bet_small": 0.308,
-      "bet_medium": 0.227,
-      "bet_large": 0.001,
+      "check": 0.487,
+      "bet_small": 0.293,
+      "bet_medium": 0.22,
+      "bet_large": 0.0,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have top pair on a dry ace-high board: about 81% equity against BTN's range, stronger than 84% of the hands BB can have here.",
-       "BTN's range is stronger here (52% equity), and BB bets 41% of its range and checks 59%.",
+       "BTN's range is stronger here (52% equity), and BB bets 39% of its range and checks 61%.",
        "Betting is the slight favorite for value: worse hands can still call, so a bet gets paid.",
-       "This one is close: the solver splits betting 54% and checking 46% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This is essentially a coin flip: the solver splits betting 51% and checking 49% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "top pair",
@@ -3342,10 +3340,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.421,
-      "bet_small": 0.202,
-      "bet_medium": 0.048,
-      "bet_large": 0.329,
+      "check": 0.407,
+      "bet_small": 0.217,
+      "bet_medium": 0.081,
+      "bet_large": 0.296,
       "all_in": 0.0
      },
      "analysis": {
@@ -3353,7 +3351,7 @@
        "You have top pair (a strong kicker) on a dry eight-high board: about 74% equity against BTN's range, stronger than 91% of the hands BB can have here.",
        "The two ranges are about even on this board, and BB bets 34% of its range and checks 66%.",
        "Betting is the slight favorite for value: worse hands can still call, so a bet gets paid.",
-       "This one is close: the solver splits betting 58% and checking 42% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
+       "This one is close: the solver splits betting 59% and checking 41% with this exact hand, so either is reasonable and how often you do each matters more than any single choice."
       ],
       "facts": {
        "hand": "top pair",
@@ -3389,16 +3387,16 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.162,
-      "bet_small": 0.063,
-      "bet_medium": 0.465,
-      "bet_large": 0.31,
+      "check": 0.214,
+      "bet_small": 0.043,
+      "bet_medium": 0.45,
+      "bet_large": 0.293,
       "all_in": 0.0
      },
      "analysis": {
       "bullets": [
        "You have ten high and a backdoor flush draw on a dry ace-high board: about 17% equity against BB's range, stronger than 7% of the hands BTN can have here.",
-       "The two ranges are about even on this board, and BTN bets 47% of its range and checks 53%.",
+       "The two ranges are about even on this board, and BTN bets 45% of its range and checks 55%.",
        "Betting is the main play as a bluff: there is little showdown value, so the bet wins by folding out better hands."
       ],
       "facts": {
@@ -3437,10 +3435,10 @@
       "all_in"
      ],
      "mix": {
-      "check": 0.003,
+      "check": 0.001,
       "bet_small": 0.0,
-      "bet_medium": 0.007,
-      "bet_large": 0.99,
+      "bet_medium": 0.011,
+      "bet_large": 0.988,
       "all_in": 0.0
      },
      "analysis": {

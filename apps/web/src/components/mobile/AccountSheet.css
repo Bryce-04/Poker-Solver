@@ -1,0 +1,52 @@
+/* docs/mobile-redesign.md §3.3; values from docs/mobile-redesign/mockup/account.html. */
+.account-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-sheet__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.account-sheet__field input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font-size: 16px; /* 16px keeps iOS from zooming in on focus */
+}
+
+.account-sheet__signed-in {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.account-sheet__signed-in strong {
+  color: var(--text-strong);
+}
+
+.account-sheet__message {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.account-sheet__message--error {
+  color: var(--danger);
+}
+
+.account-sheet__note {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-muted);
+}

@@ -1,0 +1,40 @@
+/* The phone Ranges page (docs/mobile-redesign.md §5; values from
+   docs/mobile-redesign/mockup/ranges.html). Shared pieces (.m-step, .m-field,
+   the range editor) come from components/mobile/. */
+
+.m-ranges-page__stack {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.m-ranges-page__stack > .seg {
+  flex: 1;
+}
+
+.m-ranges-page__row {
+  display: flex;
+  gap: 10px;
+}
+
+.m-ranges-page__chart {
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.m-ranges-page__chart[data-loading] .range-grid {
+  opacity: 0.6;
+}
+
+.m-ranges-page__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.m-ranges-page__standard {
+  margin-top: 6px;
+}
