@@ -6,6 +6,35 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-04 — Train tab: lessons and the Drill under one tab
+
+**Status:** proposed.
+
+**What.** The fourth tab is now **Train** (`/train`, was Drill). It is a normal in-shell page
+(`pages/TrainPage.tsx`) with Lessons, Practice (a card that opens the Drill) and Coming soon
+(ranked play, playing different opponents). Nothing about the Drill itself changed: it is still the
+full-screen game at `/drill`, rendered outside the shell, with its own X. The X goes to "/", which
+returns to the last tab, so a Drill started from Train comes back to Train. The phone shell, tab
+bar and tab memory are untouched apart from the tab's id/label/icon (`drill` to `train`) and
+dropping the old "the Drill is not a remembered tab" special cases.
+
+**Lessons are data** (`lib/lessons.ts`): reading cards and multiple-choice questions with an
+explanation per choice, so adding a lesson needs no UI code. Two exist: "Positions and the button"
+and "Pot odds and equity" (content checked against the formulas by `lessons.test.ts`). A lesson is
+played at `/train?lesson=<id>`; the query string is what makes the tab bar's "last place in each
+tab" return to it. Progress (done, score) is in `localStorage` only for now.
+
+**Not done yet (planned).** Lessons graded by the solver (preflop opens against the reference ranges,
+the flop c-bet against the Drill's solved spots), the AI coach (a provider-agnostic `POST /coach` in
+`apps/api`, starting on Gemini's free tier, with the existing rule-based explanations as the
+fallback), the lesson guide, ranked play (rated by decision quality against the solver, not by chips
+won, which swing too much), and opponent types (needs node-locking in the solver).
+
+**Tests.** `TrainPage.test.tsx`, `lessons.test.ts`, and two `App.test.tsx` cases (Drill opened from
+Train and back; a lesson is remembered when you leave and return to the tab).
+
+---
+
 ## 2026-11-03 — Sheets closing as soon as they open, in development
 
 **Status:** proposed.

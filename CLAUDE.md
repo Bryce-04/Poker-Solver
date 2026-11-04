@@ -160,6 +160,12 @@ A custom menu names actions by percentage (`bet_33`); `/spots/solve` and
 in `docs/decisions.md` (`apps/api/scripts/compare_bet_menus.py`): time grows with
 sizes and roughly doubles per extra raise. No UI sets it yet.
 
+**Train tab (2026-11-04)**: the fourth tab is Train (`/train`), a lessons hub with the
+Drill reachable from it (the Drill itself is unchanged, still full screen at `/drill`). Lessons are
+plain data in `lib/lessons.ts` (reading cards + graded questions), played at `/train?lesson=<id>`,
+progress in localStorage. See `docs/decisions.md` for what's planned next (solver-graded lessons,
+an AI coach, ranked play, opponent types).
+
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
 colors, the pot on the table, bb amounts, and the "why" analysis with its

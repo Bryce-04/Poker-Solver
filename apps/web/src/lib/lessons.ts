@@ -1,0 +1,167 @@
+// The Train tab's lessons (docs/decisions.md, 2026-11 Train tab). A lesson is
+// plain data -- short reading cards and multiple-choice questions -- so adding
+// one needs no new UI code. Progress is kept in this browser only for now.
+
+export interface Choice {
+  label: string;
+  correct?: boolean;
+  /** Shown after answering, whichever choice was picked. */
+  why: string;
+}
+
+export type LessonStep =
+  | { kind: "read"; title: string; body: string[] }
+  | { kind: "quiz"; prompt: string; choices: Choice[] };
+
+export interface Lesson {
+  id: string;
+  title: string;
+  summary: string;
+  minutes: number;
+  steps: LessonStep[];
+}
+
+export const LESSONS: Lesson[] = [
+  {
+    id: "positions",
+    title: "Positions and the button",
+    summary: "Who acts when, and why sitting last is such an edge.",
+    minutes: 4,
+    steps: [
+      {
+        kind: "read",
+        title: "Six seats, one button",
+        body: [
+          "At a 6-handed table the seats are named by where they sit relative to the dealer button: UTG, HJ (hijack), CO (cutoff), BTN (button), SB (small blind) and BB (big blind).",
+          "The button moves one seat clockwise after every hand, so everyone gets each seat in turn.",
+          'The small blind posts half a big blind and the big blind posts a full one before the cards are dealt. Those two seats are "in the blinds".',
+        ],
+      },
+      {
+        kind: "read",
+        title: "Who acts first?",
+        body: [
+          "Before the flop, action starts with UTG (the seat left of the big blind) and goes around. The big blind acts last.",
+          "After the flop the order flips: the small blind acts first, then the big blind, then UTG and so on, and the button acts last. Anyone who folded is skipped.",
+          'Acting last is called being "in position"; acting first is "out of position".',
+        ],
+      },
+      {
+        kind: "read",
+        title: "Why position is worth so much",
+        body: [
+          "Acting later means you see what your opponent does before you decide. A check tells you they are probably weak; a big bet tells you they probably are not.",
+          "That information is worth real money over many hands. It's why good players open more hands from the button than from UTG, and why the blinds, who act first after the flop, are the hardest seats to play.",
+        ],
+      },
+      {
+        kind: "quiz",
+        prompt: "The flop is dealt. The small blind and the button are still in the hand. Who acts first?",
+        choices: [
+          { label: "The small blind", correct: true, why: "After the flop the small blind acts first of the players still in; the button acts last." },
+          { label: "The button", why: "The button acts last after the flop, which is why it's the best seat." },
+          { label: "Whoever bet most before the flop", why: "Order never depends on the betting. After the flop it always starts with the first live seat after the button." },
+        ],
+      },
+      {
+        kind: "quiz",
+        prompt: "Which seat acts first BEFORE the flop at a 6-handed table?",
+        choices: [
+          { label: "UTG, the seat left of the big blind", correct: true, why: "Preflop starts with the seat after the big blind (UTG) and ends with the big blind." },
+          { label: "The small blind", why: "The small blind acts first only after the flop. Preflop it acts second to last." },
+          { label: "The button", why: "The button is third to last to act preflop, just before the blinds." },
+        ],
+      },
+      {
+        kind: "quiz",
+        prompt: "Why is the button the best seat?",
+        choices: [
+          { label: "It acts last after the flop, so it sees what everyone else does first", correct: true, why: "Information is the edge: acting last means every opponent has already shown their hand strength by checking or betting." },
+          { label: "It pays no blind and so always wins chips", why: "Paying no blind helps, but the main edge is acting last on every later street." },
+          { label: "It always gets the best cards", why: "Cards are random. The button's edge is position, not better cards." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "pot-odds",
+    title: "Pot odds and equity",
+    summary: "Work out whether a call pays off, using a number instead of a feeling.",
+    minutes: 6,
+    steps: [
+      {
+        kind: "read",
+        title: "Equity: your share of the pot",
+        body: [
+          "Your equity is how often your hand wins (counting ties as a share) if all the remaining cards are dealt out. A hand with 40% equity wins about 4 times in 10.",
+          "You don't need to calculate it exactly. A useful shortcut: with a draw on the flop, multiply your outs (cards that complete it) by 4 to get a rough percentage of hitting by the river. A flush draw has 9 outs, so about 9 × 4 = 36%.",
+        ],
+      },
+      {
+        kind: "read",
+        title: "Pot odds: the price you are being offered",
+        body: [
+          "When someone bets, the call amount and the size of the pot give you a price. The equity you need to break even is:",
+          "call ÷ (pot after their bet + your call)",
+          "Example: the pot is 10, they bet 10, so the pot is 20 and you must call 10 to win it. You need 10 ÷ (20 + 10) = 33% equity. If your hand wins more than that, calling makes money over time; less, and it loses.",
+        ],
+      },
+      {
+        kind: "quiz",
+        prompt: "The pot is 20 and your opponent bets 10. What equity do you need to call?",
+        choices: [
+          { label: "25%", correct: true, why: "The pot becomes 30 and you pay 10: 10 ÷ (30 + 10) = 25%." },
+          { label: "33%", why: "33% is the price of a pot-sized bet. A half-pot bet is cheaper: 10 ÷ (30 + 10) = 25%." },
+          { label: "50%", why: "You'd need 50% only if the price were one to one. Here it's 10 ÷ 40 = 25%." },
+        ],
+      },
+      {
+        kind: "quiz",
+        prompt: "You have a flush draw (9 outs) on the flop. Roughly how often does it complete by the river?",
+        choices: [
+          { label: "About 18%", why: "That's about one card to come (9 × 2). From the flop you see two more cards, so it's about double." },
+          { label: "About 35%", correct: true, why: "With two cards to come, outs × 4 is the shortcut: 9 × 4 = 36%. The exact value is about 35%." },
+          { label: "About 50%", why: "That's too high. A flush draw misses roughly two times in three by the river." },
+        ],
+      },
+      {
+        kind: "quiz",
+        prompt: "The pot is 10, the opponent bets 10, and you hold a flush draw (about 35%). Is calling profitable on the draw alone?",
+        choices: [
+          { label: "Yes, narrowly", correct: true, why: "You need 33% and have about 35%, so a call is slightly profitable, before counting any extra money you win when you hit." },
+          { label: "No, you need more than 50%", why: "Equity needed depends on the price. A pot-sized bet needs only 33%." },
+          { label: "No, drawing hands should never call", why: "Draws often call when the price is right. That's what pot odds measure." },
+        ],
+      },
+    ],
+  },
+];
+
+export interface LessonProgress {
+  done: boolean;
+  correct: number;
+  total: number;
+}
+
+const KEY = "poker-solver.train.progress.v1";
+
+export function readProgress(): Record<string, LessonProgress> {
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, LessonProgress>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeProgress(id: string, progress: LessonProgress): void {
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify({ ...readProgress(), [id]: progress }));
+  } catch {
+    // Storage blocked or full: progress just isn't remembered.
+  }
+}
+
+export const quizCount = (lesson: Lesson): number => lesson.steps.filter((s) => s.kind === "quiz").length;

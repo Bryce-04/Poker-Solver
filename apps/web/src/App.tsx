@@ -21,6 +21,7 @@ import { readSavedSpot, readSolvePrefill, type SolvePrefill } from "./lib/solveP
 import { useIsDesktop } from "./lib/useIsDesktop";
 import { LibraryPage } from "./pages/LibraryPage";
 import { RangesPage } from "./pages/RangesPage";
+import { TrainPage } from "./pages/TrainPage";
 import { SolvePage } from "./pages/SolvePage";
 import { DrillPage } from "./pages/DrillPage";
 import type { Spot } from "@poker-solver/schema";
@@ -104,7 +105,7 @@ function useTabMemory(enabled: boolean) {
 
   // Updated during render as the location changes (no effect round trip).
   const path = pathname + search;
-  if (tab && tab !== "drill" && (memory.paths[tab] !== path || memory.lastTab !== tab)) {
+  if (tab && (memory.paths[tab] !== path || memory.lastTab !== tab)) {
     setMemory({ paths: { ...memory.paths, [tab]: path }, lastTab: tab });
   }
   const { paths, lastTab } = memory;
@@ -121,7 +122,7 @@ function useTabMemory(enabled: boolean) {
   }, [enabled, tab]);
 
   useLayoutEffect(() => {
-    if (!enabled || !tab || tab === "drill") return;
+    if (!enabled || !tab) return;
     window.scrollTo(0, scrolls.current[tab] ?? 0);
   }, [enabled, tab]);
 
@@ -132,7 +133,7 @@ function useTabMemory(enabled: boolean) {
  * The app shell around every page but the Drill.
  *
  * Four destinations (docs/desktop-redesign.md §3): Solve, Ranges, Library,
- * Drill. The old routes redirect so links and bookmarks keep working.
+ * Train (lessons, with the Drill launched from it). The old routes redirect so links and bookmarks keep working.
  *
  * Phones and tablets (< 1024px; docs/mobile-redesign.md §3): a sticky top bar
  * (page title, the page's actions, the account button), the page in a column
@@ -187,6 +188,7 @@ function Shell() {
                   <Route path="/solve" element={null} />
                   <Route path="/ranges" element={<RangesPage />} />
                   <Route path="/library" element={<LibraryPage />} />
+                  <Route path="/train" element={<TrainPage />} />
                   {/* The Drill renders outside the shell (App, below). */}
                   <Route path="/drill" element={null} />
                   <Route path="/saved" element={<Navigate to="/library" replace />} />
