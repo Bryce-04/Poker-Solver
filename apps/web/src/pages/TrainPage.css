@@ -1,0 +1,297 @@
+/* The Train tab: lesson hub and lesson player. Uses the shared tokens only, so
+   light/dark and the phone/desktop shells need nothing special. */
+
+.train {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.train__heading {
+  margin: 0 0 6px;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--text-strong);
+}
+
+.train__hint,
+.train__text {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.train__hint {
+  color: var(--text-muted);
+}
+
+.train__list,
+.train__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.train__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.train__card:not(:disabled):hover {
+  background: var(--surface-hover);
+}
+
+.train__card--soon {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.train__card--soon:hover {
+  background: var(--surface);
+}
+
+.train__card-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.train__card-title {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text-strong);
+}
+
+.train__card-sub {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.train__card-meta {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.train__chevron {
+  font-size: 22px;
+  color: var(--text-muted);
+}
+
+.train__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.train__back {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 600 15px/1 var(--sans);
+  cursor: pointer;
+}
+
+.train__progress {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.train__meter {
+  width: 100%;
+  height: 6px;
+  margin-top: -12px;
+  accent-color: var(--accent);
+}
+
+.train__panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.train__choice {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-strong);
+  text-align: left;
+  font: 600 15px/1.35 var(--sans);
+  cursor: pointer;
+}
+
+.train__choice:disabled {
+  cursor: default;
+}
+
+.train__choice[data-state="correct"] {
+  border-color: var(--success);
+  background: var(--success-subtle);
+}
+
+.train__choice[data-state="wrong"] {
+  border-color: var(--danger);
+  background: var(--danger-subtle);
+}
+
+.train__feedback {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.train__feedback-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.train__result {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.train__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.train__primary {
+  min-height: 48px;
+  padding: 8px 22px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font: 650 15px/1.25 var(--sans);
+  cursor: pointer;
+}
+
+.train__hand {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.train__coach {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+
+.train__coach-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.train__coach-answer {
+  white-space: pre-wrap;
+}
+
+.train__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.train__chip {
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-strong);
+  font: 600 13.5px/1.2 var(--sans);
+  cursor: pointer;
+}
+
+.train__chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.train__ask {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.train__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font-size: 16px; /* 16px keeps iOS from zooming in on focus */
+}
+
+.train__link {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 600 15px/1 var(--sans);
+  cursor: pointer;
+}
+
+.train__next {
+  padding: 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  background: var(--accent-subtle);
+}
+
+.train__next-text {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+
+.train__primary--link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

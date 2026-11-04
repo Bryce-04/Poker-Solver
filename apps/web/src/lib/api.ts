@@ -471,3 +471,153 @@ export async function fetchPreflopRanges(spot: Spot): Promise<PreflopRangesResul
   }
   return { kind: "error", status: res.status };
 }
+
+// ---------------------------------------------------------------------------
+// The Train tab's AI coach (apps/api's POST /coach). The server answers from
+// the facts the lesson already computed; when the model is unavailable it
+// returns the app's own explanation with `source: "fallback"`, so a reply is
+// always usable.
+
+export interface CoachContext {
+  lesson_title: string;
+  prompt: string;
+  board: string[];
+  hand: string[];
+  picked: string;
+  correct: string;
+  explanation: string;
+}
+
+export interface CoachAnswer {
+  answer: string;
+  source: "ai" | "fallback";
+  reason: "not_configured" | "rate_limited" | "unavailable" | null;
+}
+
+export type AskCoachResult =
+  | { kind: "answer"; data: CoachAnswer }
+  | { kind: "signed-out" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Asks the coach a question about one lesson answer. Never throws. */
+export async function askCoach(question: string, context: CoachContext): Promise<AskCoachResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/coach`,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      data: { question, context },
+      // The model call can take several seconds; the server gives up at 20s.
+      connectTimeout: 15000,
+      readTimeout: 40000,
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+
+  if (res.status >= 200 && res.status < 300) {
+    const body = asJson(res.data) as Partial<CoachAnswer>;
+    if (typeof body.answer !== "string") return { kind: "error", status: res.status };
+    return {
+      kind: "answer",
+      data: { answer: body.answer, source: body.source === "ai" ? "ai" : "fallback", reason: body.reason ?? null },
+    };
+  }
+  if (res.status === 401) return { kind: "signed-out" };
+  return { kind: "error", status: res.status };
+}
+
+// ---------------------------------------------------------------------------
+// The coach as a streamed chat (apps/api's POST /coach/chat): the same grounded coach, but the
+// answer arrives word by word and the learner can ask follow-ups. Same rule as askCoach above:
+// when the model can't answer, the reply is the app's own explanation (`fallback` says why), so
+// there is always something to show.
+
+/** One turn of a conversation. It always opens with the coach's first answer. */
+export interface CoachChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** The server accepts at most this many messages (the new question included). */
+export const COACH_MAX_MESSAGES = 12;
+
+export type CoachChatOutcome =
+  | { kind: "done"; fallback: CoachAnswer["reason"] }
+  | { kind: "signed-out" }
+  | { kind: "interrupted" } // words started, then the stream broke
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/**
+ * Streams the coach's reply to `onDelta` as it is written. `messages` empty = explain the answer;
+ * otherwise the conversation so far, opening with the coach's earlier answer and ending with the
+ * learner's new question. Never throws.
+ *
+ * Uses fetch, not CapacitorHttp: CapacitorHttp returns a finished response, and the point here is
+ * showing words as they arrive. apps/api's CORS list already allows the native apps' origin.
+ */
+export async function streamCoach(
+  context: CoachContext,
+  messages: CoachChatMessage[],
+  onDelta: (text: string) => void,
+  signal?: AbortSignal,
+): Promise<CoachChatOutcome> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}/coach/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ context, messages }),
+      signal,
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status === 401) return { kind: "signed-out" };
+  if (!res.ok) return { kind: "error", status: res.status };
+
+  // Server-Sent Events: "data: {json}" blocks separated by a blank line.
+  const reader = res.body?.getReader();
+  if (!reader) return { kind: "error", status: res.status };
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let sawText = false;
+  let fallback: CoachAnswer["reason"] = null;
+  const handle = (block: string): CoachChatOutcome | null => {
+    const line = block.split("\n").find((l) => l.startsWith("data:"));
+    if (!line) return null;
+    let event: { delta?: unknown; done?: unknown; error?: unknown; fallback?: unknown };
+    try {
+      event = JSON.parse(line.slice(5));
+    } catch {
+      return null;
+    }
+    if (typeof event.fallback === "string") fallback = event.fallback as CoachAnswer["reason"];
+    if (typeof event.delta === "string" && event.delta) {
+      sawText = true;
+      onDelta(event.delta);
+    }
+    if (event.error) return { kind: "interrupted" };
+    if (event.done) return { kind: "done", fallback };
+    return null;
+  };
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let end: number;
+      while ((end = buffer.indexOf("\n\n")) !== -1) {
+        const outcome = handle(buffer.slice(0, end));
+        buffer = buffer.slice(end + 2);
+        if (outcome) return outcome;
+      }
+    }
+  } catch {
+    return sawText ? { kind: "interrupted" } : { kind: "network-error" };
+  }
+  return sawText ? { kind: "interrupted" } : { kind: "error", status: res.status };
+}

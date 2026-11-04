@@ -29,6 +29,26 @@ describe("DrillPage", () => {
     expect(screen.getByRole("link", { name: /exit the drill/i }).getAttribute("href")).toBe("/");
   });
 
+  it("offers the AI coach after an answer", () => {
+    open();
+    play();
+    answerFirst();
+    expect(screen.getByRole("region", { name: /ai coach/i })).toBeTruthy();
+  });
+
+  it("doesn't skip to the next hand when you press Space or Enter inside the coach", () => {
+    open();
+    play();
+    answerFirst();
+    const coach = screen.getByRole("region", { name: /ai coach/i });
+    fireEvent.keyDown(coach, { key: " " });
+    fireEvent.keyDown(coach, { key: "Enter" });
+    expect(screen.getByRole("region", { name: /ai coach/i })).toBeTruthy(); // still on this hand's answer
+    // ...but Space outside it still moves on, as before.
+    fireEvent.keyDown(window, { key: " " });
+    expect(screen.queryByRole("region", { name: /ai coach/i })).toBeNull();
+  });
+
   it("deals a card that says who you are, with the board and hand", () => {
     open();
     play();

@@ -22,7 +22,7 @@ const ICONS: Record<NavId, ReactNode> = {
     </>
   ),
   library: <path d="M6 3h12v18l-6-4-6 4V3z" />,
-  drill: (
+  train: (
     <>
       <rect x="3" y="6" width="11" height="15" rx="2" />
       <path d="M9 3h10a2 2 0 0 1 2 2v12" />

@@ -160,6 +160,29 @@ A custom menu names actions by percentage (`bet_33`); `/spots/solve` and
 in `docs/decisions.md` (`apps/api/scripts/compare_bet_menus.py`): time grows with
 sizes and roughly doubles per extra raise. No UI sets it yet.
 
+**Train tab (2026-11-04)**: the fourth tab is Train (`/train`), a lessons hub with the
+Drill reachable from it (the Drill itself is unchanged, still full screen at `/drill`). Lessons are
+plain data in `lib/lessons.ts` (reading cards + graded questions), played at `/train?lesson=<id>`,
+progress in localStorage. "Which hands to open" is graded against the reference opening ranges, shipped as
+`apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
+a test fails if it drifts). "The continuation bet" is graded by the Drill deck's solver frequencies
+(`lib/cbetLesson.ts`). See `docs/decisions.md` for what's planned next (an AI coach, a lesson guide,
+ranked play, opponent types).
+
+**Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
+`done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own
+explanation, never an error) and takes the conversation so far, so the learner can ask follow-ups.
+The Drill's answer screen uses it (`components/CoachChat`, `lib/coach.ts` builds the context); the
+lessons still use the one-shot `POST /coach`. `GEMINI_MODEL` may be a comma-separated list and
+`GEMINI_THINKING_BUDGET` defaults to 0 (see docs/decisions.md for why, and for local-dev traps:
+`SUPABASE_URL` and root certificates).
+
+**AI coach (2026-11-05)**: each answered Train question has "Ask the coach", backed by
+`apps/api`'s `POST /coach` (`app/coach.py`): a model (Gemini free tier, `GEMINI_API_KEY` /
+`GEMINI_MODEL` env vars, unset = off) explains from the facts the lesson computed and never decides
+what's right; any failure, no key, or a rate limit falls back to the app's own explanation. Sign-in
+required. See `docs/decisions.md` (including the unverified-model-name caveat).
+
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
 colors, the pot on the table, bb amounts, and the "why" analysis with its
@@ -524,6 +547,7 @@ pip install -e packages/schema -e apps/api -e "services/solver[dev]"
 cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
 cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
+cd apps/api && python scripts/make_open_ranges.py            # regenerate the Train tab's opening-range data
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer vs its frozen pre-speed-up copy

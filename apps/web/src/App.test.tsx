@@ -49,7 +49,7 @@ describe('<App />', () => {
   it('has exactly the four nav destinations', () => {
     render(<App />)
     const links = screen.getAllByRole('link').map((link) => link.textContent)
-    expect(links).toEqual(['Solve', 'Ranges', 'Library', 'Drill'])
+    expect(links).toEqual(['Solve', 'Ranges', 'Library', 'Train'])
   })
 
   it('navigates to Ranges (all three modes), Library and Solve without throwing', async () => {
@@ -162,13 +162,26 @@ describe('<App />', () => {
       expect(screen.getByText('BTN to act · facing 1bb')).toBeInTheDocument()
     })
 
-    it("goes back to the last tab from the Drill's X", async () => {
+    it("opens the Drill from the Train tab, and its X comes back to Train", async () => {
       const user = userEvent.setup()
       render(<App />)
-      await user.click(screen.getByRole('link', { name: /^ranges$/i }))
-      await user.click(screen.getByRole('link', { name: /^drill$/i }))
+      await user.click(screen.getByRole('link', { name: /^train$/i }))
+      expect(window.location.pathname).toBe('/train')
+      await user.click(screen.getByRole('link', { name: /^drill/i }))
+      expect(window.location.pathname).toBe('/drill')
       await user.click(screen.getByRole('link', { name: /exit the drill/i }))
-      expect(window.location.pathname).toBe('/ranges')
+      expect(window.location.pathname).toBe('/train')
+    })
+
+    it('returns to the lesson you were in when you come back to the Train tab', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('link', { name: /^train$/i }))
+      await user.click(screen.getByRole('button', { name: /positions and the button/i }))
+      expect(window.location.search).toBe('?lesson=positions')
+      await user.click(screen.getByRole('link', { name: /^ranges$/i }))
+      await user.click(screen.getByRole('link', { name: /^train$/i }))
+      expect(window.location.search).toBe('?lesson=positions')
     })
   })
 

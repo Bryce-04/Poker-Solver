@@ -26,3 +26,10 @@ services:
       # a secret, but set in the dashboard alongside DATABASE_URL.
       - key: SUPABASE_URL
         sync: false
+      # The Train tab's AI coach (Gemini free tier). Unset = coach off and the
+      # lessons show their own explanations. Set in the dashboard, never here.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional: a current Flash model name from Google AI Studio.
+      - key: GEMINI_MODEL
+        sync: false

@@ -6,7 +6,7 @@ export const NAV_ITEMS = [
   { id: "solve", to: "/solve", label: "Solve", subtitle: "Best play after the flop" },
   { id: "ranges", to: "/ranges", label: "Ranges", subtitle: "Which hands to play preflop" },
   { id: "library", to: "/library", label: "Library", subtitle: "Your saved spots" },
-  { id: "drill", to: "/drill", label: "Drill", subtitle: "Practice game · full screen" },
+  { id: "train", to: "/train", label: "Train", subtitle: "Lessons and practice" },
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];
@@ -24,6 +24,10 @@ export const PAGE_HEADERS: Record<
     description: "Set up a hand, then let the solver find the best mix of plays for whoever is to act.",
     workspace: true,
     ownHeader: true,
+  },
+  "/train": {
+    title: "Train",
+    description: "Short lessons and a practice game that explain how to play, starting from the basics.",
   },
   "/ranges": {
     title: "Ranges",

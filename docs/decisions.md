@@ -6,6 +6,155 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — The coach as a streamed chat, and the Drill's "Ask the coach"
+
+**What.** `POST /coach/chat` (`apps/api/app/coach.py`, `routes/coach.py`): the same grounded coach as
+`POST /coach` below, but the answer streams (Server-Sent Events) and the learner can ask follow-ups.
+The Drill's answer screen gets an "Ask the coach to explain" box (`components/CoachChat`) with three
+suggested questions and a text box. `POST /coach` and the lessons' coach are unchanged.
+
+**Why one coach, not two.** A Drill hand fits the existing `CoachContext` (the hand, the board, what
+the learner chose, the solver's most frequent action, and an explanation computed from the solver),
+so the Drill reuses the same facts prompt, sign-in, limiter and provider. `lib/coach.ts` builds that
+context from a Drill spot; the whole solver mix goes into `explanation`, because a mixed strategy
+has no single "correct" action and the model must be able to say so.
+
+**Rules kept.** The solver decides, the model explains, from the given facts only. The coach never
+dead-ends: when the model isn't configured, is over the limit, or fails before its first word, the
+reply is the app's own explanation (`{"fallback": reason}` then that text as the one delta), and the
+UI says so in the same words as the lessons. Only a break *after* words have started is an error
+(`{"error": true}`; the UI keeps the partial answer's absence and offers to try again). Each chat
+message counts against the hourly and daily limits, so a conversation uses several: raise
+`COACH_PER_HOUR` if 20 feels tight. The server keeps no conversation; each call carries the history
+(at most 12 messages, opening with the coach's answer).
+
+**Speed and reliability on the free tier** (found by running it against the real service, which the
+entry below says hadn't happened yet):
+- Most of the wait was Gemini 2.5's silent "thinking", not the answer. `GEMINI_THINKING_BUDGET`
+  defaults to `0` (off); `default` leaves the model's behaviour alone. A model that rejects the
+  setting (HTTP 400) is retried without it. Streaming shows the first words in about a second.
+- Free-tier models are often "high demand" (HTTP 503). `GEMINI_MODEL` may be a comma-separated list;
+  each is tried in order, and the whole list a second time after a 2 s pause, until the first word
+  arrives. 404 (a retired name) and 429 also move on to the next; a bad key (401/403) does not.
+- Model names go stale. `gemini-2.5-flash` answered 404 for the project this was tried with, while
+  the alias `gemini-flash-latest` existed (it was merely busy). The default is left as it was; set
+  `GEMINI_MODEL=gemini-flash-latest,gemini-flash-lite-latest` (or what AI Studio lists) and read the
+  server log: every failed call logs the provider's own reason.
+- Local-dev traps that look like coach bugs: the API needs `SUPABASE_URL` (the same project URL as
+  the web app's `VITE_SUPABASE_URL`) or every sign-in check crashes into a 500 the browser reports as
+  "couldn't reach the server"; and a python.org Python with no root certificates fails the sign-in
+  check with `CERTIFICATE_VERIFY_FAILED` (a 503). Fix with
+  `SSL_CERT_FILE=$(python -c 'import certifi;print(certifi.where())')`. Docker images are not affected.
+
+**Not done.** The lessons' coach still uses the one-shot `POST /coach` (no streaming, one question);
+moving it to `/coach/chat` is a small change. No saved conversations, no "describe a spot in words"
+coach (the mockup in the design review), no leak finder.
+
+**Tests.** `apps/api/tests/test_coach_chat.py` (25, no network: conversation shape and limits, every
+fallback, the limiter, the stream cutting off, and Gemini's streaming transport through
+`httpx.MockTransport`: model list, retry rounds, the thinking setting). Web: `CoachChat.test.tsx`,
+`coachApi.test.ts` (SSE parsing across chunk boundaries), `coach.test.ts`, and the Drill's keyboard
+guard (Space/Enter typed into the coach must not skip the hand).
+
+## 2026-11-05 — Train tab: the AI coach (Gemini free tier, grounded, with a fallback)
+
+**Status:** proposed.
+
+**What.** Under every answered lesson question there is an "Ask the coach" panel: three quick
+questions and a free-text box. `POST /coach` (`apps/api/app/coach.py`, `routes/coach.py`) sends a
+model the learner's question plus the **facts the lesson already computed** (hand, board, what they
+chose, the right answer, and the explanation derived from the solver's frequencies or the range
+data). The system prompt says to use only those facts, never invent numbers, say so when the facts
+don't cover a question, and treat instructions inside the question as data. **The solver and lesson
+data decide what is right; the model only explains.**
+
+**Provider.** One small interface (`CoachProvider.generate`), implemented for Gemini's REST
+`generateContent` (`x-goog-api-key` header, system instruction, 20 s timeout). Chosen because it has
+a free tier with no card; swapping provider is a new class, not a rewrite. Settings are environment
+variables: `GEMINI_API_KEY` (unset = coach off), `GEMINI_MODEL` (default `gemini-2.5-flash`),
+`COACH_PER_HOUR` (20 per user) and `COACH_PER_DAY_TOTAL` (800 across users). **Caveat: model names
+and free-tier limits change. I could not verify the current model or quota against Google's docs
+(the pages I could read describe a newer API and a newer model name), so the default may need
+changing to whichever Flash model AI Studio shows; set `GEMINI_MODEL`.**
+
+**Never a dead end.** If there is no key, the model errors or times out, or the user is over their
+limit, the response is still 200 with the app's own explanation and `source: "fallback"` plus a
+reason, and the panel says why. The limits are in memory on the one server process (a restart
+resets them): a free-tier guard, not billing control. Sign-in is required, so the shared quota is
+spent only by real accounts.
+
+**Privacy.** Only the question, the hand, the board and the lesson text are sent to the provider:
+no email, user id or other account data. A free tier may use requests to improve the provider's
+models; nothing sent is private.
+
+**Tests.** `recommendNext` and the Up next card in `lessons.test.ts` / `TrainPage.test.tsx`; `apps/api/tests/test_coach.py` (21, no network or database: grounding, injection text
+stays in the user turn, every fallback path, both rate limits, input limits, the Gemini request and
+response shape against a fake server) and the panel's states in `TrainPage.test.tsx`.
+
+**The lesson guide ("Up next") is rules, not the model, on purpose.** The Train hub's top card
+(`recommendNext` in `lib/lessons.ts`) picks the first lesson you haven't finished, else the weakest
+finished lesson under 80% right (shown with your score), else sends you to the Drill. Choosing from
+the fixed course by plain rules means it can't invent a lesson or misreport a score, needs no key or
+network, and is fully testable. The model could later phrase the message, but the choice stays
+rule-based. It reads progress from this browser only; moving progress to the account (so the guide
+follows you across devices) is the next step and needs a table, so it is not done.
+
+**Not done.** Streaming answers, account-level progress, and a live check against Google: it needs a
+key, so the coach has not run against the real service. Also: Render deploys `main`, so the coach
+does nothing in the deployed app until the Train PR is merged.
+
+---
+
+## 2026-11-04 — Train tab: lessons and the Drill under one tab
+
+**Status:** proposed.
+
+**What.** The fourth tab is now **Train** (`/train`, was Drill). It is a normal in-shell page
+(`pages/TrainPage.tsx`) with Lessons, Practice (a card that opens the Drill) and Coming soon
+(ranked play, playing different opponents). Nothing about the Drill itself changed: it is still the
+full-screen game at `/drill`, rendered outside the shell, with its own X. The X goes to "/", which
+returns to the last tab, so a Drill started from Train comes back to Train. The phone shell, tab
+bar and tab memory are untouched apart from the tab's id/label/icon (`drill` to `train`) and
+dropping the old "the Drill is not a remembered tab" special cases.
+
+**Lessons are data** (`lib/lessons.ts`): reading cards and multiple-choice questions with an
+explanation per choice, so adding a lesson needs no UI code. Two exist: "Positions and the button"
+and "Pot odds and equity" (content checked against the formulas by `lessons.test.ts`). A lesson is
+played at `/train?lesson=<id>`; the query string is what makes the tab bar's "last place in each
+tab" return to it. Progress (done, score) is in `localStorage` only for now.
+
+**Lesson 3, "Which hands to open" (solver-backed grading).** Ten "folded to you in seat X with hand
+Y: raise or fold?" questions (five from UTG, five from the BTN), graded against the repo's reference
+opening ranges rather than hand-written answers. The ranges ship as app data,
+`apps/web/src/data/open-ranges.json`, written by `apps/api/scripts/make_open_ranges.py` from
+`reference_charts.py` (the same pattern as the Drill deck, so it works offline), and
+`apps/api/tests/test_open_ranges_data.py` fails if the file drifts from the charts: rerun the script
+after changing them. A new lesson step kind, `open` (`lib/lessons.ts`), computes the right answer and
+the explanation ("not in the UTG range; it becomes an open from the HJ onward") from that data; the
+percentages quoted in the reading cards are computed too. The reference ranges are approximate
+(constructed from standard opening principles, not solver output), and the lesson says so.
+
+**Lesson 4, "The continuation bet" (graded by the flop solver).** Six "you raised from the BTN, the BB
+called and checked this flop: bet or check?" hands, taken from the Drill's pre-solved deck
+(`lib/cbetLesson.ts`; the BTN-in-position, facing-a-check spots, 24 of them). It shows the flop and
+your two cards; the answer is the solver's own frequency for that exact hand. Hands are picked from
+whatever the deck holds (seeded: three clear bets, three clear checks, alternating), so regenerating
+the deck changes the hands but cannot make the lesson wrong. "Bet" merges the three bet sizes; the
+explanation gives the bet/check split, the size the solver favors, and the Drill's rule-based
+reasoning for the hand (a rule of thumb, as the Drill says). A hand counts as a clear bet or check at
+60% or more. Mixed hands (nearer 50/50) are left out of the quiz on purpose, since "one right answer"
+would be a lie for them; a later lesson on mixed strategies can use them.
+
+**Not done yet (planned).** The AI coach (a provider-agnostic `POST /coach` in
+`apps/api`, starting on Gemini's free tier, with the existing rule-based explanations as the
+fallback), the lesson guide, ranked play (rated by decision quality against the solver, not by chips
+won, which swing too much), and opponent types (needs node-locking in the solver).
+
+**Tests.** `TrainPage.test.tsx`, `lessons.test.ts`, `test_open_ranges_data.py`, the c-bet lesson's tests in `lessons.test.ts`, and two `App.test.tsx` cases (Drill opened from
+Train and back; a lesson is remembered when you leave and return to the tab).
+
+---
+
 ## 2026-11-03 — Sheets closing as soon as they open, in development
 
 **Status:** proposed.
