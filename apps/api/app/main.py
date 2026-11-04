@@ -14,6 +14,7 @@ from poker_solver_schema import __version__ as schema_version
 
 from .db import engine
 from .routes.coach import router as coach_router
+from .routes.progress import router as progress_router
 from .routes.spots import router as spots_router
 
 app = FastAPI(title="Poker Solver API", version="0.1.0")
@@ -37,6 +38,7 @@ app.add_middleware(
 
 app.include_router(spots_router)
 app.include_router(coach_router)
+app.include_router(progress_router)
 
 
 @app.get("/health")

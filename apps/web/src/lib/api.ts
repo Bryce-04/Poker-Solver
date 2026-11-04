@@ -621,3 +621,71 @@ export async function streamCoach(
   }
   return sawText ? { kind: "interrupted" } : { kind: "error", status: res.status };
 }
+
+// ---------------------------------------------------------------------------
+// Train-tab lesson progress (apps/api's GET /progress, PUT /progress/{id}).
+// Server rows are the account's copy; lib/progress.ts merges them with the
+// device's by "newest attempt wins".
+
+export interface ServerProgress {
+  done: boolean;
+  correct: number;
+  total: number;
+  at: number;
+}
+
+export type FetchProgressResult =
+  | { kind: "ok"; lessons: Record<string, ServerProgress> }
+  | { kind: "signed-out" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** The signed-in user's lesson progress. Never throws. */
+export async function fetchProgress(): Promise<FetchProgressResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/progress`,
+      method: "GET",
+      headers: { ...(await authHeaders()) },
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status >= 200 && res.status < 300) {
+    const body = asJson(res.data) as { lessons?: Record<string, ServerProgress> };
+    return { kind: "ok", lessons: body.lessons ?? {} };
+  }
+  if (res.status === 401) return { kind: "signed-out" };
+  return { kind: "error", status: res.status };
+}
+
+export type PutProgressResult =
+  | { kind: "saved"; stored: ServerProgress }
+  | { kind: "signed-out" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Uploads one lesson attempt; `stored` is what the server holds afterwards
+ * (the newer attempt if it already had one). Never throws. */
+export async function putProgress(
+  lessonId: string,
+  progress: { done: boolean; correct: number; total: number; at?: number },
+): Promise<PutProgressResult> {
+  let res: { status: number; data: unknown };
+  try {
+    res = await CapacitorHttp.request({
+      url: `${API_BASE_URL}/progress/${encodeURIComponent(lessonId)}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      data: { done: progress.done, correct: progress.correct, total: progress.total, at: progress.at ?? Date.now() },
+    });
+  } catch {
+    return { kind: "network-error" };
+  }
+  if (res.status >= 200 && res.status < 300) {
+    return { kind: "saved", stored: asJson(res.data) as ServerProgress };
+  }
+  if (res.status === 401) return { kind: "signed-out" };
+  return { kind: "error", status: res.status };
+}

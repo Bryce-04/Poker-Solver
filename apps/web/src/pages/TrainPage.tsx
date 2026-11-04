@@ -1,17 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   LESSONS,
   questionFor,
   recommendNext,
   quizCount,
-  readProgress,
-  writeProgress,
   type Lesson,
   type LessonProgress,
 } from "../lib/lessons";
 import { PlayingCard } from "../components/PlayingCard/PlayingCard";
+import { putProgress } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import { isPracticeFilter, type PracticeFilter } from "../lib/practiceTable";
+import { readProgress, syncProgress, writeProgress } from "../lib/progress";
 import { CoachPanel } from "./train/CoachPanel";
 import { PracticeTable } from "./train/PracticeTable";
 import "./TrainPage.css";
@@ -24,6 +25,11 @@ import "./TrainPage.css";
  */
 export function TrainPage() {
   const [params, setParams] = useSearchParams();
+  const auth = useAuth();
+  // Progress is kept per account on this device and, when signed in, on the
+  // server too (lib/progress.ts). Keyed by account so a sign-in or an account
+  // switch starts the screen fresh.
+  const account = auth.status === "signed-in" ? (auth.email ?? "account") : null;
   const practice = params.get("practice");
   if (isPracticeFilter(practice)) {
     return (
@@ -38,19 +44,45 @@ export function TrainPage() {
   if (lesson) {
     return (
       <LessonPlayer
-        key={lesson.id}
+        key={`${account}:${lesson.id}`}
         lesson={lesson}
+        account={account}
         onExit={() => setParams({}, { replace: false })}
         onPractice={(f) => setParams({ practice: f })}
       />
     );
   }
-  return <TrainHub onOpen={(id) => setParams({ lesson: id })} onPractice={() => setParams({ practice: "all" })} />;
+  return (
+    <TrainHub
+      key={account ?? "guest"}
+      account={account}
+      onOpen={(id) => setParams({ lesson: id })}
+      onPractice={() => setParams({ practice: "all" })}
+    />
+  );
 }
 
-function TrainHub({ onOpen, onPractice }: { onOpen: (id: string) => void; onPractice: () => void }) {
-  // Read once per visit to the hub: finishing a lesson remounts it.
-  const [progress] = useState(readProgress);
+function TrainHub({
+  account,
+  onOpen,
+  onPractice,
+}: {
+  account: string | null;
+  onOpen: (id: string) => void;
+  onPractice: () => void;
+}) {
+  // This device's copy now; the account's server copy replaces it once synced.
+  const [progress, setProgress] = useState(() => readProgress(account));
+  useEffect(() => {
+    if (account === null) return;
+    let cancelled = false;
+    void syncProgress(account).then((merged) => {
+      if (!cancelled) setProgress(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
   const next = recommendNext(progress);
   return (
     <div className="train">
@@ -152,10 +184,12 @@ type Result = LessonProgress;
 
 function LessonPlayer({
   lesson,
+  account,
   onExit,
   onPractice,
 }: {
   lesson: Lesson;
+  account: string | null;
   onExit: () => void;
   onPractice: (filter: PracticeFilter) => void;
 }) {
@@ -172,7 +206,10 @@ function LessonPlayer({
   function next(nowCorrect: number) {
     if (last) {
       const finished = { done: true, correct: nowCorrect, total };
-      writeProgress(lesson.id, finished);
+      const stored = writeProgress(lesson.id, finished, account);
+      // Signed in: also send it to the account. Fire and forget; if it fails
+      // (offline) the next sync uploads it, because the device copy is newer.
+      if (account !== null) void putProgress(lesson.id, stored);
       setResult(finished);
       return;
     }

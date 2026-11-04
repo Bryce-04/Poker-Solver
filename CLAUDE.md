@@ -33,7 +33,7 @@ dependency, checked against the project's public JWKS keys -- only
 only ever touches the caller's own spots (`SpotRow.created_by`). A spot
 that's missing, someone else's, or ownerless is the same 404 to
 PATCH/DELETE. Rows saved before auth have no owner and are deliberately
-left in place, listed for no one. The `spots` table is managed by Alembic
+left in place, listed for no one. The `spots` and `lesson_progress` tables are managed by Alembic
 (`apps/api/migrations`), not `create_all`. `apps/api` is deployed on
 Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
@@ -163,12 +163,14 @@ sizes and roughly doubles per extra raise. No UI sets it yet.
 **Train tab (2026-11-04)**: the fourth tab is Train (`/train`), a lessons hub with the
 Drill reachable from it (the Drill itself is unchanged, still full screen at `/drill`). Lessons are
 plain data in `lib/lessons.ts` (reading cards + graded questions), played at `/train?lesson=<id>`,
-progress in localStorage. "Which hands to open" is graded against the reference opening ranges, shipped as
+progress kept per account on the device (`lib/progress.ts`) and, signed in, on the server
+(`GET`/`PUT /progress`, table `lesson_progress`; newest attempt wins per lesson; see `docs/decisions.md`).
+"Which hands to open" is graded against the reference opening ranges, shipped as
 `apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
 a test fails if it drifts). "The continuation bet" is graded by the Drill deck's solver frequencies
-(`lib/cbetLesson.ts`). The Train hub also has a **6-max practice table**
-(`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`): preflop-first, the bots play the
-reference charts and every decision is graded against them (data in
+(`lib/cbetLesson.ts`). "Up next" is rule-based (`recommendNext`). The Train hub also has a **6-max
+practice table** (`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`): preflop-first, the bots
+play the reference charts and every decision is graded against them (data in
 `apps/web/src/data/preflop-pairs.json`, regenerate with `python apps/api/scripts/make_preflop_pairs.py`;
 a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
 (generated lessons, postflop practice, ranked play, opponent types).
@@ -581,8 +583,8 @@ access. `db.py` loads `.env` itself via `python-dotenv` for bare
 `uvicorn --reload` runs; docker-compose and Render set the real env var
 directly, so that's a no-op there.
 
-Schema changes to the `spots` table go through Alembic, from `apps/api`:
-edit `SpotRow` in `app/db.py`, then `alembic revision --autogenerate -m
+Schema changes to a table (`spots`, `lesson_progress`) go through Alembic, from `apps/api`:
+edit its model (`SpotRow`, `LessonProgressRow`) in `app/db.py`, then `alembic revision --autogenerate -m
 "..."`, review the generated file, and `alembic upgrade head`. `alembic
 check` confirms models and migrations agree. Deploys (the Dockerfile's
 CMD, docker-compose) run `alembic upgrade head` before starting uvicorn.

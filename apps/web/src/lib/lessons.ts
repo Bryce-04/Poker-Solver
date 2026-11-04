@@ -250,31 +250,14 @@ export function questionFor(step: LessonStep): Question | null {
   };
 }
 
+/** A finished (or started) lesson: the latest attempt's score, and when it
+ * finished (ms since the epoch; the newest attempt wins when devices merge).
+ * Storage and syncing live in lib/progress.ts. */
 export interface LessonProgress {
   done: boolean;
   correct: number;
   total: number;
-}
-
-const KEY = "poker-solver.train.progress.v1";
-
-export function readProgress(): Record<string, LessonProgress> {
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, LessonProgress>) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function writeProgress(id: string, progress: LessonProgress): void {
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify({ ...readProgress(), [id]: progress }));
-  } catch {
-    // Storage blocked or full: progress just isn't remembered.
-  }
+  at?: number;
 }
 
 /** Below this share right, a finished lesson is worth another go. */
