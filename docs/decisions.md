@@ -35,6 +35,15 @@ practice table", `/train?practice=<mixed|open|defend>`):
   (`pages/train/CoachPanel.tsx`, extracted from the Train page, unchanged).
 - Lessons link in: "Which hands to open" ends with "Practice this at the table" (`Lesson.practice`).
 
+**Wording** (found by playing it on the phone): a first-in prompt must not describe a table that isn't
+there (UTG acts first, so "everyone has folded to you" was wrong for it). `lib/seats.ts` is the one
+place seats are spoken of ("under the gun (UTG)", "on the button (BTN)"...) and the first-in prompt is
+built there for both the lessons and the table. In the log your own moves read "You raise / 3-bet /
+call", a bot's "BTN raises / 3-bets / calls" (a bot's name stands without an article, a sentence
+about it takes "The"), a call shows what it adds (the big blind facing 2.5bb calls **1.5bb**, not
+2.5bb), and the outcomes read as sentences. Tests pin each of these, and three deliberate breaks of
+them are caught.
+
 **Data.** `apps/web/src/data/preflop-pairs.json`, written by `apps/api/scripts/make_preflop_pairs.py`
 from `preflop_ranges.py` (the same pattern as the opening ranges and the Drill deck, so the table
 works offline). `apps/api/tests/test_preflop_pairs_data.py` fails if it drifts from the charts, and

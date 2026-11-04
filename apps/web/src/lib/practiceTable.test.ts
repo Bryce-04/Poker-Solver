@@ -264,18 +264,56 @@ describe("wording", () => {
     const d = deal("BB", { BTN: OPENS.BTN[0], BB: PAIRS["BTN>BB"].flat[0] });
     const node = startNode(d)!;
     expect(actionLabel(node, "fold")).toBe("Fold");
-    expect(actionLabel(node, "call")).toBe("Call 2.5bb");
+    expect(actionLabel(node, "call")).toBe("Call 1.5bb"); // the big blind already has 1bb in
     expect(actionLabel(node, "raise")).toBe("3-bet to 9bb");
     const open = startNode(deal("UTG"))!;
     expect(actionLabel(open, "raise")).toBe("Raise to 2.5bb");
-    expect(describeNode(node)).toMatch(/BTN raised to 2.5bb/);
-    expect(describeNode(open)).toMatch(/everyone has folded to you/);
+    expect(describeNode(node)).toBe("You're in the big blind (BB) with 100bb. The BTN raised to 2.5bb and everyone else folded. What do you do?");
+    expect(describeNode(startNode(deal("BTN"))!)).toMatch(/on the button \(BTN\) with 100bb and everyone has folded to you/);
   });
 
   it("explains in terms of the chart, and says the ranges are approximate", () => {
     const d = deal("BB", { BTN: OPENS.BTN[0], BB: PAIRS["BTN>BB"].threeBet[0] });
     const node = startNode(d)!;
-    expect(node.explanation).toMatch(/is a 3-bet against the BTN's open from the BB/);
+    expect(node.explanation).toMatch(/is a 3-bet for the BB against the BTN's open/);
     expect(node.explanation).toMatch(/approximate reference ranges/);
+  });
+});
+
+describe("wording never describes a table that isn't there", () => {
+  it("UTG acts first, so nobody has folded to it", () => {
+    const prompt = describeNode(startNode(deal("UTG"))!);
+    expect(prompt).toBe("You're under the gun (UTG) with 100bb, so you act first. Open or fold?");
+    expect(prompt).not.toMatch(/folded to you/);
+  });
+
+  it("every other first-in seat is told everyone folded to it, in words a player would use", () => {
+    const say = (seat: Seat) => describeNode(startNode(deal(seat))!);
+    expect(say("HJ")).toMatch(/^You're in the hijack \(HJ\) with 100bb and everyone has folded to you/);
+    expect(say("CO")).toMatch(/^You're in the cutoff \(CO\)/);
+    expect(say("BTN")).toMatch(/^You're on the button \(BTN\)/);
+    expect(say("SB")).toMatch(/^You're in the small blind \(SB\)/);
+  });
+
+  it("the log says 'You' for you and the seat for a bot, with verbs that agree", () => {
+    const d = deal("BTN", { BTN: OPENS.BTN[0], BB: PAIRS["BTN>BB"].threeBet[0] });
+    const out = applyAction(d, startNode(d)!, "raise");
+    const lines = out.table.log;
+    expect(lines).toContain("You raise to 2.5bb");
+    expect(lines).toContain("SB folds");
+    expect(lines).toContain("BB 3-bets to 9bb");
+    expect(lines.join(" ")).not.toMatch(/\bBTN raise\b/);
+  });
+
+  it("a call logs what it adds, and a flat call by the big blind is 1.5bb not 2.5bb", () => {
+    const d = deal("BB", { BTN: OPENS.BTN[0], BB: PAIRS["BTN>BB"].flat[0] });
+    const out = applyAction(d, startNode(d)!, "call");
+    expect(out.table.log.at(-1)).toBe("You call 1.5bb");
+  });
+
+  it("outcomes read as sentences about 'the' seat", () => {
+    const d = deal("BTN", { BTN: OPENS.BTN[0], BB: PAIRS["BTN>BB"].flat[0] });
+    const out = applyAction(d, startNode(d)!, "raise");
+    expect(out.summary).toMatch(/^The BB called with .+, and you see a flop\.$/);
   });
 });

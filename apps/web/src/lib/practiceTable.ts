@@ -3,6 +3,7 @@ import pairData from "../data/preflop-pairs.json";
 import { RANKS } from "./hands";
 import { explainOpen } from "./lessons";
 import type { OpenSeat } from "./openRanges";
+import { The, openPrompt, seatPhrase, the } from "./seats";
 
 // The 6-max practice table's engine: pure logic, no React. A hand is dealt, the
 // bots act from the reference charts up to your first decision, you act, and the
@@ -126,16 +127,15 @@ function withLog(t: TableState, line: string, change?: (t: TableState) => void):
 }
 
 const fold = (t: TableState, seat: Seat) => withLog(t, `${seat} folds`, (n) => void (n.folded[seat] = true));
-const raise = (t: TableState, seat: Seat, to: number, verb: string) =>
-  withLog(t, `${seat} ${verb} to ${bb(to)}`, (n) => void (n.bets[seat] = to));
-const call = (t: TableState, seat: Seat, to: number) =>
-  withLog(t, `${seat} calls ${bb(to)}`, (n) => void (n.bets[seat] = to));
+/** `verb` agrees with the subject: "raises"/"3-bets" for a bot, "raise"/"3-bet" for "You". */
+const raise = (t: TableState, seat: Seat, to: number, verb: string, subject: string = seat) =>
+  withLog(t, `${subject} ${verb} to ${bb(to)}`, (n) => void (n.bets[seat] = to));
+/** A call puts in only what is missing, and the log says how much that is. */
+const call = (t: TableState, seat: Seat, to: number, subject: string = seat) =>
+  withLog(t, `${subject} ${subject === "You" ? "call" : "calls"} ${bb(to - t.bets[seat])}`, (n) => void (n.bets[seat] = to));
 
 const seatsAfter = (seat: Seat): Seat[] => SEATS.slice(SEATS.indexOf(seat) + 1);
 const seatsBefore = (seat: Seat): Seat[] => SEATS.slice(0, SEATS.indexOf(seat));
-
-/** A seat name with its article for sentences: "the BTN". */
-const the = (seat: Seat) => `the ${seat}`;
 
 const labelOf = (deal: Deal, seat: Seat) => labelFor(...deal.hands[seat]);
 
@@ -144,24 +144,24 @@ const labelOf = (deal: Deal, seat: Seat) => labelFor(...deal.hands[seat]);
 const NOTE = " These are the app's approximate reference ranges, not a solver's output.";
 
 function explainVsOpen(hand: string, hero: Seat, opener: Seat, best: Action): string {
-  const where = `against ${the(opener)}'s open from the ${hero}`;
-  if (best === "raise") return `${hand} is a 3-bet ${where}: it is in the ${hero}'s 3-bet range.${NOTE}`;
-  if (best === "call") return `${hand} is a call ${where}: strong enough to continue but not to 3-bet.${NOTE}`;
-  return `${hand} is a fold ${where}: it is in neither the ${hero}'s calling nor 3-betting range.${NOTE}`;
+  const spot = `for the ${hero} against ${the(opener)}'s open`;
+  if (best === "raise") return `${hand} is a 3-bet ${spot}: it is in the ${hero}'s 3-bet range.${NOTE}`;
+  if (best === "call") return `${hand} is a call ${spot}: strong enough to continue but not to 3-bet.${NOTE}`;
+  return `${hand} is a fold ${spot}: it is in neither the ${hero}'s calling nor its 3-betting range.${NOTE}`;
 }
 
 function explainVs3bet(hand: string, hero: Seat, opponent: Seat, best: Action): string {
-  const where = `facing ${the(opponent)}'s 3-bet after opening from the ${hero}`;
-  if (best === "raise") return `${hand} is a 4-bet ${where}: it is in the ${hero}'s 4-bet range.${NOTE}`;
-  if (best === "call") return `${hand} is a call ${where}: it is in the ${hero}'s calling range against a 3-bet.${NOTE}`;
-  return `${hand} is a fold ${where}: it is in neither the calling nor the 4-betting range.${NOTE}`;
+  const spot = `for the ${hero} facing ${the(opponent)}'s 3-bet after opening`;
+  if (best === "raise") return `${hand} is a 4-bet ${spot}: it is in the ${hero}'s 4-bet range.${NOTE}`;
+  if (best === "call") return `${hand} is a call ${spot}: it is in the ${hero}'s calling range against a 3-bet.${NOTE}`;
+  return `${hand} is a fold ${spot}: it is in neither the calling nor the 4-betting range.${NOTE}`;
 }
 
 function explainVs4bet(hand: string, hero: Seat, opener: Seat, best: Action): string {
-  const where = `facing ${the(opener)}'s 4-bet after 3-betting from the ${hero}`;
+  const spot = `for the ${hero} facing ${the(opener)}'s 4-bet after a 3-bet`;
   return best === "call"
-    ? `${hand} is a call ${where}: one of the hands that continue.${NOTE}`
-    : `${hand} is a fold ${where}: it is not among the hands that continue against a 4-bet.${NOTE}`;
+    ? `${hand} is a call ${spot}: it is one of the hands that continue.${NOTE}`
+    : `${hand} is a fold ${spot}: it is not among the hands that continue against a 4-bet.${NOTE}`;
 }
 
 // --- building decisions -----------------------------------------------------------------------
@@ -303,7 +303,7 @@ export function applyAction(deal: Deal, node: HeroNode, action: Action): Outcome
   }
 
   if (node.kind === "open") {
-    table = raise(table, hero, OPEN_TO, "raise");
+    table = raise(table, hero, OPEN_TO, "raise", "You");
     for (const seat of seatsAfter(hero)) {
       const pair = pairFor(hero, seat);
       const botHand = labelOf(deal, seat);
@@ -313,7 +313,7 @@ export function applyAction(deal: Deal, node: HeroNode, action: Action): Outcome
       }
       if (pair?.flat.includes(botHand)) {
         table = call(table, seat, OPEN_TO);
-        return end(table, `${seat} called with ${botHand}. You see a flop.`);
+        return end(table, `${The(seat)} called with ${botHand}, and you see a flop.`);
       }
       table = fold(table, seat);
     }
@@ -323,11 +323,11 @@ export function applyAction(deal: Deal, node: HeroNode, action: Action): Outcome
   if (node.kind === "vs-open") {
     const opener = node.opponent as Seat;
     if (action === "call") {
-      table = call(table, hero, OPEN_TO);
+      table = call(table, hero, OPEN_TO, "You");
       // The others behind you fold; the hand goes to the flop with you and the opener.
       return end(table, `You call. It's you against ${the(opener)}, and you see a flop.`);
     }
-    table = raise(table, hero, THREE_BET_TO, "3-bet");
+    table = raise(table, hero, THREE_BET_TO, "3-bet", "You");
     const pair = pairFor(opener, hero) as PairRanges;
     const botHand = labelOf(deal, opener);
     if (pair.fourBet.includes(botHand)) {
@@ -336,54 +336,54 @@ export function applyAction(deal: Deal, node: HeroNode, action: Action): Outcome
     }
     if (pair.callVs3.includes(botHand)) {
       table = call(table, opener, THREE_BET_TO);
-      return end(table, `${opener} called your 3-bet with ${botHand}. You see a flop.`);
+      return end(table, `${The(opener)} called your 3-bet with ${botHand}, and you see a flop.`);
     }
     table = fold(table, opener);
-    return end(table, `${opener} folded ${botHand} to your 3-bet. You win the pot.`);
+    return end(table, `${The(opener)} folded ${botHand} to your 3-bet, and you win the pot.`);
   }
 
   if (node.kind === "vs-3bet") {
     const defender = node.opponent as Seat;
     if (action === "call") {
-      table = call(table, hero, THREE_BET_TO);
+      table = call(table, hero, THREE_BET_TO, "You");
       return end(table, `You call the 3-bet. You see a flop against ${the(defender)}.`);
     }
-    table = raise(table, hero, FOUR_BET_TO, "4-bet");
+    table = raise(table, hero, FOUR_BET_TO, "4-bet", "You");
     const pair = pairFor(hero, defender) as PairRanges;
     const botHand = labelOf(deal, defender);
     if (pair.callVs4.includes(botHand)) {
       table = call(table, defender, FOUR_BET_TO);
-      return end(table, `${defender} called your 4-bet with ${botHand}. You see a flop.`);
+      return end(table, `${The(defender)} called your 4-bet with ${botHand}, and you see a flop.`);
     }
     table = fold(table, defender);
-    return end(table, `${defender} folded ${botHand} to your 4-bet. You win the pot.`);
+    return end(table, `${The(defender)} folded ${botHand} to your 4-bet, and you win the pot.`);
   }
 
   // vs-4bet: fold was handled above, so this is a call.
-  table = call(table, hero, FOUR_BET_TO);
+  table = call(table, hero, FOUR_BET_TO, "You");
   return end(table, `You call the 4-bet. You see a flop against ${the(node.opponent as Seat)}.`);
 }
 
 /** The labels of the two buttons that aren't "Fold", worded for the decision. */
 export function actionLabel(node: HeroNode, action: Action): string {
   if (action === "fold") return "Fold";
-  if (action === "call") return `Call ${bb(node.toMatch)}`;
+  if (action === "call") return `Call ${bb(node.toMatch - node.table.bets[node.seat])}`;
   const names: Record<NodeKind, string> = { open: "Raise", "vs-open": "3-bet", "vs-3bet": "4-bet", "vs-4bet": "Raise" };
   return `${names[node.kind]} to ${bb(node.raiseTo ?? node.toMatch)}`;
 }
 
 /** A one-line description of the spot, for the prompt and the coach. */
 export function describeNode(node: HeroNode): string {
-  const seat = node.seat;
+  const you = `You're ${seatPhrase(node.seat)} with 100bb.`;
+  const opponent = node.opponent as Seat;
   switch (node.kind) {
     case "open":
-      return `You're in the ${seat} at 100bb and everyone has folded to you. Open or fold?`;
+      return openPrompt(node.seat);
     case "vs-open":
-      return `You're in the ${seat} at 100bb. ${node.opponent} raised to ${bb(OPEN_TO)} and the rest folded. What do you do?`;
+      return `${you} ${The(opponent)} raised to ${bb(OPEN_TO)} and everyone else folded. What do you do?`;
     case "vs-3bet":
-      return `You opened from the ${seat} and ${node.opponent} 3-bet to ${bb(THREE_BET_TO)}. What do you do?`;
+      return `You opened from ${the(node.seat)} and ${the(opponent)} 3-bet to ${bb(THREE_BET_TO)}. What do you do?`;
     case "vs-4bet":
-      return `You 3-bet from the ${seat} and ${node.opponent} 4-bet to ${bb(FOUR_BET_TO)}. What do you do?`;
+      return `You 3-bet from ${the(node.seat)} and ${the(opponent)} 4-bet to ${bb(FOUR_BET_TO)}. What do you do?`;
   }
 }
-

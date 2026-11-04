@@ -115,9 +115,9 @@ describe("filters and leaving", () => {
     const { onFilter } = renderTable("all");
     await user.click(screen.getByRole("button", { name: /^defending$/i }));
     expect(onFilter).toHaveBeenCalledWith("defend");
-    expect(screen.getByText(/raised to 2.5bb and the rest folded/i)).toBeInTheDocument();
+    expect(screen.getByText(/raised to 2.5bb and everyone else folded/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^opening$/i }));
-    expect(screen.getByText(/everyone has folded to you/i)).toBeInTheDocument();
+    expect(screen.getByText(/(everyone has folded to you|so you act first)\. Open or fold\?/i)).toBeInTheDocument();
   });
 
   it("goes back", async () => {
