@@ -267,8 +267,11 @@ def test_the_nash_gap_equals_best_responses_minus_the_pot_when_the_game_is_const
     trainer.train(30)
     classic = (trainer.best_response_value(0) + trainer.best_response_value(1) - config.pot_bb) / 2
     gap = sum(trainer.best_response_value(p) - trainer.value_under_average(p) for p in (0, 1)) / 2
-    assert gap == pytest.approx(classic, rel=1e-6, abs=1e-9)
-    assert trainer.exploitability() == pytest.approx(classic, rel=1e-6, abs=1e-9)  # exact game: the classic formula
+    # The two are computed by different passes over float32 state, so they differ by float32
+    # rounding (about 1e-6 relative here, which is what tipped a 1e-6 tolerance on Linux CI); a
+    # real accounting error is orders of magnitude larger.
+    assert gap == pytest.approx(classic, rel=1e-4, abs=1e-6)
+    assert trainer.exploitability() == pytest.approx(classic, rel=1e-4, abs=1e-6)  # exact game: the classic formula
 
 
 def test_a_sampled_solve_converges_under_the_nash_gap_and_never_goes_negative():
