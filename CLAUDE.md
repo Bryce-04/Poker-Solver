@@ -185,7 +185,7 @@ a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also li
 explanation, never an error) and takes the conversation so far, so the learner can ask follow-ups.
 The Drill's answer screen uses it (`components/CoachChat`, `lib/coach.ts` builds the context); the
 lessons still use the one-shot `POST /coach`. `GEMINI_MODEL` may be a comma-separated list and
-`GEMINI_THINKING_BUDGET` defaults to 0 (see docs/decisions.md for why, and for local-dev traps:
+`GEMINI_THINKING_LEVEL` defaults to `minimal` (see docs/decisions.md for why, and for local-dev traps:
 `SUPABASE_URL` and root certificates).
 
 **AI coach (2026-11-05)**: each answered Train question has "Ask the coach", backed by

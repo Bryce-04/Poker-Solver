@@ -213,7 +213,7 @@ def test_provider_is_configured_only_by_environment(monkeypatch):
     provider = coach.get_provider()
     assert isinstance(provider, coach.GeminiProvider) and provider._model == "custom-model"
     monkeypatch.delenv("GEMINI_MODEL")
-    assert coach.get_provider()._model == coach.DEFAULT_MODEL
+    assert coach.get_provider()._models == coach.DEFAULT_MODEL.split(",")  # a list now: see DEFAULT_MODEL
 
 
 # --- GET /coach/status: is the coach switched on here? --------------------------------------
@@ -236,7 +236,7 @@ def test_status_lists_models_but_never_the_key(monkeypatch):
     assert "super-secret-key" not in res.text
 
     monkeypatch.delenv("GEMINI_MODEL")
-    assert client.get("/coach/status").json()["models"] == [coach.DEFAULT_MODEL]
+    assert client.get("/coach/status").json()["models"] == coach.DEFAULT_MODEL.split(",")
 
 
 def test_a_blank_key_counts_as_off(monkeypatch):

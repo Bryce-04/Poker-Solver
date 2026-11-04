@@ -28,15 +28,16 @@ describe("drillCoachContext", () => {
     const ctx = drillCoachContext(spot, "check", "pct");
     expect(ctx.picked).toBe("Check");
     expect(ctx.correct).toMatch(/most frequent action/);
-    expect(ctx.explanation).toMatch(/^The solver's mix for this exact hand: /);
-    expect(ctx.explanation).toContain(`Check: ${Math.round((spot.mix["check"] ?? 0) * 100)}%`);
+    expect(ctx.details).toMatch(/^The solver's mix for this exact hand: /);
+    expect(ctx.details).toContain(`Check: ${Math.round((spot.mix["check"] ?? 0) * 100)}%`);
+    expect(ctx.explanation).not.toMatch(/solver's mix/); // the bars already show it
   });
 
   it("passes on the computed analysis and nothing else", () => {
     const spot = SPOTS.find((s) => s.analysis)!;
     const ctx = drillCoachContext(spot, spot.actions[0], "bb");
-    for (const bullet of spot.analysis!.bullets) expect(ctx.explanation).toContain(bullet);
-    expect(ctx.explanation).toContain(`${spot.analysis!.facts.equityPct}% equity`);
+    for (const bullet of spot.analysis!.bullets) expect(ctx.details).toContain(bullet);
+    expect(ctx.details).toContain(`${spot.analysis!.facts.equityPct}% equity`);
   });
 
   it("stays inside the server's size limits for every spot in the deck", () => {
@@ -47,6 +48,7 @@ describe("drillCoachContext", () => {
         expect(ctx.picked.length).toBeLessThanOrEqual(120);
         expect(ctx.correct.length).toBeLessThanOrEqual(120);
         expect(ctx.explanation.length).toBeLessThanOrEqual(1500);
+        expect((ctx.details ?? "").length).toBeLessThanOrEqual(1500);
       }
     }
   });
@@ -54,7 +56,15 @@ describe("drillCoachContext", () => {
   it("works for a spot with no analysis", () => {
     const { analysis: _drop, ...bare } = SPOTS[0];
     const ctx = drillCoachContext(bare as DrillSpot, bare.actions[0], "bb");
-    expect(ctx.explanation).toMatch(/^The solver's mix/);
+    expect(ctx.explanation).toMatch(/^The solver plays /);
+    expect(ctx.details).toMatch(/^The solver's mix/);
+  });
+
+  it("keeps what you read if the AI can't answer short: two sentences, not the whole analysis", () => {
+    const spot = SPOTS.find((s) => s.analysis && s.analysis.bullets.length >= 4)!;
+    const ctx = drillCoachContext(spot, spot.actions[0], "bb");
+    expect(ctx.explanation).toBe(`${spot.analysis!.bullets[0]} ${spot.analysis!.bullets[2]}`);
+    expect(ctx.explanation.length).toBeLessThan(spot.analysis!.bullets.join(" ").length);
   });
 });
 

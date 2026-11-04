@@ -116,7 +116,8 @@ export function CoachChat({
   }
 
   const asked = new Set(messages.filter((m) => m.role === "user").map((m) => m.content));
-  const chips = suggestions.filter((q) => !asked.has(q));
+  // Two at a time: a long menu of questions is more to read than the answer itself.
+  const chips = suggestions.filter((q) => !asked.has(q)).slice(0, 2);
   return (
     <section className="coach" aria-label="AI coach" aria-busy={busy}>
       {!started && !busy && (
