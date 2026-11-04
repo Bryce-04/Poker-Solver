@@ -1,6 +1,9 @@
 # Mobile redesign — spec
 
-Status: agreed with the team on 2026-11-03, not started.
+Status: agreed with the team on 2026-11-03; built and merged the same day (PR #33),
+all six phases. What was decided along the way is in `docs/decisions.md`. Still
+open: the real-device checks in "After each phase", and the optional extras
+(swipe-down to close a sheet, haptics, hiding the tab bar while typing).
 Scope: everything under 1024px wide (phones, tablets, and the Capacitor Android
 app; iOS later) for every screen **except the Drill**. Desktop (≥1024px) stays
 exactly as the desktop redesign left it.

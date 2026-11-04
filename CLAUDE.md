@@ -14,17 +14,18 @@ and 2 are complete. Stage 3 (text entry, `parseSpotText.ts`) and Stage 4
 does — rule-based, not freeform text, per plan.md's "rule-based parser
 first, not LLM-first." The 13×13 range grid (weighted-brush/drag-paint/
 keyboard selection with weight shading) is mounted editable everywhere a
-matched chart is shown (Builder, Type in, Import) — adjust before saving,
-not just view. The whole app has a design-token visual pass (light +
+matched chart is shown (Ranges on both layouts, and Solve) — adjust before
+saving, not just view. The whole app has a design-token visual pass (light +
 dark, `index.css`) and is routed into four destinations (Solve / Ranges /
 Library / Drill; see "Desktop redesign" below). Saved spots is wired end-to-end: `apps/api` persists
 Spots as JSONB (`app/db.py`'s `SpotRow`) behind `POST`/`GET /spots`,
 matching the contract `apps/web/src/lib/api.ts` was built against (see
 `docs/decisions.md`). Stage 6 auth works for saved spots. Frontend:
 Supabase email/password sign-in, session state, and an `Authorization`
-header on save/list calls (`apps/web/src/lib/auth.tsx`, `lib/supabase.ts`,
-the header's `AuthStatus` component); the save button on all three entry
-screens gates on being signed in. Backend: `apps/api`
+header on save/list calls (`apps/web/src/lib/auth.tsx`, `lib/supabase.ts`;
+sign-in UI is `AuthStatus` in the desktop sidebar and `AccountSheet` on
+phones, both over `lib/useSignInForm.ts`); every Save gates on being signed
+in. Backend: `apps/api`
 verifies that header as a Supabase JWT (`app/auth.py`'s `current_user_id`
 dependency, checked against the project's public JWKS keys -- only
 `SUPABASE_URL` needed, no secret), `POST`/`GET /spots` and
@@ -240,10 +241,10 @@ marked `workspace` in `PAGE_HEADERS` fill the content area edge to edge.
 the merged rail-and-chart page (Pick / Type it / Hand history in the rail,
 the chart, stats and save card on the right). There's no "get chart"
 button: Pick and Type it fetch on every change (250ms debounce), and
-"Read hand" loads a pasted hand. **Phones deliberately keep the old Builder
-/ Type in / Import pages** under the mode switch, unchanged. This departs
-from the spec's "delete them", because of the no-visual-change-under-1024px
-rule; see `docs/decisions.md`. `pages/RangesPage.tsx` picks the layout. All
+"Read hand" loads a pasted hand. Phones kept the old Builder / Type in /
+Import pages at the time (the desktop redesign's no-visual-change rule); the
+mobile redesign's Phase 4 has since replaced and deleted them (below).
+`pages/RangesPage.tsx` picks the layout. All
 of them share `lib/useReferenceChart.ts`: fetch (only the latest request's
 response is applied), the editable copy of the chart's range, `edited`, and
 save. "Solve a flop from here" navigates to `/solve` with route state that
@@ -252,15 +253,16 @@ save. "Solve a flop from here" navigates to `/solve` with route state that
 two optional props: `reset` (a toolbar button) and `showSummary`. On
 desktop it gets the mockup's toolbar ("Paint with" pill, ghost Suits /
 Reset / Clear), bigger cells, and weight drawn as a bottom-up fill. That
-applies to Solve's grids on desktop too; phones are unchanged.
+applies to Solve's grids on desktop too. (Phones use `RangeGrid`'s `mode`
+prop instead; see the mobile redesign below.)
 Not done in Phase 3: the save card's "Save as" name field. It needs Phase
 5's `Spot.name`, and showing it before then would silently drop the name.
 **Phase 4 (Solve) is done, desktop only**: all of Solve's state, derived
 values and actions live in `pages/solve/useSolveSetup.ts`, called once in
-`SolvePage`. The phone layout (`SolvePhone` in `SolvePage.tsx`) has the
-original markup byte for byte, and phones are pixel-identical. At >= 1024px
-`SolveWorkspace.tsx` renders from the same hook, so crossing the breakpoint
-keeps the setup. Setup view:
+`SolvePage`. (At the time phones kept the original markup; the mobile
+redesign's Phases 2-3 have since replaced it with `pages/solve/phone/`.) At
+>= 1024px `SolveWorkspace.tsx` renders from the same hook, so crossing the
+breakpoint keeps the setup. Setup view:
 - `ActionTimeline` (a restyle of StreetActions over `lib/handBuilder`)
 - `BoardSlots` (five slots, `CardPicker` in a popover, "Or type it")
 - a "Ready to solve" checklist
@@ -293,10 +295,10 @@ category labels and "Why?" (Phase 6).
   has `renameSpot` / `deleteSpot`.
 - Desktop `/library` is `pages/library/LibraryWorkspace.tsx`: search, an
   All / Preflop / Postflop filter, a table, and a preview panel with Open /
-  Duplicate / Rename / Delete (delete asks to confirm). Phones keep
-  `SavedSpotsPage` unchanged; `pages/LibraryPage.tsx` picks the layout.
-- Unnamed spots fall back to `lib/spotText.ts`'s `summarize()` (moved
-  there from SavedSpotsPage).
+  Duplicate / Rename / Delete (delete asks to confirm).
+  `pages/LibraryPage.tsx` picks the layout; on phones it's now
+  `LibraryPhone` (the mobile redesign's Phase 5 replaced `SavedSpotsPage`).
+- Unnamed spots fall back to `lib/spotText.ts`'s `summarize()`.
 - "Open" passes the spot as route state: preflop charts to Ranges
   (`RangesWorkspace`'s `initialSpot`, which shows the *saved* range via
   `useReferenceChart`'s `load(spot, startRange)` and keeps its name),
@@ -334,8 +336,8 @@ PR per phase; the team's call). Hard rule,
 the mirror of the desktop one: **desktop (>= 1024px) must not change**.
 **Phase 0 (status bar) is done**: `body` no longer pads by the top safe-area
 inset (that padding scrolled away, letting content slide under the Android
-status bar). The phone header (`.app__header`) is sticky with a solid
-background and pads itself by the top inset, under `@media (max-width: 1023px)`.
+status bar). The phone header was made sticky to cover the inset; Phase 1
+then replaced it with the sticky `TopBar`, which pads itself by the top inset.
 Read insets as `--safe-top` / `--safe-right` / `--safe-bottom` / `--safe-left`
 (`index.css`), which prefer Capacitor's injected `--safe-area-inset-*` over
 `env()`: Capacitor 8's built-in SystemBars plugin sets those on Android (older
@@ -355,7 +357,10 @@ form are gone. `body` pads by no top or bottom inset.
   opens it via `useReferenceChart.save()`, and so does the signed-out
   Library's Sign in button.
 - `BottomSheet` pushes a history entry while open, so Android back / browser
-  back closes it first.
+  back closes it first. Closing queues its Back for a moment, and a sheet
+  opening in that moment reuses the entry instead of pushing. Without that,
+  StrictMode's double mount in development made Chrome's Back land before
+  both entries, and sheets closed as soon as they opened.
 - Tabs remember their route and scroll position. **Solve is kept mounted but
   hidden** (`SolveKeepAlive` in `App.tsx`), so its setup survives a tab switch
   and a trip into the Drill. The phone shell stays mounted under the Drill,
@@ -560,7 +565,7 @@ Four services, one shared schema, request flow: `web -> api -> {solver, postgres
   shape from here; don't let any of those define their own parallel
   representation. `apps/web/src/lib/spot.ts` is where that convergence
   actually lives on the frontend: `buildOpenSpot`/`buildVsRaiseSpot` are
-  shared by `SpotBuilder` and `parseSpotText.ts` — a new entry path adds a
+  shared by Ranges' Pick (`lib/rangesSpot.ts`) and `parseSpotText.ts` — a new entry path adds a
   call into `lib/spot.ts`, not its own inline `Spot` construction. `apps/api`
   and `services/solver` both `pip install -e` this package rather than
   depending on copies.

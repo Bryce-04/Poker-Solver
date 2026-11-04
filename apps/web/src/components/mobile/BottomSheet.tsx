@@ -4,6 +4,10 @@ import { createPortal } from "react-dom";
 import { SHEET_ENTRY } from "../../lib/mobileShell";
 import "./BottomSheet.css";
 
+/** The Back a just-closed sheet has queued to remove its history entry, if
+ * any (see the history effect below). One at a time: only one sheet is open. */
+let pendingBack: number | null = null;
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -36,12 +40,21 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     onCloseRef.current = onClose;
   });
 
-  // Back closes the sheet. A pop that lands on another sheet entry is
-  // ignored: that's StrictMode's mount-unmount-mount in development, whose
-  // cleanup's history.back() lands after the second push.
+  // Back closes the sheet.
   useEffect(() => {
     if (!open) return;
-    window.history.pushState({ ...window.history.state, [SHEET_ENTRY]: true }, "");
+    // A sheet that closed a moment ago left its entry and a Back queued to
+    // remove it. Opening again now (StrictMode's mount-unmount-mount in
+    // development, or the card picker moving on to the next card) reuses that
+    // entry and cancels the Back. Otherwise Chrome runs the Back after this
+    // sheet's push and lands *before both* entries, which reads as the user
+    // pressing Back, and the sheet closes as soon as it opens.
+    if (pendingBack !== null && window.history.state?.[SHEET_ENTRY]) {
+      clearTimeout(pendingBack);
+      pendingBack = null;
+    } else {
+      window.history.pushState({ ...window.history.state, [SHEET_ENTRY]: true }, "");
+    }
     let closedByBack = false;
     function onPopState() {
       if (window.history.state?.[SHEET_ENTRY]) return;
@@ -51,7 +64,14 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     window.addEventListener("popstate", onPopState);
     return () => {
       window.removeEventListener("popstate", onPopState);
-      if (!closedByBack && window.history.state?.[SHEET_ENTRY]) window.history.back();
+      if (closedByBack || !window.history.state?.[SHEET_ENTRY]) return;
+      // Closed some other way: go back over the entry, a moment later, so a
+      // sheet opening right now can take it over instead.
+      if (pendingBack !== null) clearTimeout(pendingBack);
+      pendingBack = window.setTimeout(() => {
+        pendingBack = null;
+        if (window.history.state?.[SHEET_ENTRY]) window.history.back();
+      }, 0);
     };
   }, [open]);
 

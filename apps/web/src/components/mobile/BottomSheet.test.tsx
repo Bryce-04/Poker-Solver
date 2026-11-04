@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { act, render, screen } from "@testing-library/react";
+import { StrictMode, useState } from "react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BottomSheet } from "./BottomSheet";
 
@@ -75,7 +75,52 @@ describe("BottomSheet", () => {
     render(<Harness />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.keyboard("{Escape}");
-    expect(back).toHaveBeenCalledTimes(1);
+    // A tick later, so a sheet opening right away could take the entry over.
+    await waitFor(() => expect(back).toHaveBeenCalledTimes(1));
     back.mockRestore();
+  });
+
+  it("reuses the entry when a sheet reopens at once, instead of Back then push", async () => {
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const push = vi.spyOn(window.history, "pushState");
+    const { rerender } = render(
+      <BottomSheet open onClose={() => {}} title="One">
+        <p>one</p>
+      </BottomSheet>,
+    );
+    expect(push).toHaveBeenCalledTimes(1);
+    // Close and reopen in one go, as the card picker does moving to the next card.
+    rerender(
+      <BottomSheet open={false} onClose={() => {}} title="One">
+        <p>one</p>
+      </BottomSheet>,
+    );
+    rerender(
+      <BottomSheet open onClose={() => {}} title="Two">
+        <p>two</p>
+      </BottomSheet>,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(back).not.toHaveBeenCalled();
+    expect(window.history.state).toMatchObject({ bottomSheet: true });
+    back.mockRestore();
+    push.mockRestore();
+  });
+});
+
+describe("BottomSheet under StrictMode (development)", () => {
+  it("stays open: the mount-unmount-mount doesn't read as Back", async () => {
+    const user = userEvent.setup();
+    render(
+      <StrictMode>
+        <Harness />
+      </StrictMode>,
+    );
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    // Give any queued history traversal time to land.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByRole("dialog", { name: "Pick a card" })).toBeInTheDocument();
+    expect(window.history.state).toMatchObject({ bottomSheet: true });
   });
 });
