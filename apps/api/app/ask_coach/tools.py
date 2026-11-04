@@ -50,7 +50,10 @@ DECLARATIONS: list[dict] = [
                 "effective_stack_bb": {"type": "NUMBER", "description": "Effective stack in big blinds. Omit for 100."},
                 "hero_hand": {
                     "type": "STRING",
-                    "description": 'The user\'s two cards, "AhQd", or a hand type ("AQo", "AKs", "TT") when no suits were given.',
+                    "description": (
+                        'The user\'s two cards with suits ONLY if the user wrote suits ("AhQd"); otherwise '
+                        'a hand type ("AQo", "AKs", "TT"). Never invent suits.'
+                    ),
                 },
                 "board": {
                     "type": "ARRAY",
@@ -65,16 +68,12 @@ DECLARATIONS: list[dict] = [
                             "type": "STRING",
                             "enum": list(spot_builder.CLOSED_LINES + spot_builder.DECISION_LINES),
                             "description": (
-                                "open_call: one raise, one call. three_bet_call: open, 3-bet, call. "
-                                "four_bet_call: open, 3-bet, 4-bet, call. For a preflop decision: unopened "
-                                "(folded to the user), facing_open (the opponent opened), facing_three_bet "
-                                "(the user opened and the opponent 3-bet)."
+                                "Preflop betting that FINISHED (there is a flop): open_call (raise, call), "
+                                "three_bet_call (open, 3-bet, call), four_bet_call (open, 3-bet, 4-bet, call). "
+                                "The user ASKING what to do preflop: unopened (folded to them), facing_open "
+                                "(the opponent opened), facing_three_bet (the user opened, the opponent 3-bet). "
+                                "Who raised is worked out from the seats."
                             ),
-                        },
-                        "aggressor": {
-                            "type": "STRING",
-                            "enum": ["hero", "villain"],
-                            "description": "Who made the last raise preflop. Needed for the *_call lines.",
                         },
                         "open_size_bb": {"type": "NUMBER", "description": "The open, raised to, in bb. Omit for 2.5."},
                         "three_bet_size_bb": {"type": "NUMBER", "description": "The 3-bet, raised to, in bb. Omit for 3x the open."},
@@ -84,7 +83,11 @@ DECLARATIONS: list[dict] = [
                 },
                 "postflop_actions": {
                     "type": "ARRAY",
-                    "description": "Every action after the flop, in order. Omit if none yet.",
+                    "description": (
+                        "Every action after the flop, in order, checks included: 'checked to me' is the "
+                        "opponent's check, 'check-raised' is a check then a raise. The out-of-position "
+                        "player acts first on each street. Omit if none yet."
+                    ),
                     "items": {
                         "type": "OBJECT",
                         "properties": {

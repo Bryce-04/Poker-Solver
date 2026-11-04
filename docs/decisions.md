@@ -54,7 +54,32 @@ model on `coach_eval/cases.jsonl` (51 messy descriptions).
 - **The spot card's payload** carries `hero_position` and a one-line `summary` beyond the spec's
   fields. The summary is how the card is shown to the model in later turns.
 
-**Not run yet:** the evaluation. It needs a key in `.env`, so the 90% target is unmeasured.
+**Evaluation (2026-11-04, `gemini-3-flash-preview`):** 65% exact on the first run, then **80%
+(41 of 51)** after these fixes. Still short of the 90% target, so the Coach isn't ready for anyone
+outside the team.
+- **Who raised preflop is worked out from the seats.** In a finished heads-up line the opener is
+  always the seat that acts first preflop, so `describe_spot` no longer takes `aggressor`. The model
+  often left it out.
+- **A street that is just two checks** is put in the right order if the model lists them backwards.
+- **The prompt and tool descriptions now say:**
+  - list every action, checks included ("checked to me", "check-raised");
+  - who acts first after the flop;
+  - when to use a preflop-decision line;
+  - include every stated fact (stack depth, turn and river cards);
+  - never invent suits for the user's hand.
+- **The scorer accepts a describe_spot call that comes back with a question** (`asks` cases).
+
+Remaining misses:
+- Suits: invented suits ("As2s" for "A2s"), and the opposite, dropping suits the user gave.
+- Facts left out: a turn card, the stack depth, the hand.
+- A missed check before a check-raise.
+- An action that never happened.
+- Guessing a position instead of asking.
+- Two genuinely ambiguous texts.
+
+Runs vary from one to the next, so judge a prompt change on more than one run. The default model in
+`app/coach.py` on `main` (`gemini-2.5-flash`) answers 404 for new keys. The eval used
+`coach-on-train`'s model list via `GEMINI_MODEL`.
 
 ---
 

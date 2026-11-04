@@ -262,17 +262,21 @@ def fmt_bb(x: float) -> str:
     return f"{round(x, 2):g}bb"
 
 
-def _preflop_actions(line: str, hero: str, villain: str, aggressor: str, sizes: dict) -> tuple[list[Act], list[str]]:
-    """The preflop actions for a line, and any problems."""
-    hero_aggr = aggressor == "hero"
-    agg, other = (hero, villain) if hero_aggr else (villain, hero)
+def _preflop_actions(line: str, hero: str, villain: str, sizes: dict) -> tuple[list[Act], list[str]]:
+    """The preflop actions for a line, and any problems.
+
+    In a finished heads-up line the opener is always the seat that acts first
+    preflop: the other seat acts after it, so it can only call or re-raise. So
+    who raised is worked out from the seats, never asked of the model (the
+    eval showed it often left it out)."""
+    first = hero if PREFLOP_ORDER.index(hero) < PREFLOP_ORDER.index(villain) else villain
     if line == "open_call":
-        opener, acts = agg, lambda o, d: [Act(o, "raise", sizes["open"]), Act(d, "call")]
+        opener, acts = first, lambda o, d: [Act(o, "raise", sizes["open"]), Act(d, "call")]
     elif line == "three_bet_call":
-        opener = other
+        opener = first
         acts = lambda o, d: [Act(o, "raise", sizes["open"]), Act(d, "raise", sizes["three"]), Act(o, "call")]
     elif line == "four_bet_call":
-        opener = agg
+        opener = first
         acts = lambda o, d: [
             Act(o, "raise", sizes["open"]),
             Act(d, "raise", sizes["three"]),
@@ -289,6 +293,20 @@ def _preflop_actions(line: str, hero: str, villain: str, aggressor: str, sizes: 
     if PREFLOP_ORDER.index(opener) > PREFLOP_ORDER.index(defender):
         return [], [f"{defender} acts before {opener} preflop, so {opener} can't have opened against {defender}."]
     return acts(opener, defender), []
+
+
+def _order_checked_through_streets(actions: list, hero: str, oop: str) -> list:
+    """A street that is exactly two checks, listed in-position player first,
+    is put in the right order: check-check is the same either way, and the
+    model often lists the user's check first. Any other order mistake is left
+    for the legality check to ask about."""
+    oop_actor = "hero" if hero == oop else "villain"
+    out = list(actions)
+    for street in ("flop", "turn", "river"):
+        idx = [i for i, a in enumerate(out) if isinstance(a, dict) and a.get("street") == street]
+        if len(idx) == 2 and all(out[i].get("action") == "check" for i in idx) and out[idx[0]].get("actor") != oop_actor:
+            out[idx[0]], out[idx[1]] = out[idx[1]], out[idx[0]]
+    return out
 
 
 def _verb(a: Act) -> str:
@@ -360,9 +378,6 @@ def describe(args: dict) -> Described:
     if dupes:
         problems.append(f"{', '.join(dupes)} appears twice between your hand and the board.")
 
-    aggressor = str(preflop.get("aggressor") or "")
-    if line in CLOSED_LINES and aggressor not in ("hero", "villain"):
-        problems.append("Who made the last raise preflop, you or your opponent?")
     sizes: dict[str, float] = {}
     try:
         if line != "unopened":
@@ -389,13 +404,13 @@ def describe(args: dict) -> Described:
         return out
 
     oop, ip = assign_postflop_seats(hero, villain)
-    preflop_acts, line_problems = _preflop_actions(line, hero, villain, aggressor, sizes)
+    preflop_acts, line_problems = _preflop_actions(line, hero, villain, sizes)
     problems += line_problems
     if line == "unopened" and PREFLOP_ORDER.index(villain) < PREFLOP_ORDER.index(hero):
         problems.append(f"{villain} acts before you preflop, so the pot isn't unopened when it's your turn. Did {villain} fold or raise?")
 
     streets: dict[str, list[Act]] = {"preflop": preflop_acts, "flop": [], "turn": [], "river": []}
-    postflop = args.get("postflop_actions") or []
+    postflop = _order_checked_through_streets(list(args.get("postflop_actions") or []), hero, oop)
     if postflop and line in DECISION_LINES:
         problems.append("The preflop action wasn't finished, so there can't be action after the flop. What happened preflop?")
     last_street_index = 0

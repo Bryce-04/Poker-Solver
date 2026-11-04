@@ -43,3 +43,9 @@ def test_compare():
     assert compare({"no_describe": True}, None) == []
     assert compare({"no_describe": True}, args) == ["called describe_spot"]
     assert compare(expect, None) == ["no describe_spot call"]
+    # "asks": asking directly, or a describe_spot that comes back with a question, both pass.
+    assert compare({"asks": True}, None) == []
+    assert compare({"asks": True}, {"hero_hand": "KQs", "preflop": {"line": "open_call"}}) == []
+    assert compare({"asks": True}, {**args, "villain_position": "BB", "board": ["Qs", "5c", "2c"]}) == [
+        "describe_spot found nothing to ask"
+    ]

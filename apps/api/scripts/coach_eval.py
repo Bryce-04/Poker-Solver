@@ -12,13 +12,16 @@ expected fields. Run it before and after every prompt change. Target: at least
 
 Free tiers allow only a few requests a minute, so cases are spaced out
 (--delay, default 7s). A case's `expect`:
-    hero, villain, hand, stack, line, aggressor: compared when present
+    hero, villain, hand, stack, line: compared when present (who raised preflop
+        isn't: describe_spot works it out from the seats)
     board + board_match: "exact" (default), "ranks" (suits weren't given; flop
         order ignored), or "pattern" (which cards share a suit must match: "two
         clubs", "rainbow")
     actions: [[street, actor, action], ...] in order; amounts aren't compared
     no_describe: true means the model must NOT call describe_spot (a live hand,
-        a concept question, a three-way pot, a missing fact to ask about)
+        a concept question, a three-way pot)
+    asks: true means the model must end up asking the user: either no
+        describe_spot call, or one that comes back with problems
 """
 
 from __future__ import annotations
@@ -73,6 +76,8 @@ def compare(expect: dict, args: dict | None) -> list[str]:
     """The fields that don't match; empty means an exact match."""
     if expect.get("no_describe"):
         return [] if args is None else ["called describe_spot"]
+    if expect.get("asks"):
+        return [] if args is None or not sb.describe(args).ok else ["describe_spot found nothing to ask"]
     if args is None:
         return ["no describe_spot call"]
     wrong = []
@@ -81,7 +86,6 @@ def compare(expect: dict, args: dict | None) -> list[str]:
         "hero": str(args.get("hero_position", "")).upper(),
         "villain": str(args.get("villain_position", "")).upper(),
         "line": pre.get("line"),
-        "aggressor": pre.get("aggressor"),
         "stack": args.get("effective_stack_bb"),
     }
     for key, got in checks.items():
@@ -116,7 +120,7 @@ def check_cases(cases: list[dict]) -> int:
     bad = checked = 0
     for c in cases:
         e = c["expect"]
-        if e.get("no_describe"):
+        if e.get("no_describe") or e.get("asks"):
             continue
         checked += 1
         args = {
@@ -125,7 +129,7 @@ def check_cases(cases: list[dict]) -> int:
             "hero_hand": e.get("hand"),
             "effective_stack_bb": e.get("stack"),
             "board": e.get("board", []),
-            "preflop": {"line": e["line"], "aggressor": e.get("aggressor")},
+            "preflop": {"line": e["line"]},
             "postflop_actions": [
                 {"street": s, "actor": who, "action": act, **({"amount_bb": 2 + 3 * i} if act in ("bet", "raise") else {})}
                 for i, (s, who, act) in enumerate(e.get("actions", []))

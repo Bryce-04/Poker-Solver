@@ -41,7 +41,13 @@ def main() -> int:
         spot = "I'm on the button with AhQd, BB called my open, flop Qs 5c 2c, he checks. What do I do?"
         parts = provider.generate_turn(system_instruction(None), [{"role": "user", "parts": [{"text": spot}]}], DECLARATIONS)
     except coach.CoachBusy as e:
-        print("Gemini is busy or rate limited right now:", e)
+        if "HTTP 404" in str(e):
+            print(
+                "No model in the list is available to this key:", e,
+                "\nSet GEMINI_MODEL to current Flash models from Google AI Studio (comma-separated).",
+            )
+        else:
+            print("Gemini is busy or rate limited right now:", e)
         return 1
     except coach.CoachUnavailable as e:
         print("Gemini failed:", e, "(a 400/403 usually means a bad key or model name)")

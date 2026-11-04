@@ -170,7 +170,6 @@ def test_a_hand_without_suited_or_offsuit_is_a_question():
         ({"hero_hand": "QsKd"}, "appears twice"),
         ({"board": ["Qs", "5c", "Zz"]}, "board card"),
         ({"preflop": {"line": "limped"}}, "preflop action"),
-        ({"preflop": {"line": "open_call"}}, "last raise preflop"),
         ({"preflop": {"line": "open_call", "aggressor": "hero", "open_size_bb": 0.5}}, "don't add up"),
         ({"effective_stack_bb": 1}, "between 2bb and 1000bb"),
     ],
@@ -214,9 +213,47 @@ def test_a_closed_preflop_line_without_a_flop_asks_for_it():
     assert d.problems == ["What was the flop?"]
 
 
-def test_the_opener_must_act_first_preflop():
-    d = sb.describe({**BTN_VS_BB_FLOP, "hero_position": "BB", "villain_position": "BTN", "preflop": {"line": "open_call", "aggressor": "hero"}})
+@pytest.mark.parametrize(
+    "hero,villain,line,opener",
+    [
+        ("BTN", "BB", "open_call", "BTN"),
+        ("BB", "BTN", "open_call", "BTN"),
+        ("BB", "CO", "three_bet_call", "CO"),
+        ("SB", "BTN", "four_bet_call", "BTN"),
+    ],
+)
+def test_who_opened_comes_from_the_seats_not_the_model(hero, villain, line, opener):
+    # The model's own `aggressor`, even a wrong one, is ignored.
+    d = sb.describe({**BTN_VS_BB_FLOP, "hero_position": hero, "villain_position": villain, "preflop": {"line": line, "aggressor": "nonsense"}, "postflop_actions": []})
+    assert d.ok, d.problems
+    first = sb.describe({**BTN_VS_BB_FLOP, "hero_position": hero, "villain_position": villain, "preflop": {"line": line}, "postflop_actions": []})
+    assert first.ok, first.problems
+    assert first.spot.actions[0].position.value == opener and first.spot.actions[0].action.value == "raise"
+
+
+def test_facing_an_open_from_a_later_seat_is_a_question():
+    d = sb.describe({"hero_position": "BTN", "villain_position": "BB", "preflop": {"line": "facing_open"}})
     assert any("can't have opened" in p for p in d.problems)
+
+
+def test_a_checked_through_street_in_the_wrong_order_is_fixed():
+    d = sb.describe(
+        {
+            **BTN_VS_BB_FLOP,
+            "board": ["Qs", "5c", "2c", "9h"],
+            "postflop_actions": [
+                {"street": "flop", "actor": "hero", "action": "check"},  # BTN listed first: wrong
+                {"street": "flop", "actor": "villain", "action": "check"},
+            ],
+        }
+    )
+    assert d.ok, d.problems
+    assert [(a.position.value, a.street.value) for a in d.spot.actions[2:]] == [("BB", "flop"), ("BTN", "flop")]
+
+
+def test_other_order_mistakes_are_still_questions():
+    d = sb.describe({**BTN_VS_BB_FLOP, "postflop_actions": [{"street": "flop", "actor": "hero", "action": "bet", "amount_bb": 2}]})
+    assert any("BB's turn" in p for p in d.problems)
 
 
 def test_titles():

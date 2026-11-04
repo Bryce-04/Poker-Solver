@@ -210,7 +210,9 @@ one usage limit**. One PR per phase.
 - **With a key** (`GEMINI_API_KEY` in the repo-root `.env`), from `apps/api`:
   `python scripts/coach_smoke.py` checks it, and `python scripts/coach_eval.py` scores the model on
   `coach_eval/cases.jsonl`. Run the eval before and after any prompt change; the target is 90%.
-  `--check-cases` validates the cases without a key. **The eval hasn't been run yet.**
+  `--check-cases` validates the cases without a key. **Last result: 80% (41 of 51), below the 90%
+  target**; the misses are listed in `docs/decisions.md`. `main`'s default `gemini-2.5-flash` is a 404
+  for new keys: until `coach-on-train` merges, set `GEMINI_MODEL` (that branch's list works).
 - **Migration clash to watch:** the unmerged `account-progress` branch also adds a `0003`. Whichever
   merges second renumbers to `0004`.
 - **Next is Phase 3**: the solver tools. No UI exists until Phase 4, which must word the limit as
