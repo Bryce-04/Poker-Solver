@@ -1,0 +1,590 @@
+/* The phone Solve flow (docs/mobile-redesign.md §4). Values from
+   docs/mobile-redesign/mockup/solve-*.html; colors are tokens from index.css.
+   Only rendered under 1024px. */
+
+.m-step {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: -8px;
+  font-size: 15px;
+}
+
+.m-step__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--text-strong);
+}
+
+.m-step__lede {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.m-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m-section--tight {
+  gap: 6px;
+}
+
+.m-section__gap {
+  margin-top: 6px;
+}
+
+.m-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.m-note--small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+/* A text button that reads as a link. */
+.m-link {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--nav-active);
+  font: 600 14px/1.2 var(--sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.m-link:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent-hover);
+}
+
+.m-btn--inline {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 8px;
+  font-size: 14px;
+}
+
+.m-btn--danger-text {
+  color: var(--danger);
+}
+
+.m-card {
+  margin: 0;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.m-card--padded {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+}
+
+.m-card__title {
+  font-weight: 650;
+  color: var(--text-strong);
+}
+
+.m-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.m-field input,
+.m-field textarea {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text-strong);
+  font-size: 16px; /* 16px keeps iOS from zooming in on focus */
+}
+
+.m-field textarea {
+  font-family: var(--mono);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.m-field__mono {
+  font-family: var(--mono);
+}
+
+.m-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.m-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+/* --- Step 1: the action card --- */
+
+.m-actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--divider);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.m-actions > li + li {
+  border-top: 1px solid var(--divider);
+}
+
+.m-actions__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--text-strong);
+}
+
+.m-actions__pot {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-actions__turn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--accent-subtle);
+}
+
+.m-actions__actor {
+  font-weight: 650;
+  color: var(--text-strong);
+}
+
+.m-actions__buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-actions__done {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  color: var(--text-strong);
+}
+
+.m-actions__done svg {
+  flex: none;
+  color: var(--range-in);
+}
+
+.m-actions__folded {
+  padding: 14px;
+  font-size: 14px;
+  color: var(--warning);
+}
+
+/* --- Raise sheet --- */
+
+.m-raise__presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-raise__preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 56px;
+}
+
+.m-raise__sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.m-raise__stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.m-raise__step {
+  border: 1px solid var(--border-strong);
+}
+
+.m-raise__amount {
+  flex: 1;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 750;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-sheet__buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.m-sheet__cancel {
+  flex: 0 0 110px;
+}
+
+.m-sheet__confirm {
+  flex: 1;
+}
+
+.m-sheet__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- Step 2: board slots and the card sheet --- */
+
+.m-slots {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.m-slots__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.m-slots__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.m-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 62px;
+  max-width: calc((100vw - 32px - 32px) / 5);
+  height: 88px;
+  padding: 0;
+  border: 2px dashed var(--border-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 750 24px/1 var(--sans);
+  cursor: pointer;
+}
+
+.m-slot:hover:not(:disabled) {
+  background: transparent;
+}
+
+.m-slot[data-filled] {
+  border: 2px solid transparent;
+  background: var(--card-face);
+  color: var(--card-ink);
+}
+
+.m-slot[data-filled]:hover:not(:disabled) {
+  background: var(--card-face);
+}
+
+.m-slot[data-red] {
+  color: var(--card-red);
+}
+
+.m-slot[data-picking] {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.m-slot:disabled {
+  opacity: 0.35;
+}
+
+.m-slot__suit {
+  font-size: 20px;
+}
+
+.m-ranks {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.m-ranks .m-chip {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.m-suits {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.m-suit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 64px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: var(--card-face);
+  color: var(--card-ink);
+  font: 700 28px/1 var(--sans);
+  cursor: pointer;
+}
+
+.m-suit[data-red] {
+  color: var(--card-red);
+}
+
+.m-suit:hover:not(:disabled) {
+  background: var(--card-face);
+  border-color: var(--accent);
+}
+
+.m-suit:disabled {
+  opacity: 0.3;
+}
+
+.m-suit__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* --- Step 3: ranges --- */
+
+.m-ranges__modes {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.m-ranges__modes > .seg {
+  flex: 1;
+}
+
+.m-ranges__reload {
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--chip-border);
+  border-radius: 12px;
+}
+
+.m-ranges__summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.m-ranges__count {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-ranges__legend {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.m-ranges__key {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.m-ranges__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--range-in);
+}
+
+.m-ranges__swatch--half {
+  background: linear-gradient(to top, var(--range-in) 50%, var(--range-empty) 50%);
+}
+
+.m-hand__title {
+  display: flex;
+  flex-direction: column;
+}
+
+.m-hand__name {
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.m-hand__kind {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.m-hand__question {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* --- Step 4: summary, solving, done --- */
+
+.m-summary__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.m-summary__row + .m-summary__row {
+  border-top: 1px solid var(--divider);
+}
+
+.m-summary__row dd {
+  margin: 2px 0 0;
+  color: var(--text-strong);
+}
+
+.m-summary__row .m-link {
+  align-self: center;
+}
+
+.m-summary__row dd.m-summary__cards {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.m-mini-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 50px;
+  border-radius: 6px;
+  background: var(--card-face);
+  color: var(--card-ink);
+  font: 750 15px/1 var(--sans);
+}
+
+.m-mini-card[data-red] {
+  color: var(--card-red);
+}
+
+.m-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 50svh;
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.m-status__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--success-subtle);
+  color: var(--range-in);
+}
+
+/* No progress comes back from the API, so the bar moves without claiming a
+   percentage. */
+.m-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--range-empty);
+  overflow: hidden;
+}
+
+.m-progress__bar {
+  display: block;
+  width: 35%;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  animation: m-progress-slide 1.6s ease-in-out infinite;
+}
+
+@keyframes m-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-progress__bar {
+    width: 100%;
+    animation: none;
+    opacity: 0.6;
+  }
+}

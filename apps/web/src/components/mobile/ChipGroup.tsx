@@ -26,12 +26,12 @@ export interface ChipGroupProps<T extends string> {
 export function ChipGroup<T extends string>({ label, options, value, onChange, columns }: ChipGroupProps<T>) {
   const style = { "--chip-columns": columns ?? options.length } as CSSProperties;
   return (
-    <div className="chip-group" role="group" aria-label={label} style={style}>
+    <div className="m-chip-group" role="group" aria-label={label} style={style}>
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
-          className="chip"
+          className="m-chip"
           aria-pressed={option.value === value}
           disabled={option.disabled}
           onClick={() => onChange(option.value)}

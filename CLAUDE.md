@@ -371,6 +371,43 @@ form are gone. `body` pads by no top or bottom inset.
   `--chip-border-hover`, `--chip-selected`, `--scrim`.
 - See `docs/decisions.md`.
 
+**Phase 2 (Solve steps) is done**: on phones Solve is four steps plus a
+result screen, in `pages/solve/phone/`. `SolvePhone` routes them, and there's
+one file per step: `HandStep`, `BoardStep`, `RangesStep`, `ReadyStep`, and
+`InterimResult`. All of them run over the same `useSolveSetup` as desktop.
+`SolvePage.tsx` is now only the layout switch.
+- **Steps are in the URL**: `/solve?step=hand|board|ranges|ready|result`, one
+  history entry each. With no `?step=`, Solve opens on the first step that
+  still needs something (`firstOpenStep`).
+- **Pure logic lives in `phone/phoneSteps.ts`**, tested on its own: step
+  blockers, raise names and presets, typed-board parsing, accuracy wording.
+- **Sheets**:
+  - Raise (presets, plus a stepper in 0.5bb steps).
+  - Starting stack.
+  - Paste a hand history (fills everything, then jumps to Ready).
+  - Card picker (rank, then suit).
+  - Hand weight (0 / 25 / 50 / 75 / 100%).
+- **Moving to a step from inside a sheet** replaces the sheet's history entry
+  (`onSheetEntry()` in `lib/mobileShell.ts`) instead of pushing past it.
+- **Shared with desktop**: desktop's error copy and range auto-load are now
+  `pages/solve/SolveProblem.tsx` and `useAutoLoadRanges.ts`.
+- **`RangeGrid`'s optional `mode` prop** (`"tap"`, which calls `onCellTap`, or
+  `"paint"`, which writes `brush`) is the phone editor. Leave `mode` unset
+  everywhere else.
+- **`SegmentedControl` options** take an optional `detail`, shown as a
+  second line.
+- **`useSolveSetup.cancelSolve()`** drops the running solve's result. The
+  server still finishes it.
+- The Solve tab shows a dot while a solve runs and until its result is
+  opened.
+- Phone chips use **`m-chip`**, never `chip`: `DrillPage.css` owns a global
+  `.chip`.
+- The result step is **interim** (the old phone result) until Phase 3.
+- `useSolveSetup`'s redo (`goForward`) has no UI any more and is a deletion
+  candidate.
+- Screenshot runs should build with `VITE_API_BASE_URL` pointing at a dead
+  address. Production builds call the deployed API.
+
 ## Commands
 
 This is a pnpm workspace (`apps/*`, `packages/*`) plus two standalone

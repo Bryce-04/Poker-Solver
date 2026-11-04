@@ -43,7 +43,7 @@ describe('<App />', () => {
   it('sends the default route to Solve', () => {
     render(<App />)
     expect(window.location.pathname).toBe('/solve')
-    expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
   })
 
   it('has exactly the four nav destinations', () => {
@@ -77,7 +77,7 @@ describe('<App />', () => {
     expect(await screen.findByText(/not signed in/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: /^solve$/i }))
-    expect(screen.getByLabelText(/^player 1$/i)).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
   })
 
   it.each([
@@ -132,21 +132,34 @@ describe('<App />', () => {
     it('keeps the Solve setup across a tab switch', async () => {
       const user = userEvent.setup()
       render(<App />)
-      await user.selectOptions(screen.getByLabelText(/^player 1$/i), 'UTG')
+      const player1 = () => within(screen.getByRole('group', { name: 'Player 1' }))
+      await user.click(player1().getByRole('button', { name: 'UTG' }))
       await user.click(screen.getByRole('link', { name: /^library$/i }))
       // Hidden, not unmounted, and its Start over is out of the top bar.
       expect(screen.queryByRole('button', { name: /start over/i })).not.toBeInTheDocument()
       await user.click(screen.getByRole('link', { name: /^solve$/i }))
-      expect(screen.getByLabelText(/^player 1$/i)).toHaveValue('UTG')
+      expect(player1().getByRole('button', { name: 'UTG' })).toHaveAttribute('aria-pressed', 'true')
       await user.click(screen.getByRole('button', { name: /start over/i }))
-      expect(screen.getByLabelText(/^player 1$/i)).toHaveValue('BB')
+      expect(player1().getByRole('button', { name: 'BB' })).toHaveAttribute('aria-pressed', 'true')
     })
 
     it('renders Solve and titles the tab at "/solve/" too (trailing slash)', () => {
       window.history.pushState({}, '', '/solve/')
       render(<App />)
       expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
-      expect(screen.getByLabelText(/^player 1$/i)).toBeVisible()
+      expect(screen.getByRole('group', { name: 'Player 1' })).toBeVisible()
+    })
+
+    it('Start over in the top bar clears Solve and goes back to step 1', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByRole('button', { name: 'Call 1bb' }))
+      await user.click(screen.getByRole('button', { name: 'Check' }))
+      await user.click(screen.getByRole('button', { name: 'Next: the board' }))
+      expect(window.location.search).toBe('?step=board')
+      await user.click(screen.getByRole('button', { name: 'Start over' }))
+      expect(window.location.search).toBe('?step=hand')
+      expect(screen.getByText('BTN to act · facing 1bb')).toBeInTheDocument()
     })
 
     it("goes back to the last tab from the Drill's X", async () => {

@@ -6,6 +6,71 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Mobile redesign Phase 2: Solve as four steps on phones
+
+**Status:** proposed.
+
+**Context.** `docs/mobile-redesign.md` §4.1–4.4: replace the long phone Solve
+page with Hand / Board / Ranges / Ready steps, over the same `useSolveSetup`.
+
+**Decisions.**
+- **New view, same state.** `pages/solve/phone/` (`SolvePhone` and one file
+  per step) replaces the old `SolvePhone` markup; `SolvePage.tsx` is now just
+  the layout switch. The pure logic (what blocks each step, raise names and
+  sizes, typed-board parsing, accuracy wording) is `phoneSteps.ts`, tested on
+  its own. Desktop's error copy (`SolveProblem`) and range auto-load
+  (`useAutoLoadRanges`) moved out of `SolveWorkspace.tsx` unchanged so both
+  layouts share them.
+- **Steps in the URL.** `/solve?step=hand|board|ranges|ready|result`, one
+  history entry per step, so Android back walks back through the steps. No
+  `?step=` opens on the first step that still needs something, which is how a
+  spot from Ranges (hand) or the Library (usually Ready) lands. That landing
+  isn't written into the URL: replacing the entry would change its key and
+  re-seed the kept-alive Solve. A step change made from inside a sheet (a
+  pasted hand jumps to Ready) replaces the sheet's history entry instead of
+  pushing past it (`onSheetEntry()`), or Back would land on a dead sheet entry.
+- **Raise presets, one deviation.** Facing a raise: 3×, 3.5×, 4× it, per the
+  spec. **Opening** (only the big blind to beat): 2×, 2.5×, 3×, since 3–4×
+  the big blind would be oversized opens. After the flop: the solver's own
+  25 / 75 / 125% of the pot, as desktop offers. The stepper moves 0.5bb.
+- **The street being solved isn't entered on step 1** (§4.1 shows only earlier
+  streets); actions already logged on it still show and can be undone.
+  Seeding a decision after a bet is Phase 3's "Keep exploring".
+- **Ranges load on their own once preflop closes** (desktop's hook), which is
+  before step 3 is reached, so they're usually ready on arrival. If the
+  preflop line isn't charted, the server's reason and each seat's fallback
+  problem both show.
+- **`RangeGrid` gained `mode` / `onCellTap` / `brush`** (§8). Unset, nothing
+  changes. "tap" edits nothing itself and lets the page scroll; "paint" writes
+  the brush (0 erases) and takes the drag (`touch-action: none` only then).
+  Its phone look is scoped to `[data-mode]`.
+- **Cancel** (`useSolveSetup.cancelSolve`) stops waiting, not the server: the
+  API can't abort, so the server finishes (and answers "busy" until then) and
+  the result is dropped. Solves are numbered so a stale response can't land.
+- **No fake progress**: the API reports none, so the bar is indeterminate.
+- **Solve tab dot**: while a solve runs, and until its result is opened
+  (`SolveBadgeContext`; screen readers hear "solving" / "new result").
+- **Result screen is interim**: `?step=result` shows the old phone result
+  (chart, notes, details) until Phase 3 builds §4.5.
+- **Chip class is `m-chip`**, not `chip`: `DrillPage.css` has a global `.chip`
+  whose colors only exist inside the Drill, and it was wiping the chips out.
+- The old `SolvePage.test.tsx` (it drove the removed markup) is replaced by
+  `phone/SolvePhone.test.tsx`, which ports its behaviors (spot shape, 3-bet
+  sizes, folds, paste, narrowing, preflop ranges, prefill, errors) through the
+  new flow. **Left in place:** `useSolveSetup`'s redo (`goForward`, the redo
+  stack) no longer has any UI on either layout; a deletion candidate.
+
+**Checked.** Build, lint, 367 tests. Desktop at 1440px pixel-identical to the
+Phase 1 build (Solve, Solve after a preflop line with ranges auto-loaded,
+Ranges Pick and Type it, Library). Phone screenshots at 390×844 in dark mode
+match the mockup's steps, raise sheet, card sheet, hand sheet, Ready and
+Solving (screenshots used a stubbed API, not the deployed one). Screenshots
+caught three real bugs before commit: the Drill's `.chip` clash, the board
+step showing a pot of 0 before the flop, and "Narrowed by the the flop".
+Still not checked on a real Android device.
+
+---
+
 ## 2026-11-03 — Mobile redesign Phase 1: the phone shell
 
 **Status:** proposed.

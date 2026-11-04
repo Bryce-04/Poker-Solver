@@ -26,3 +26,22 @@ export const AccountSheetContext = createContext<(() => void) | null>(null);
 export function useOpenAccountSheet(): (() => void) | null {
   return useContext(AccountSheetContext);
 }
+
+/**
+ * Puts a dot on the Solve tab, or takes it off with null (docs/mobile-redesign.md
+ * §4.4: a solve running or a result not yet seen). The text ("solving") is
+ * what a screen reader hears. Null on desktop.
+ */
+export const SolveBadgeContext = createContext<((badge: string | null) => void) | null>(null);
+
+/** Marks the history entry an open BottomSheet pushes (so Back closes it). */
+export const SHEET_ENTRY = "bottomSheet";
+
+/**
+ * True while the current history entry is an open sheet's. A step change
+ * made from inside a sheet should replace that entry rather than push past
+ * it, or Back would land on the stale sheet entry instead of the step before.
+ */
+export function onSheetEntry(): boolean {
+  return Boolean(window.history.state?.[SHEET_ENTRY]);
+}

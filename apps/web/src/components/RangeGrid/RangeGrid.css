@@ -299,3 +299,59 @@ button.range-grid__cell:focus-visible {
     color: var(--text-strong);
   }
 }
+
+/* --- Phone ranges editor: mode="tap" | "paint" (docs/mobile-redesign.md
+   §4.3; values from docs/mobile-redesign/mockup/solve-3-ranges.html). Only
+   the phone flow sets a mode, so nothing above changes for anyone else. --- */
+
+.range-grid-wrap:has(> .range-grid[data-mode]) {
+  max-width: none;
+}
+
+.range-grid[data-mode] {
+  gap: 2px;
+  width: auto;
+  margin: 0 -8px;
+  padding: 4px;
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 10px;
+}
+
+/* Tap mode leaves scrolling alone; only paint mode takes the drag. */
+.range-grid[data-mode="tap"] {
+  touch-action: manipulation;
+}
+
+.range-grid[data-mode="paint"] {
+  border-color: var(--accent);
+}
+
+.range-grid[data-mode] .range-grid__cell {
+  --cell-bg: linear-gradient(
+    to top,
+    var(--range-in) calc(var(--w) * 100%),
+    var(--range-empty) calc(var(--w) * 100%)
+  );
+  min-width: 0;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  box-shadow: none;
+}
+
+.range-grid[data-mode] .range-grid__cell[data-selected="true"],
+.range-grid[data-mode] .range-grid__cell[data-tier="high"] {
+  color: var(--text-strong);
+}
+
+.range-grid[data-mode] .range-grid__cell[data-full] {
+  color: var(--range-in-contrast);
+}
+
+/* The weight is the fill height; no number on top of a 9px label. */
+.range-grid[data-mode] .range-grid__weight {
+  display: none;
+}

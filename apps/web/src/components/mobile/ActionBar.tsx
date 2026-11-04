@@ -14,6 +14,9 @@ export interface ActionBarProps {
   /** The secondary Back button; left out when absent. */
   onBack?: () => void;
   backDisabled?: boolean;
+  /** The main button's look: primary (default), or secondary for a
+   * button that stops something (the solve's Cancel). */
+  variant?: "primary" | "secondary";
 }
 
 /**
@@ -22,7 +25,14 @@ export interface ActionBarProps {
  * above the tab bar, never on it. A spacer of the same height stays in the
  * page flow, so the page's last content can always scroll clear of the bar.
  */
-export function ActionBar({ primaryLabel, onPrimary, disabledReason, onBack, backDisabled }: ActionBarProps) {
+export function ActionBar({
+  primaryLabel,
+  onPrimary,
+  disabledReason,
+  onBack,
+  backDisabled,
+  variant = "primary",
+}: ActionBarProps) {
   const disabled = Boolean(disabledReason);
   return (
     <>
@@ -41,7 +51,7 @@ export function ActionBar({ primaryLabel, onPrimary, disabledReason, onBack, bac
           )}
           <button
             type="button"
-            className="m-btn m-btn--primary action-bar__primary"
+            className={`m-btn m-btn--${variant} action-bar__primary`}
             onClick={onPrimary}
             disabled={disabled}
           >

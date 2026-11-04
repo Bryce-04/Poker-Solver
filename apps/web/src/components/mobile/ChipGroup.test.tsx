@@ -2,6 +2,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChipGroup } from "./ChipGroup";
 import { ActionBar } from "./ActionBar";
+import { StepProgress } from "./StepProgress";
+import { TabBar } from "./TabBar";
+import { MemoryRouter } from "react-router-dom";
 
 const SEATS = [
   { value: "UTG", label: "UTG" },
@@ -60,5 +63,35 @@ describe("ActionBar", () => {
   it("leaves Back out when there's none", () => {
     render(<ActionBar primaryLabel="Solve" onPrimary={() => {}} />);
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+  });
+});
+
+describe("StepProgress", () => {
+  const STEPS = [
+    { id: "hand", label: "Hand" },
+    { id: "board", label: "Board" },
+    { id: "ranges", label: "Ranges" },
+  ] as const;
+
+  it("lets you tap back to an earlier step, not ahead", async () => {
+    const user = userEvent.setup();
+    const onPick = vi.fn();
+    render(<StepProgress steps={STEPS} current="board" onPick={onPick} />);
+    await user.click(screen.getByRole("button", { name: "Hand" }));
+    expect(onPick).toHaveBeenCalledWith("hand");
+    expect(screen.getByText("Board")).toHaveAttribute("aria-current", "step");
+    expect(screen.queryByRole("button", { name: "Ranges" })).not.toBeInTheDocument();
+  });
+});
+
+describe("TabBar", () => {
+  it("links each tab to where it was left, with a badge when asked", () => {
+    render(
+      <MemoryRouter>
+        <TabBar paths={{ ranges: "/ranges?mode=type" }} badges={{ solve: "solving" }} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: /^ranges$/i })).toHaveAttribute("href", "/ranges?mode=type");
+    expect(screen.getByRole("link", { name: "Solve (solving)" })).toBeInTheDocument();
   });
 });
