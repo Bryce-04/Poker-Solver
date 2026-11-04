@@ -6,6 +6,29 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — CI guard: a failed web run must show up before the push, not after
+
+**Status:** proposed.
+
+**What happened.** PR #40's CI web job failed with every test passing: three "Unhandled errors" (the
+Train hub's background progress sync ran against a mocked API function that returned `undefined`
+after its test had ended). Locally the same errors were in the output, but the run was already
+non-zero from an unrelated flaky test, and checking only the pass count hid them.
+
+**Fixes.**
+- The flaky test (`RangesPhone` "follows the seat, a raise and the stack...") raced a 250ms
+  debounce: it asserted the last fetch right after a heading that appears *before* the fetch for the
+  new stack. It now waits for the call. A failing exit code now means something.
+- `pnpm check:web` runs exactly CI's web steps (lint, test, build). `pnpm hooks` (opt-in, once)
+  makes git run it before every push (`.githooks/pre-push`; `--no-verify` skips it).
+- `CLAUDE.md` says to read the exit code and what a test that mocks an API module must provide.
+
+**Not done.** The api and solver jobs aren't in the hook (they need a Python environment; the API
+tests need Postgres). The hook is opt-in, so it protects only whoever runs `pnpm hooks`; CI remains
+the backstop.
+
+---
+
 ## 2026-11-05 — The 6-max practice table (preflop-first)
 
 **Status:** proposed.

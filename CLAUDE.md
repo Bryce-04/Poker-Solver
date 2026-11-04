@@ -531,7 +531,14 @@ pnpm dev:web                 # dev server
 pnpm --filter web build      # production build (tsc -b && vite build)
 pnpm --filter web lint       # oxlint
 pnpm --filter web test       # vitest
+pnpm check:web               # what CI's web job runs: lint, tests, build (run before every push)
+pnpm hooks                   # once: run pnpm check:web automatically before every git push
 ```
+**Read the exit code, not just "N passed".** Vitest fails the run for errors that happen in the
+background after a test has finished ("Unhandled errors", e.g. an awaited function from a mocked
+module that returns `undefined`) even when every test passes; that is how a red CI run got through
+once. A test that mocks `lib/api` or `lib/auth` must give every function the component under test
+awaits a resolved value (see `TrainPage.test.tsx`'s `beforeEach`).
 
 ### Schema (`packages/schema`) — the shared source of truth
 Python (Pydantic, in `src/poker_solver_schema/models.py`) is authoritative;

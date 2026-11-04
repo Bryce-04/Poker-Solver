@@ -1,0 +1,16 @@
+#!/bin/sh
+# Runs what CI's web job runs (lint, tests, build) before anything is pushed, so a
+# red CI run never has to be the first place a problem shows up. Opt in once with
+# `pnpm hooks`. To push anyway (a docs-only change on a slow machine): git push --no-verify
+#
+# The tests' exit code is what counts: vitest fails the run for errors that happen
+# in the background after a test has finished ("Unhandled errors"), even when every
+# test reports as passed. Never read only the "Tests  N passed" line.
+
+echo "pre-push: running the web checks (lint, test, build)..."
+if ! pnpm check:web; then
+  echo ""
+  echo "pre-push: the web checks failed, so nothing was pushed."
+  echo "          Fix it, or push anyway with: git push --no-verify"
+  exit 1
+fi
