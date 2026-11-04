@@ -6,6 +6,50 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Mobile redesign Phase 3: the Solve result on phones
+
+**Status:** proposed.
+
+**Context.** `docs/mobile-redesign.md` §4.5: the phone result screen, replacing
+Phase 2's interim one (the old phone result).
+
+**Decisions.**
+- **Same content as desktop, laid out for a phone** (`pages/solve/phone/ResultStep.tsx`).
+  The headline, the line under it, the mix and the advice all come from
+  `solveText.ts` / `strategySummary.ts`, as on desktop. `StrategyResult.tsx` now
+  exports `FrequencyBar` and `HandPanel`; the hand sheet *is* `HandPanel`
+  (category, combos, a bar per action, advice, "Why?", suit view), with a new
+  optional `showHand={false}` because the sheet's title shows the hand. Its
+  phone styles are scoped to `.m-hand-sheet`, since desktop's only exist at
+  1024px and up. The bar's words stay in its accessible label and the legend;
+  at 28px they're not drawn on it, as in the mockup.
+- **Top bar title and back arrow**: a page renders `<TopBarTitle>` (via
+  `TopBarTitleContext`) to show "← BB's flop strategy"; back goes to Ready.
+  Start over is hidden on the result; Save spot (a bookmark) takes its place.
+- **Save spot saves the setup**, as desktop does. Signed out, it opens the
+  account sheet and says so; saved, the icon fills and disables.
+- **Keep exploring** uses desktop's `exploreOptions` and wording. It adds the
+  action, then either solves again (you watch it on Ready's Solving view) or,
+  when it closes the street, goes to the board for the next card.
+- **The chart scrolls on phones now**: StrategyGrid reuses RangeGrid's
+  `touch-action: none`, which blocked scrolling over the old phone result too.
+  `.m-result__grid` sets it back to `manipulation` (the chart is read-only).
+- **"About this solve"** (collapsed): iterations, the exploitability sentence,
+  the time-limit note and any bucketing notes, which had no other place here.
+
+**Seen, not changed (desktop):** a sub-second solve says "Solved in 1
+seconds" (the number is floored at 1, the plural check isn't). The phone's
+own wording (`phoneSteps.solvedIn`) gets it right.
+
+**Checked.** Build, lint, 372 tests (new: the top-bar title and back, the
+summary, the hand sheet with category and "Why?", Keep exploring's solve,
+and Save signed out and in). Desktop at 1440px pixel-identical to the Phase 2
+build, including a full solve to its result with a hand's panel open. Phone
+screenshots of the result and the hand sheet match the mockup. Not checked on
+a real device.
+
+---
+
 ## 2026-11-03 — Mobile redesign Phase 2: Solve as four steps on phones
 
 **Status:** proposed.

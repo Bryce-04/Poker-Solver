@@ -1,12 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
 import { SolvePage } from "../../SolvePage";
-import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, solveSpot } from "../../../lib/api";
+import { fetchPreflopRanges, fetchReferenceStrategy, narrowRanges, saveSpot, solveSpot } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
 import type { SolvePrefill } from "../../../lib/solvePrefill";
-import { SolveBadgeContext } from "../../../lib/mobileShell";
+import { AccountSheetContext, SolveBadgeContext, TopBarSlotContext, TopBarTitleContext } from "../../../lib/mobileShell";
 
 // The phone Solve flow (docs/mobile-redesign.md §4) end to end, over the real
 // useSolveSetup: jsdom has no matchMedia, so SolvePage renders the phone
@@ -17,7 +18,11 @@ vi.mock("../../../lib/api", () => ({
   fetchReferenceStrategy: vi.fn(),
   narrowRanges: vi.fn(),
   fetchPreflopRanges: vi.fn(),
+  saveSpot: vi.fn(),
 }));
+vi.mock("../../../lib/auth", () => ({ useAuth: vi.fn() }));
+const mockAuth = vi.mocked(useAuth);
+const mockSave = vi.mocked(saveSpot);
 const mockSolve = vi.mocked(solveSpot);
 const mockReference = vi.mocked(fetchReferenceStrategy);
 const mockNarrow = vi.mocked(narrowRanges);
@@ -30,6 +35,8 @@ beforeEach(() => {
   mockReference.mockReset();
   mockNarrow.mockReset();
   mockPreflopRanges.mockReset();
+  mockSave.mockReset();
+  mockAuth.mockReturnValue({ status: "signed-out", email: null });
   // No chart unless a test says so: auto-loaded ranges stay empty.
   mockReference.mockResolvedValue({ kind: "no-match" });
   mockPreflopRanges.mockResolvedValue({ kind: "unsupported", reason: "Not charted." });
@@ -613,5 +620,115 @@ describe("phone Solve -- arriving from another screen", () => {
     });
     expect(screen.getByRole("heading", { name: "Ready to solve" })).toBeInTheDocument();
     expect(screen.getByText("BB vs BTN · BTN raised, BB called")).toBeInTheDocument();
+  });
+});
+
+/** The bits of the phone shell a page talks to: a top-bar slot for its
+ * actions, its title override, and the account sheet opener. */
+function WithShell({ onTitle, onAccount }: { onTitle: (t: unknown) => void; onAccount: () => void }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  return (
+    <MemoryRouter initialEntries={["/solve"]}>
+      <AccountSheetContext.Provider value={onAccount}>
+        <TopBarTitleContext.Provider value={onTitle}>
+          <TopBarSlotContext.Provider value={slot}>
+            <div data-testid="top-bar" ref={setSlot} />
+            <SolvePage />
+            <SearchSpy />
+          </TopBarSlotContext.Provider>
+        </TopBarTitleContext.Provider>
+      </AccountSheetContext.Provider>
+    </MemoryRouter>
+  );
+}
+
+describe("phone Solve -- the result", () => {
+  async function reachResult(user: User) {
+    await reachReady(user);
+    await user.click(primary(/^solve bb.s flop$/i));
+    await user.click(await screen.findByRole("button", { name: /see the result/i }));
+  }
+
+  beforeEach(() => {
+    mockSolve.mockResolvedValue(
+      solved({
+        strategy: { KJo: { check: 0.6, bet_small: 0.4 } },
+        hand_categories: { KJo: "Top pair, weak kicker" },
+        hand_reasons: { KJo: ["You have top pair on a dry board."] },
+      }),
+    );
+  });
+
+  it("titles the top bar, with a way back to the setup", async () => {
+    const onTitle = vi.fn();
+    const user = userEvent.setup();
+    render(<WithShell onTitle={onTitle} onAccount={() => {}} />);
+    await reachResult(user);
+    expect(onTitle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: "BB's flop strategy", backLabel: "Back to setup" }),
+    );
+    onTitle.mock.lastCall?.[0].onBack();
+    expect(await screen.findByRole("heading", { name: "Ready to solve" })).toBeInTheDocument();
+    expect(onTitle).toHaveBeenLastCalledWith(null);
+  });
+
+  it("leads with a sentence and the range's mix, then the chart", async () => {
+    const user = userEvent.setup();
+    renderSolve();
+    await reachResult(user);
+    const summary = screen.getByRole("region", { name: "Summary" });
+    expect(within(summary).getByText("BB checks 60% of the time on this flop.")).toBeInTheDocument();
+    expect(within(summary).getByRole("img", { name: /check 60%, bet small .* 40%/i })).toBeInTheDocument();
+    expect(screen.getByText("BB vs BTN · pot 2.5bb")).toBeInTheDocument();
+    expect(screen.getByText("Very accurate")).toBeInTheDocument();
+  });
+
+  it("opens a hand's sheet: its mix, category, advice and Why?", async () => {
+    const user = userEvent.setup();
+    renderSolve();
+    await reachResult(user);
+    await user.click(screen.getByRole("gridcell", { name: /^KJo:/ }));
+    const sheet = screen.getByRole("dialog", { name: "KJo" });
+    expect(within(sheet).getByText("Top pair, weak kicker")).toBeInTheDocument();
+    // Desktop's HandPanel, as is: its count is the range's, before board blockers.
+    expect(within(sheet).getByText("12 combos in BB’s range")).toBeInTheDocument();
+    expect(within(sheet).getByText("60%")).toBeInTheDocument();
+    await user.click(within(sheet).getByText("Why?"));
+    expect(within(sheet).getByText("You have top pair on a dry board.")).toBeVisible();
+  });
+
+  it("keeps exploring: solves BTN's reply to a check", async () => {
+    const user = userEvent.setup();
+    renderSolve();
+    await reachResult(user);
+    const explore = screen.getByRole("region", { name: "Keep exploring" });
+    await user.click(within(explore).getByRole("button", { name: "What does BTN do if BB checks?" }));
+    expect(mockSolve).toHaveBeenLastCalledWith(
+      expect.objectContaining({ actions: [{ position: "BB", street: "flop", action: "check" }] }),
+    );
+    expect(currentSearch).toBe("?step=ready");
+  });
+
+  it("saves the setup from the top bar, or asks to sign in first", async () => {
+    const onAccount = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<WithShell onTitle={() => {}} onAccount={onAccount} />);
+    await reachResult(user);
+    const bar = screen.getByTestId("top-bar");
+    expect(within(bar).queryByRole("button", { name: "Start over" })).toBeNull();
+
+    await user.click(within(bar).getByRole("button", { name: "Save spot" }));
+    expect(onAccount).toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("Sign in to save spots.");
+
+    mockAuth.mockReturnValue({ status: "signed-in", email: "hero@example.com" });
+    mockSave.mockResolvedValue({ kind: "saved", spot: {} as Spot });
+    rerender(<WithShell onTitle={() => {}} onAccount={onAccount} />);
+    await user.click(within(bar).getByRole("button", { name: "Save spot" }));
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({ positions_in_hand: ["BB", "BTN"], board: ["Ks", "Qh", "9d"] }),
+    );
+    expect(await screen.findByText("Saved to your Library.")).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Saved" })).toBeDisabled();
   });
 });

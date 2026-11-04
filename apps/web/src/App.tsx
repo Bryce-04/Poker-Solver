@@ -8,7 +8,14 @@ import { TopBar } from "./components/mobile/TopBar";
 import { PageHeader } from "./components/PageHeader/PageHeader";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { AuthProvider } from "./lib/auth";
-import { AccountSheetContext, PageActiveContext, SolveBadgeContext, TopBarSlotContext } from "./lib/mobileShell";
+import {
+  AccountSheetContext,
+  PageActiveContext,
+  SolveBadgeContext,
+  TopBarSlotContext,
+  TopBarTitleContext,
+  type TopBarTitleOverride,
+} from "./lib/mobileShell";
 import { NAV_ITEMS, PAGE_HEADERS, type NavId } from "./lib/navigation";
 import { readSavedSpot, readSolvePrefill, type SolvePrefill } from "./lib/solvePrefill";
 import { useIsDesktop } from "./lib/useIsDesktop";
@@ -143,6 +150,7 @@ function Shell() {
   const [topBarSlot, setTopBarSlot] = useState<HTMLElement | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [solveBadge, setSolveBadge] = useState<string | null>(null);
+  const [titleOverride, setTitleOverride] = useState<TopBarTitleOverride | null>(null);
 
   const workspace = PAGE_HEADERS[pathname]?.workspace === true;
   const tab = tabFor(pathname);
@@ -157,11 +165,17 @@ function Shell() {
     <AccountSheetContext.Provider value={isDesktop ? null : () => setAccountOpen(true)}>
       <SolveBadgeContext.Provider value={isDesktop ? null : setSolveBadge}>
       <TopBarSlotContext.Provider value={isDesktop ? null : topBarSlot}>
+      <TopBarTitleContext.Provider value={isDesktop ? null : setTitleOverride}>
         <div className={isDesktop ? "app-shell" : "app"}>
           {isDesktop ? (
             <Sidebar />
           ) : (
-            <TopBar title={title} actionsRef={setTopBarSlot} onAccount={() => setAccountOpen(true)} />
+            <TopBar
+              title={titleOverride?.title ?? title}
+              back={titleOverride ? { label: titleOverride.backLabel, onClick: titleOverride.onBack } : null}
+              actionsRef={setTopBarSlot}
+              onAccount={() => setAccountOpen(true)}
+            />
           )}
           <div className={isDesktop ? "app-shell__content" : "app__content"}>
             {isDesktop && <ShellPageHeader />}
@@ -186,6 +200,7 @@ function Shell() {
           {!isDesktop && <TabBar paths={paths} badges={solveBadge ? { solve: solveBadge } : undefined} />}
           {!isDesktop && <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />}
         </div>
+      </TopBarTitleContext.Provider>
       </TopBarSlotContext.Provider>
       </SolveBadgeContext.Provider>
     </AccountSheetContext.Provider>

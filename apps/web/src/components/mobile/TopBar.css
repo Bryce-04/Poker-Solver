@@ -20,6 +20,11 @@
   padding: 0 6px 0 16px;
 }
 
+/* With a back arrow, the arrow takes the left padding's place. */
+.top-bar__inner[data-back] {
+  padding-left: 4px;
+}
+
 .top-bar__title {
   flex: 1 1 auto;
   min-width: 0;

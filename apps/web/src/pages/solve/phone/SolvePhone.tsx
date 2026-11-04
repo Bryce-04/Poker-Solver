@@ -7,8 +7,9 @@ import { useAutoLoadRanges } from "../useAutoLoadRanges";
 import type { SolveSetup } from "../useSolveSetup";
 import { BoardStep } from "./BoardStep";
 import { HandStep } from "./HandStep";
-import { InterimResult } from "./InterimResult";
 import { RangesStep } from "./RangesStep";
+import { ResultStep } from "./ResultStep";
+import type { ExploreOption } from "../solveText";
 import { ReadyStep } from "./ReadyStep";
 import { SETUP_STEPS, firstOpenStep, readStep, type SolveStep } from "./phoneSteps";
 import "./phone.css";
@@ -65,17 +66,33 @@ export function SolvePhone({ setup: s }: { setup: SolveSetup }) {
     go("hand");
   }
 
+  /** Keep exploring (§4.5): add the action, then solve again (watching it on
+   * the Ready step) or, when it closes the street, pick the next card. The
+   * same as desktop's. */
+  function explore(option: ExploreOption) {
+    const street = s.currentStreet;
+    const next = { ...s.streets, [street]: [...s.streets[street], option.action] };
+    s.setStreetActions(street, next[street]);
+    if (option.dealsNext) go("board");
+    else {
+      void s.solve(next);
+      go("ready");
+    }
+  }
+
   const setupStep = step === "result" ? "ready" : step;
 
   return (
     <div className="m-step">
-      <TopBarActions>
-        <button type="button" className="icon-button" aria-label="Start over" onClick={startOver}>
+      {step !== "result" && (
+        <TopBarActions>
+          <button type="button" className="icon-button" aria-label="Start over" onClick={startOver}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" />
           </svg>
-        </button>
-      </TopBarActions>
+          </button>
+        </TopBarActions>
+      )}
 
       {step !== "result" && <StepProgress steps={SETUP_STEPS} current={setupStep} onPick={go} />}
 
@@ -87,7 +104,7 @@ export function SolvePhone({ setup: s }: { setup: SolveSetup }) {
       {step === "ready" && (
         <ReadyStep s={s} acknowledged={seen} onGo={go} onSeeResult={() => go("result")} />
       )}
-      {step === "result" && <InterimResult s={s} onBack={() => go("ready")} />}
+      {step === "result" && <ResultStep s={s} onBack={() => go("ready")} onExplore={explore} />}
     </div>
   );
 }

@@ -374,7 +374,7 @@ form are gone. `body` pads by no top or bottom inset.
 **Phase 2 (Solve steps) is done**: on phones Solve is four steps plus a
 result screen, in `pages/solve/phone/`. `SolvePhone` routes them, and there's
 one file per step: `HandStep`, `BoardStep`, `RangesStep`, `ReadyStep`, and
-`InterimResult`. All of them run over the same `useSolveSetup` as desktop.
+`ResultStep` (Phase 3). All of them run over the same `useSolveSetup` as desktop.
 `SolvePage.tsx` is now only the layout switch.
 - **Steps are in the URL**: `/solve?step=hand|board|ranges|ready|result`, one
   history entry each. With no `?step=`, Solve opens on the first step that
@@ -402,11 +402,26 @@ one file per step: `HandStep`, `BoardStep`, `RangesStep`, `ReadyStep`, and
   opened.
 - Phone chips use **`m-chip`**, never `chip`: `DrillPage.css` owns a global
   `.chip`.
-- The result step is **interim** (the old phone result) until Phase 3.
 - `useSolveSetup`'s redo (`goForward`) has no UI any more and is a deletion
   candidate.
 - Screenshot runs should build with `VITE_API_BASE_URL` pointing at a dead
   address. Production builds call the deployed API.
+
+**Phase 3 (Solve result) is done**: `pages/solve/phone/ResultStep.tsx`.
+- **Layout**: the board with an accuracy pill, the headline and mix, the
+  strategy chart, Keep exploring pills, and a collapsed "About this solve".
+- **Hand sheet**: tapping a hand opens desktop's `HandPanel` in a sheet.
+  `StrategyResult.tsx` exports `HandPanel` and `FrequencyBar`, and
+  `HandPanel` takes `showHand={false}` when the sheet's title shows the hand.
+  Its phone styles live under `.m-hand-sheet`.
+- **Top bar**: a page sets a title with a back arrow by rendering
+  `<TopBarTitle>` (`TopBarTitleContext`). The result's back arrow goes to
+  Ready. Save spot replaces Start over there; it saves the setup, and
+  signed out it opens the account sheet.
+- **Keep exploring** uses desktop's `exploreOptions`. It solves again on
+  Ready, or goes to the board for the next card.
+- **The strategy chart scrolls on phones**: `.m-result__grid` undoes
+  `RangeGrid`'s `touch-action: none` there.
 
 ## Commands
 

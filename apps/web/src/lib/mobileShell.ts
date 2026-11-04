@@ -45,3 +45,14 @@ export const SHEET_ENTRY = "bottomSheet";
 export function onSheetEntry(): boolean {
   return Boolean(window.history.state?.[SHEET_ENTRY]);
 }
+
+/** A page's own top-bar title with a back arrow (TopBarTitle). */
+export interface TopBarTitleOverride {
+  title: string;
+  /** What the back arrow says to a screen reader: "Back to setup". */
+  backLabel: string;
+  onBack: () => void;
+}
+
+/** Sets or clears the top bar's title override. Null on desktop. */
+export const TopBarTitleContext = createContext<((override: TopBarTitleOverride | null) => void) | null>(null);
