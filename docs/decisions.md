@@ -6,6 +6,48 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — Lesson progress follows the account
+
+**Status:** proposed.
+
+**Why.** Train-tab progress lived in one browser's `localStorage`, so the "Up next" guide forgot you
+on another phone, and ranked play (planned) needs a per-account record anyway.
+
+**What.** A new table, `lesson_progress` (Alembic `0003`; model `LessonProgressRow` in `app/db.py`),
+one row per (user, lesson): `done`, `correct`, `total`, and `updated_at`. Two endpoints, both
+sign-in-only and each user sees only their own rows (`app/routes/progress.py`):
+`GET /progress` and `PUT /progress/{lesson_id}`. The lessons themselves stay in the web app; the
+server stores a slug (`^[a-z0-9][a-z0-9-]{0,63}$`) and a score and never interprets either.
+
+**Merging: newest attempt wins, per lesson.** A `PUT` carries `at`, the attempt's time on the
+client's clock (ms). The server applies it only if it is not older than what it holds, and returns
+what is stored afterwards. So a late upload from an offline device cannot undo a newer attempt,
+repeating a request is harmless, and no device needs to be "the" source of truth. Impossible input
+is a 422 (more right than questions, a time more than a day ahead of the server: one bad clock must
+not pin a row forever; and more than 100 lessons per account).
+
+**On the device (`lib/progress.ts`).** Progress is still written to `localStorage` first, so a lesson
+works offline and signed out, but the key is now **per account** (the email), so two people on one
+device no longer share it. When signed in, finishing a lesson also `PUT`s it (fire and forget; if it
+fails the device copy is newer and the next sync uploads it), and the Train hub syncs on open: fetch
+the server's copy, keep the newer attempt per lesson, store the result, upload whatever the server
+lacks or has older. If the server can't be reached the device copy is used as is.
+
+**Guest progress.** What was played signed out is claimed by the first account that syncs on that
+device, and the guest copy is cleared only after the upload succeeded. On a shared device the first
+account to sign in therefore gets the guest's progress; that was judged better than losing it.
+
+**Not done.** Only Train progress is stored per account (not the Drill's scores). No history of
+attempts, only the latest per lesson (a "best score" rule would hide a lesson you've since forgotten).
+Ranked play will need its own tables.
+
+**Tests.** `apps/api/tests/test_progress.py` (Postgres, like the other persistence tests; also run
+here against SQLite to check the logic before CI), `lib/progress.test.ts` (merge rules, per-account
+keys, every sync path), and the Train page tests (server copy appears on a device with none; signed
+out never calls the server; a failed upload keeps the result on the device).
+
+---
+
 ## 2026-11-05 — The coach as a streamed chat, and the Drill's "Ask the coach"
 
 **What.** `POST /coach/chat` (`apps/api/app/coach.py`, `routes/coach.py`): the same grounded coach as
@@ -96,8 +138,8 @@ response shape against a fake server) and the panel's states in `TrainPage.test.
 finished lesson under 80% right (shown with your score), else sends you to the Drill. Choosing from
 the fixed course by plain rules means it can't invent a lesson or misreport a score, needs no key or
 network, and is fully testable. The model could later phrase the message, but the choice stays
-rule-based. It reads progress from this browser only; moving progress to the account (so the guide
-follows you across devices) is the next step and needs a table, so it is not done.
+rule-based. It read progress from this browser only at first; it now follows the account (see "Lesson
+progress follows the account", above).
 
 **Not done.** Streaming answers, account-level progress, and a live check against Google: it needs a
 key, so the coach has not run against the real service. Also: Render deploys `main`, so the coach
@@ -121,7 +163,7 @@ dropping the old "the Drill is not a remembered tab" special cases.
 explanation per choice, so adding a lesson needs no UI code. Two exist: "Positions and the button"
 and "Pot odds and equity" (content checked against the formulas by `lessons.test.ts`). A lesson is
 played at `/train?lesson=<id>`; the query string is what makes the tab bar's "last place in each
-tab" return to it. Progress (done, score) is in `localStorage` only for now.
+tab" return to it. Progress (done, score) started in `localStorage` only; see "Lesson progress follows the account".
 
 **Lesson 3, "Which hands to open" (solver-backed grading).** Ten "folded to you in seat X with hand
 Y: raise or fold?" questions (five from UTG, five from the BTN), graded against the repo's reference

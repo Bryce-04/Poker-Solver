@@ -2,13 +2,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { TrainPage } from "./TrainPage";
-import { LESSONS, readProgress } from "../lib/lessons";
-import { askCoach } from "../lib/api";
+import { LESSONS } from "../lib/lessons";
+import { readProgress } from "../lib/progress";
+import { askCoach, fetchProgress, putProgress } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
-vi.mock("../lib/api", () => ({ askCoach: vi.fn() }));
+vi.mock("../lib/api", () => ({ askCoach: vi.fn(), fetchProgress: vi.fn(), putProgress: vi.fn() }));
 vi.mock("../lib/auth", () => ({ useAuth: vi.fn() }));
 const mockAsk = vi.mocked(askCoach);
+const mockFetchProgress = vi.mocked(fetchProgress);
+const mockPutProgress = vi.mocked(putProgress);
+const ACCOUNT_KEY = "poker-solver.train.progress.v1:a@b.c";
 const mockUseAuth = vi.mocked(useAuth);
 
 function renderTrain(path = "/train") {
@@ -22,6 +26,10 @@ function renderTrain(path = "/train") {
 beforeEach(() => {
   window.localStorage.clear();
   mockAsk.mockReset();
+  mockFetchProgress.mockReset();
+  mockFetchProgress.mockResolvedValue({ kind: "ok", lessons: {} });
+  mockPutProgress.mockReset();
+  mockPutProgress.mockResolvedValue({ kind: "saved", stored: { done: true, correct: 0, total: 0, at: 0 } });
   mockUseAuth.mockReset();
   mockUseAuth.mockReturnValue({ status: "signed-in", email: "a@b.c" });
 });
@@ -54,7 +62,7 @@ describe("Up next", () => {
 
   it("moves on after a lesson is finished", () => {
     window.localStorage.setItem(
-      "poker-solver.train.progress.v1",
+      ACCOUNT_KEY,
       JSON.stringify({ positions: { done: true, correct: 3, total: 3 } }),
     );
     renderTrain();
@@ -63,11 +71,44 @@ describe("Up next", () => {
 
   it("sends someone who has finished everything strongly to the Drill", () => {
     window.localStorage.setItem(
-      "poker-solver.train.progress.v1",
+      ACCOUNT_KEY,
       JSON.stringify(Object.fromEntries(LESSONS.map((l) => [l.id, { done: true, correct: 9, total: 10 }]))),
     );
     renderTrain();
     expect(screen.getByRole("link", { name: /open the drill/i }).getAttribute("href")).toBe("/drill");
+  });
+});
+
+describe("Progress follows the account", () => {
+  it("shows what the server has once synced, on a device that has none", async () => {
+    mockFetchProgress.mockResolvedValue({
+      kind: "ok",
+      lessons: { positions: { done: true, correct: 3, total: 3, at: 5 } },
+    });
+    renderTrain();
+    expect(await screen.findByText(/next lesson: pot odds and equity/i)).toBeInTheDocument();
+    expect(screen.getByText(/done, 3\/3 right/i)).toBeInTheDocument();
+  });
+
+  it("does not call the server, or show another account's progress, when signed out", () => {
+    mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
+    window.localStorage.setItem(ACCOUNT_KEY, JSON.stringify({ positions: { done: true, correct: 3, total: 3, at: 5 } }));
+    renderTrain();
+    expect(mockFetchProgress).not.toHaveBeenCalled();
+    expect(screen.getByText(/start with positions and the button/i)).toBeInTheDocument();
+  });
+
+  it("keeps a finished lesson on this device when the upload fails", async () => {
+    mockPutProgress.mockResolvedValue({ kind: "network-error" });
+    const user = userEvent.setup();
+    renderTrain("/train?lesson=pot-odds");
+    for (let i = 0; i < 2; i++) await user.click(screen.getByRole("button", { name: /^next$/i }));
+    for (const name of [/^25%$/i, /^about 35%$/i, /^yes, narrowly$/i]) {
+      await user.click(screen.getByRole("button", { name }));
+      await user.click(screen.getByRole("button", { name: /^(next|finish)$/i }));
+    }
+    expect(screen.getByText(/you got 3 of 3/i)).toBeInTheDocument();
+    expect(readProgress("a@b.c")["pot-odds"]).toMatchObject({ done: true, correct: 3 });
   });
 });
 
@@ -145,7 +186,9 @@ describe("Lesson player", () => {
     await user.click(screen.getByRole("button", { name: /^finish$/i }));
 
     expect(screen.getByText(/you got 2 of 3 questions right/i)).toBeInTheDocument();
-    expect(readProgress().positions).toEqual({ done: true, correct: 2, total: 3 });
+    expect(readProgress("a@b.c").positions).toMatchObject({ done: true, correct: 2, total: 3 });
+    // Signed in, so the attempt also goes to the account.
+    expect(mockPutProgress).toHaveBeenCalledWith("positions", expect.objectContaining({ done: true, correct: 2, total: 3 }));
 
     await user.click(screen.getByRole("button", { name: /back to lessons/i }));
     expect(screen.getByText(/done, 2\/3 right/i)).toBeInTheDocument();
