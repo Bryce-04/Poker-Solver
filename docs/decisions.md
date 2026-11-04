@@ -6,6 +6,53 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-04 — The Coach page (Ask mode), Phase 1: conversations, the daily limit, no Gemini yet
+
+Status: **proposed**. Spec: `docs/coach.md` (design in `docs/coach/mockup/`).
+
+**What.** A new Coach page where a user describes a spot in plain words and gets the solver's
+answer, explained. Phase 1 is the backend foundation only: the `coach_conversations` and
+`coach_messages` tables (migration `0003`), the `/coach/conversations` and `/coach/usage`
+endpoints, the daily message limit, and a background runner that stores a fixed placeholder reply.
+No Gemini, no tools, no UI yet.
+
+**The LLM exception.** `docs/plan.md` says "rule-based parser first, not LLM-first", and the Train
+coach above only explains facts the app already computed. The Coach goes further: Gemini reads the
+user's own description of a spot. That's a deliberate exception, made safe by the spec's core rule
+(§1): **the solver decides and the Coach explains.** Gemini turns words into a spot through a tool,
+the backend builds every card and every number from tool results, and anything the solver can't
+answer goes into a box labeled "General advice · not from the solver". The structure enforces that
+labeling; it doesn't rely on the model's prose.
+
+**Choices in Phase 1 that depart from or add to the spec.**
+- **The package is `app/ask_coach/`, not the spec's `app/coach/`.** `app/coach.py` is already the
+  Train coach, and the unmerged `coach-on-train` branch is still editing it, so renaming it now
+  would conflict. The URLs are the spec's (`/coach/conversations`, `/coach/usage`); they share the
+  `/coach` prefix with the Train coach's `POST /coach` and `/coach/chat`, without overlapping.
+- **Migration number.** The unmerged `account-progress` branch also adds a `0003`
+  (`lesson_progress`). Whichever merges second renumbers its migration to `0004` and points
+  `down_revision` at the other.
+- **429 body.** The spec's `{ used, limit }` is the whole response body, not FastAPI's usual
+  `{"detail": ...}`, so the frontend can read it directly. 409 and 404 keep `{"detail": ...}`.
+- **`GET /coach/conversations/{id}` also returns `id` and `title`.** The phone's top bar shows the
+  title (§9), so a direct link doesn't need a second request.
+- **`attached_spot` is checked against the `Spot` schema now and kept in the `user_text` payload**,
+  ready for Phase 2 to use instead of the model's reading of a pasted hand history (§4.1).
+- **A turn lost to a restart** is reset to `error` (with an `error` message, so the UI can offer
+  Try again) when the conversation is read, listed, or sent to, if it has been busy and untouched
+  for 5 minutes.
+- **The limit counts stored `user_text` messages**, as the spec says. So deleting a conversation
+  gives back that day's messages from it. That's accepted for now; if it's abused, count from a
+  separate log instead. `COACH_DAILY_LIMIT` is separate from the Train coach's `COACH_PER_HOUR` /
+  `COACH_PER_DAY_TOTAL`.
+
+**Open for Phase 2.** The spec asks for the `google-genai` SDK and a single `GEMINI_MODEL` id, but
+the Train coach already calls Gemini over `httpx` with a comma-separated model fallback list (free
+keys lose access to models without notice). Phase 2 should decide whether the Coach shares that
+client and those settings or uses the SDK as specified.
+
+---
+
 ## 2026-11-05 — The coach as a streamed chat, and the Drill's "Ask the coach"
 
 **What.** `POST /coach/chat` (`apps/api/app/coach.py`, `routes/coach.py`): the same grounded coach as

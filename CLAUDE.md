@@ -169,6 +169,33 @@ a test fails if it drifts). "The continuation bet" is graded by the Drill deck's
 (`lib/cbetLesson.ts`). See `docs/decisions.md` for what's planned next (an AI coach, a lesson guide,
 ranked play, opponent types).
 
+**Coach page, Ask mode (spec agreed 2026-11-04; Phase 1 of 6 done)**: `docs/coach.md` is the
+spec, with the design as clickable HTML plus screenshots in `docs/coach/mockup/`. Read both before
+working on it. It's a separate feature from the Train coach below: a Coach page where a user
+describes a spot in plain words, and the solver decides while Gemini only explains (spec §1). One
+PR per phase.
+- **Phase 1 (backend foundation) is done**, in `apps/api/app/ask_coach/`. It's not the spec's
+  `app/coach/`, because `app/coach.py` is the Train coach; see `docs/decisions.md`.
+  - `store.py`: database helpers. `limits.py`: the daily limit. `runner.py`: the background turn.
+    `routes.py`: the endpoints.
+  - Tables `coach_conversations` / `coach_messages` (`app/db.py`, migration `0003`). A message is
+    `{seq, kind, payload}`; spec §3.1 lists the kinds.
+  - Endpoints, all signed-in and owner-only (anyone else's conversation is a 404):
+    `POST`/`GET /coach/conversations`, `GET /coach/conversations/{id}?after=N` (the frontend polls
+    it), `POST .../{id}/messages` (202; 409 while a turn runs; 429 with body `{used, limit}`),
+    `PATCH`/`DELETE .../{id}`, `GET /coach/usage`.
+  - A turn runs on a single-worker pool (`runner.submit`); for now it stores a fixed placeholder
+    reply. Tests replace `runner.submit` with an inline `run_turn`. A conversation busy and untouched
+    for 5 minutes is reset to `error` when it's next read.
+  - `COACH_DAILY_LIMIT` (default 25 per user per UTC day) counts stored `user_text` messages. It's
+    separate from the Train coach's limits.
+  - Tests: `apps/api/tests/test_ask_coach.py` (needs local Postgres).
+- **Migration clash to watch:** the unmerged `account-progress` branch also adds a `0003`. Whichever
+  merges second renumbers to `0004`.
+- **Next is Phase 2 (Gemini)**, which has an open question in `docs/decisions.md`: the spec's
+  `google-genai` SDK, or the Train coach's existing `httpx` client and model fallback list. No UI
+  exists until Phase 4.
+
 **Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
 `done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own
 explanation, never an error) and takes the conversation so far, so the learner can ask follow-ups.

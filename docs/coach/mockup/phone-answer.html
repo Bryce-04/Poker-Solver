@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Coach · phone · answer + card picker</title>
+<!-- Design mockup for docs/coach.md. Reference only: do not ship.
+     Data shown (ranges, strategy %, saved spots) is placeholder. -->
+<style>
+body{margin:0;background:#0d0d11}
+a{color:#c4b5fd}a:hover{color:#ddd6fe}
+.topbar{height:56px;flex:none;display:flex;align-items:center;gap:2px;padding:0 6px;background:#17171e;border-bottom:1px solid #2a2a34}
+.ttl{flex:1;min-width:0;font-size:16px;font-weight:700;color:#f4f3f8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{width:44px;height:44px;border:0;border-radius:22px;background:transparent;color:#b7b5c3;display:flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none;font:inherit;flex:none}
+.iconbtn:hover{background:#24242e;color:#f4f3f8}
+.avatar{width:30px;height:30px;border-radius:50%;background:#2c2c38;color:#f4f3f8;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+.tabbar{height:64px;flex:none;display:flex;background:#17171e;border-top:1px solid #2a2a34}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:#8a8899;text-decoration:none}
+.tab:hover{color:#f4f3f8}
+.tab[aria-current=page]{color:#c4b5fd}
+.pill{flex:none;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:20px;border:1px solid #43424f;background:#1b1b23;color:#f4f3f8;font:600 13px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;text-decoration:none;white-space:nowrap}
+.pill:hover{border-color:#a78bfa;color:#f4f3f8}
+.seg{display:flex;padding:3px;gap:3px;background:#0f0f14;border:1px solid #2f2f3a;border-radius:12px}
+.seg-item{flex:1 1 0;min-height:40px;border:0;border-radius:9px;background:transparent;color:#b7b5c3;font:600 14px/1.2 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.seg-item[aria-pressed=true]{background:#2c2c38;color:#f4f3f8}
+.chip{min-height:46px;border-radius:12px;border:1px solid #34343f;background:#24242e;color:#f4f3f8;font:700 17px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.chip[aria-pressed=true]{background:rgba(167,139,250,.22);border-color:#a78bfa}
+.suit{min-height:60px;border-radius:12px;border:2px solid transparent;background:#ffffff;font:700 26px/1 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer}
+.suit:hover{border-color:#a78bfa}
+.suit[disabled]{opacity:.3;cursor:not-allowed}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:8px 18px;border-radius:12px;font:650 15px/1.25 system-ui,'Segoe UI',Roboto,sans-serif;cursor:pointer;border:1px solid transparent}
+.btn-primary{background:#a78bfa;color:#1a1030}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;flex-direction:column;justify-content:flex-end;z-index:5}
+.sheet{background:#1b1b23;border-radius:20px 20px 0 0;padding:8px 16px 20px;border-top:1px solid #34343f;display:flex;flex-direction:column;gap:12px}
+.handle{width:40px;height:4px;border-radius:2px;background:#55546a;margin:4px auto 0}
+button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app" style="width:390px;margin:0 auto"></div>
+<script type="text/x-template" id="dc-template">
+
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #131318; color: #b7b5c3; font: 15px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif">
+  <header class="topbar">
+    <a href="phone-new.html" class="iconbtn" aria-label="All conversations"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <span class="ttl">AQ on the button, Q-5-2 flop</span>
+    <a href="#account" class="iconbtn" aria-label="Account"><span class="avatar">P</span></a>
+  </header>
+
+  <main style="flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 14px">
+    <div style="align-self: flex-end; max-width: 85%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: #2c2c38; color: #f4f3f8">I'm on the button with A♥ Q♦. BB called my raise. Flop Q♠ 5♣ 2♣, he checks. What should I do?</div>
+
+    <p style="margin: 0; font-size: 14px; color: #d6d4e0">I'm assuming 100bb, 6-max and standard ranges. Tell me if that's different.</p>
+
+    <div style="border: 1px solid #2f2f3a; border-radius: 14px; background: #1b1b23; overflow: hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 8px 8px 14px; border-bottom: 1px solid #2a2a34">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #8a8899">The spot I understood</span>
+        <a href="#solve" style="display: inline-flex; align-items: center; min-height: 36px; padding: 0 8px; font-size: 13px; font-weight: 600; text-decoration: none">Open in Solve</a>
+      </div>
+      <div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 4px">
+          <sc-for list="{{hero}}" as="c" hint-placeholder-count="2"><span role="img" aria-label="{{c.aria}}" style="width: 34px; height: 48px; border-radius: 5px; background: #ffffff; color: {{c.color}}; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 15px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>{{c.r}}</span><span>{{c.s}}</span></span></sc-for>
+          <span aria-hidden="true" style="width: 1px; height: 36px; background: #34343f; margin: 0 8px"></span>
+          <sc-for list="{{board}}" as="c" hint-placeholder-count="3"><span role="img" aria-label="{{c.aria}}" style="width: 34px; height: 48px; border-radius: 5px; background: #ffffff; color: {{c.color}}; display: flex; flex-direction: column; align-items: center; justify-content: center; font: 750 15px/1 system-ui, 'Segoe UI', Roboto, sans-serif"><span>{{c.r}}</span><span>{{c.s}}</span></span></sc-for>
+        </div>
+        <span style="font-size: 13px; color: #f4f3f8">You: BTN (acts last) · BB checked · Pot 5.5bb · Stacks 97.5bb</span>
+      </div>
+    </div>
+
+    <div style="border: 1px solid rgba(167,139,250,.35); border-radius: 14px; background: #1d1b28; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <span style="color: #f4f3f8; font-weight: 650">Solver's play with A♥ Q♦</span>
+        <span style="padding: 2px 8px; border-radius: 999px; background: rgba(70,176,106,.14); color: #7fd39b; font-size: 11px; font-weight: 650">Very accurate</span>
+      </div>
+      <sc-for list="{{rows}}" as="row" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="display: flex; justify-content: space-between; font-size: 14px; color: #f4f3f8"><span>{{row.label}}</span><span style="font-weight: 700">{{row.pct}}</span></span>
+          <span style="height: 8px; border-radius: 4px; background: #2b2b34; overflow: hidden; display: block"><span style="display: block; height: 100%; width: {{row.pct}}; background: {{row.color}}"></span></span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px; font-size: 15px; color: #d6d4e0">
+      <p style="margin: 0">Bet small most of the time: about 1.4bb. Top pair with the best kicker is ahead of almost everything BB calls with, and a small bet still gets called by worse.</p>
+      <p style="margin: 0">Checking sometimes is fine too, so your checks aren't all weak hands.</p>
+      <p style="margin: 0; font-size: 12px; color: #8a8899">Percentages from the solver. Explanation is standard strategy reasoning.</p>
+    </div>
+
+    <div style="display: flex; gap: 8px; overflow-x: auto; margin: 0 -14px; padding: 0 14px 4px">
+      <button type="button" class="pill">What if he check-raises?</button>
+      <button type="button" class="pill">What about K♣ Q♣?</button>
+      <button type="button" class="pill">Why not bet bigger?</button>
+    </div>
+  </main>
+
+  <div style="flex: none; padding: 8px 12px; border-top: 1px solid #2a2a34; background: #131318">
+    <div style="display: flex; align-items: flex-end; gap: 6px; border: 1px solid #43424f; border-radius: 22px; background: #1b1b23; padding: 4px">
+      <button type="button" class="iconbtn" aria-label="Add cards" onClick="{{openPicker}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="3" width="12" height="17" rx="2"></rect><path d="M11 8v6M8 11h6"></path></svg></button>
+      <label style="flex: 1; display: flex"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Message the Coach</span>
+        <textarea rows="1" placeholder="Ask a follow-up…" value="{{draft}}" readonly style="flex: 1; border: 0; background: transparent; color: #f4f3f8; font: 15px/1.4 system-ui, 'Segoe UI', Roboto, sans-serif; padding: 11px 0; resize: none; min-height: 44px; box-sizing: border-box"></textarea>
+      </label>
+      <button type="button" class="iconbtn" aria-label="Send" style="background: #a78bfa; color: #1a1030"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+    </div>
+  </div>
+
+  <nav class="tabbar" aria-label="Main">
+    <a class="tab" href="#solve"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>Solve</a>
+    <a class="tab" href="#ranges"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>Ranges</a>
+    <a class="tab" href="phone-new.html" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z"></path></svg>Coach</a>
+    <a class="tab" href="#library"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"></path></svg>Library</a>
+    <a class="tab" href="#drill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="11" height="15" rx="2"></rect><path d="M9 3h10a2 2 0 0 1 2 2v12"></path></svg>Drill</a>
+  </nav>
+
+  <sc-if value="{{pickerOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="scrim">
+      <section class="sheet" role="dialog" aria-label="Add cards">
+        <span class="handle" aria-hidden="true"></span>
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <h2 style="margin: 0; font-size: 18px; color: #f4f3f8">Add cards</h2>
+          <button type="button" class="iconbtn" aria-label="Close" onClick="{{closePicker}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <div class="seg" role="group" aria-label="Which cards">
+          <sc-for list="{{targets}}" as="t" hint-placeholder-count="2"><button type="button" class="seg-item" aria-pressed="{{t.pressed}}" onClick="{{t.pick}}">{{t.label}}</button></sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px">
+          <sc-for list="{{ranks}}" as="r" hint-placeholder-count="13"><button type="button" class="chip" aria-pressed="{{r.pressed}}" onClick="{{r.pick}}">{{r.label}}</button></sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+          <sc-for list="{{suits}}" as="s" hint-placeholder-count="4"><button type="button" class="suit" aria-label="{{s.name}}" disabled="{{s.disabled}}" onClick="{{s.pick}}" style="color: {{s.color}}">{{s.sym}}</button></sc-for>
+        </div>
+        <p style="margin: 0; font-size: 13px">Adds the cards to your message as text, like “my hand: A♥ Q♦”.</p>
+        <button type="button" class="btn btn-primary" onClick="{{closePicker}}">Done</button>
+      </section>
+    </div>
+  </sc-if>
+</div>
+</script>
+<script type="text/x-dc-logic" id="dc-logic">
+var RED = '#c0362c', BLK = '#141319';
+var NAMES = { '♠': 'spades', '♥': 'hearts', '♦': 'diamonds', '♣': 'clubs' };
+function card(r, s) { return { r: r, s: s, color: (s === '♥' || s === '♦') ? RED : BLK, aria: r + ' of ' + NAMES[s] }; }
+var SUITS = [['♠', 'Spades', BLK], ['♥', 'Hearts', RED], ['♦', 'Diamonds', RED], ['♣', 'Clubs', BLK]];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { picker: false, target: 'hand', rank: null, draft: '' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    return {
+      hero: [card('A', '♥'), card('Q', '♦')],
+      board: [card('Q', '♠'), card('5', '♣'), card('2', '♣')],
+      rows: [{ label: 'Bet small (1.4bb)', pct: '55%', color: '#f0897c' }, { label: 'Check', pct: '30%', color: '#f0b93d' }, { label: 'Bet medium (4.1bb)', pct: '15%', color: '#e8654f' }],
+      draft: st.draft, pickerOpen: st.picker,
+      openPicker: function () { self.setState({ picker: true }); },
+      closePicker: function () { self.setState({ picker: false, rank: null }); },
+      targets: [['hand', 'My hand'], ['board', 'Board']].map(function (t) {
+        return { label: t[1], pressed: String(st.target === t[0]), pick: function () { self.setState({ target: t[0] }); } };
+      }),
+      ranks: ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'].map(function (r) {
+        return { label: r, pressed: String(st.rank === r), pick: function () { self.setState({ rank: r }); } };
+      }),
+      suits: SUITS.map(function (s) {
+        return { sym: s[0], name: s[1], color: s[2], disabled: !st.rank, pick: function () {
+          var label = st.target === 'hand' ? 'my hand: ' : 'board: ';
+          var d = st.draft;
+          var tok = st.rank + s[0];
+          if (d.indexOf(label) === -1) d = (d ? d + ' ' : '') + label + tok; else d = d + ' ' + tok;
+          self.setState({ draft: d, rank: null });
+        } };
+      })
+    };
+  }
+}
+</script>
+<script>/* Tiny standalone renderer for the mockup screens: {{holes}}, <sc-for>,
+   <sc-if>, onClick handlers, and a DCLogic base class with setState. */
+(function () {
+  var TABLE_TAGS = ['table', 'thead', 'tbody', 'tr', 'td', 'th'];
+  var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g;
+  var WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+
+  function lookup(path, scope) {
+    if (path === 'true') return true;
+    if (path === 'false') return false;
+    if (/^-?\d+(\.\d+)?$/.test(path)) return Number(path);
+    var parts = path.split('.'), v = scope;
+    for (var i = 0; i < parts.length; i++) {
+      if (v == null) return undefined;
+      v = v[parts[i]];
+    }
+    return v;
+  }
+  function interp(str, scope) {
+    return str.replace(HOLE, function (_, p) {
+      var v = lookup(p, scope);
+      return v == null ? '' : String(v);
+    });
+  }
+
+  window.DCLogic = class {
+    constructor(props) { this.props = props || {}; this.state = {}; }
+    setState(patch) {
+      this.state = Object.assign({}, this.state, typeof patch === 'function' ? patch(this.state) : patch);
+      this.__rerender && this.__rerender();
+    }
+    forceUpdate() { this.__rerender && this.__rerender(); }
+  };
+
+  function renderNode(node, scope, out) {
+    if (node.nodeType === 3) { out.push(document.createTextNode(interp(node.nodeValue, scope))); return; }
+    if (node.nodeType !== 1) return;
+    var tag = node.localName;
+    if (tag === 'sc-for') {
+      var list = lookup(node.getAttribute('list').replace(WHOLE, '$1'), scope) || [];
+      var as = node.getAttribute('as') || 'item';
+      list.forEach(function (item, i) {
+        var s = Object.create(scope); s[as] = item; s.$index = i;
+        node.childNodes.forEach(function (c) { renderNode(c, s, out); });
+      });
+      return;
+    }
+    if (tag === 'sc-if') {
+      if (lookup(node.getAttribute('value').replace(WHOLE, '$1'), scope)) {
+        node.childNodes.forEach(function (c) { renderNode(c, scope, out); });
+      }
+      return;
+    }
+    var realTag = tag.indexOf('x-') === 0 && TABLE_TAGS.indexOf(tag.slice(2)) >= 0 ? tag.slice(2) : tag;
+    var el = node.namespaceURI && node.namespaceURI !== 'http://www.w3.org/1999/xhtml'
+      ? document.createElementNS(node.namespaceURI, realTag)
+      : document.createElement(realTag);
+    Array.prototype.forEach.call(node.attributes, function (a) {
+      if (a.name.indexOf('hint-') === 0) return;
+      var whole = a.value.match(WHOLE);
+      if (/^on[a-z]+$/i.test(a.name) && whole) {
+        var fn = lookup(whole[1], scope);
+        if (typeof fn === 'function') el.addEventListener(a.name.slice(2).toLowerCase(), fn);
+        return;
+      }
+      if (whole && a.name !== 'style') {
+        var v = lookup(whole[1], scope);
+        if (v === false || v == null) return;
+        el.setAttribute(a.name, v === true ? '' : String(v));
+        return;
+      }
+      el.setAttribute(a.name, interp(a.value, scope));
+    });
+    if (realTag === 'input' && node.hasAttribute('value')) el.value = interp(node.getAttribute('value'), scope);
+    node.childNodes.forEach(function (c) { renderNode(c, scope, el.childNodes && { push: function (n) { el.appendChild(n); } }); });
+    out.push(el);
+  }
+
+  window.addEventListener('DOMContentLoaded', function () {
+    var src = document.getElementById('dc-template').textContent;
+    TABLE_TAGS.forEach(function (t) {
+      src = src.replace(new RegExp('<' + t + '(?=[\\s>])', 'g'), '<x-' + t).replace(new RegExp('</' + t + '>', 'g'), '</x-' + t + '>');
+    });
+    var holder = document.createElement('div');
+    holder.innerHTML = src;
+    var Component = new Function(document.getElementById('dc-logic').textContent + '\n;return Component;')();
+    var inst = new Component({});
+    var root = document.getElementById('app');
+    inst.__rerender = function () {
+      var out = [];
+      var vals = inst.renderVals ? inst.renderVals() : {};
+      holder.childNodes.forEach(function (c) { renderNode(c, vals, out); });
+      root.replaceChildren.apply(root, out);
+    };
+    inst.__rerender();
+    if (inst.componentDidMount) inst.componentDidMount();
+  });
+})();
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@ from sqlalchemy import text
 
 from poker_solver_schema import __version__ as schema_version
 
+from .ask_coach.routes import router as ask_coach_router
 from .db import engine
 from .routes.coach import router as coach_router
 from .routes.spots import router as spots_router
@@ -37,6 +38,7 @@ app.add_middleware(
 
 app.include_router(spots_router)
 app.include_router(coach_router)
+app.include_router(ask_coach_router)
 
 
 @app.get("/health")
