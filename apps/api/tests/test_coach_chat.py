@@ -179,10 +179,10 @@ def sse(*texts, extra=()):
     return "".join(f"data: {json.dumps(c)}\r\n\r\n" for c in [*chunks, *extra]).encode()
 
 
-def provider(handler, model="big,small", thinking_budget=0):
+def provider(handler, model="big,small", thinking_level="minimal", **kw):
     return coach.GeminiProvider(
         "key", model, client=httpx.Client(transport=httpx.MockTransport(handler)),
-        thinking_budget=thinking_budget, sleep=lambda s: None,
+        thinking_level=thinking_level, sleep=lambda s: None, **kw,
     )
 
 
@@ -202,7 +202,8 @@ def test_gemini_streams_text_with_the_right_request():
     body = json.loads(req.content)
     assert body["systemInstruction"]["parts"][0]["text"] == "SYS"
     assert [c["role"] for c in body["contents"]] == ["user", "model"]  # Gemini's word for the coach
-    assert body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert body["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "minimal"}
+    assert req.extensions["timeout"]["read"] == coach.GeminiProvider.read_timeout_s  # a stuck model is dropped fast
 
 
 def test_a_model_that_rejects_the_thinking_setting_is_retried_without_it():
@@ -280,16 +281,34 @@ def test_the_lessons_one_shot_uses_the_first_model_of_a_list():
     assert seen[0].endswith("/models/big:generateContent")
 
 
-def test_thinking_is_off_by_default_and_the_environment_can_change_it(monkeypatch):
+def test_thinking_is_minimal_by_default_and_the_environment_can_change_it(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
-    monkeypatch.delenv("GEMINI_THINKING_BUDGET", raising=False)
-    assert coach.get_provider()._thinking_budget == 0
-    monkeypatch.setenv("GEMINI_THINKING_BUDGET", "default")
-    assert coach.get_provider()._thinking_budget is None
-    monkeypatch.setenv("GEMINI_THINKING_BUDGET", "256")
-    assert coach.get_provider()._thinking_budget == 256
-    monkeypatch.setenv("GEMINI_THINKING_BUDGET", "garbage")
-    assert coach.get_provider()._thinking_budget == 0
+    monkeypatch.delenv("GEMINI_THINKING_LEVEL", raising=False)
+    assert coach.get_provider()._thinking_level == "minimal"
+    monkeypatch.setenv("GEMINI_THINKING_LEVEL", "default")
+    assert coach.get_provider()._thinking_level is None
+    monkeypatch.setenv("GEMINI_THINKING_LEVEL", "LOW")
+    assert coach.get_provider()._thinking_level == "low"
+
+
+def test_it_stops_trying_models_after_the_time_budget_and_says_so(monkeypatch):
+    now = [0.0]
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        now[0] += 30  # each stuck model eats 30s
+        return httpx.Response(503, text="high demand")
+
+    p = provider(handler, model="a,b,c", clock=lambda: now[0])
+    with pytest.raises(coach.CoachUnavailable, match="gave up after 25s"):
+        list(p.stream("s", [{"role": "user", "content": "u"}]))
+    assert len(calls) == 1  # no second model once the budget is gone: the learner shouldn't wait
+
+
+def test_the_default_models_are_ones_a_new_key_can_use():
+    assert "gemini-2.5-flash" not in coach.DEFAULT_MODEL.split(",")  # 404: no longer available to new users
+    assert len(coach.DEFAULT_MODEL.split(",")) >= 3
 
 
 def test_details_reach_the_model_but_are_never_the_fallback(monkeypatch):

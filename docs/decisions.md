@@ -30,16 +30,21 @@ message counts against the hourly and daily limits, so a conversation uses sever
 
 **Speed and reliability on the free tier** (found by running it against the real service, which the
 entry below says hadn't happened yet):
-- Most of the wait was Gemini 2.5's silent "thinking", not the answer. `GEMINI_THINKING_BUDGET`
-  defaults to `0` (off); `default` leaves the model's behaviour alone. A model that rejects the
-  setting (HTTP 400) is retried without it. Streaming shows the first words in about a second.
-- Free-tier models are often "high demand" (HTTP 503). `GEMINI_MODEL` may be a comma-separated list;
-  each is tried in order, and the whole list a second time after a 2 s pause, until the first word
-  arrives. 404 (a retired name) and 429 also move on to the next; a bad key (401/403) does not.
-- Model names go stale. `gemini-2.5-flash` answered 404 for the project this was tried with, while
-  the alias `gemini-flash-latest` existed (it was merely busy). The default is left as it was; set
-  `GEMINI_MODEL=gemini-flash-latest,gemini-flash-lite-latest` (or what AI Studio lists) and read the
-  server log: every failed call logs the provider's own reason.
+- Measured against a real free key (not guessed): the wait was Gemini's queueing and silent "thinking",
+  not the answer. `gemini-3-flash-preview` with `thinkingLevel: "minimal"` returned its first word in
+  1.3s (2.3s with default thinking); the `-latest` aliases took 17-59s or failed "high demand".
+  `GEMINI_THINKING_LEVEL` defaults to `minimal` (`default` leaves the model alone); a model that
+  rejects it (HTTP 400, e.g. `flash-lite-latest`) is retried without. Streaming then shows words as
+  they come.
+- Model names go stale, and the old default died: `gemini-2.5-flash` and `-flash-lite` now answer
+  404 "no longer available to new users". `DEFAULT_MODEL` is now a list, fastest first:
+  `gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-3.5-flash-lite, gemini-flash-lite-latest`.
+  Preview models can be retired too: if the log shows 404s, set `GEMINI_MODEL` from AI Studio's list
+  (`GET /v1beta/models` with your key lists what it can use).
+- Free-tier models are often "high demand" (503) or just slow. `GEMINI_MODEL` is a comma-separated
+  list tried in order; a stuck model is dropped after 10s of silence, and after 25s in all the app's
+  own explanation is shown instead (the learner never waits longer). 404 and 429 also move on to the
+  next model; a bad key does not. Every failed attempt is logged with the provider's reason.
 - Local-dev traps that look like coach bugs: the API needs `SUPABASE_URL` (the same project URL as
   the web app's `VITE_SUPABASE_URL`) or every sign-in check crashes into a 500 the browser reports as
   "couldn't reach the server"; and a python.org Python with no root certificates fails the sign-in

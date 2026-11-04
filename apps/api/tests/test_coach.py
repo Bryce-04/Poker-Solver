@@ -198,4 +198,4 @@ def test_provider_is_configured_only_by_environment(monkeypatch):
     provider = coach.get_provider()
     assert isinstance(provider, coach.GeminiProvider) and provider._model == "custom-model"
     monkeypatch.delenv("GEMINI_MODEL")
-    assert coach.get_provider()._model == coach.DEFAULT_MODEL
+    assert coach.get_provider()._models == coach.DEFAULT_MODEL.split(",")  # a list now: see DEFAULT_MODEL
