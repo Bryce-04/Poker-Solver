@@ -231,6 +231,14 @@ def _thinking_budget_env() -> int | None:
         return 0
 
 
+def status() -> dict:
+    """Whether the coach is switched on, for a quick deploy check (GET /coach/status).
+    Never the key itself: only whether one is set and which models are configured."""
+    key_set = bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    models = [m.strip() for m in (os.environ.get("GEMINI_MODEL", "").strip() or DEFAULT_MODEL).split(",") if m.strip()]
+    return {"configured": key_set, "models": models if key_set else []}
+
+
 def get_provider() -> CoachProvider | None:
     """The configured model, or None when no key is set."""
     key = os.environ.get("GEMINI_API_KEY", "").strip()

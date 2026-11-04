@@ -199,3 +199,30 @@ def test_provider_is_configured_only_by_environment(monkeypatch):
     assert isinstance(provider, coach.GeminiProvider) and provider._model == "custom-model"
     monkeypatch.delenv("GEMINI_MODEL")
     assert coach.get_provider()._model == coach.DEFAULT_MODEL
+
+
+# --- GET /coach/status: is the coach switched on here? --------------------------------------
+
+
+def test_status_says_off_without_a_key_and_needs_no_sign_in(monkeypatch):
+    app.dependency_overrides.pop(current_user_id, None)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    res = client.get("/coach/status")
+    assert res.status_code == 200
+    assert res.json() == {"configured": False, "models": []}
+
+
+def test_status_lists_models_but_never_the_key(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "super-secret-key")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-flash-latest, gemini-2.5-flash")
+    res = client.get("/coach/status")
+    assert res.json() == {"configured": True, "models": ["gemini-flash-latest", "gemini-2.5-flash"]}
+    assert "super-secret-key" not in res.text
+
+    monkeypatch.delenv("GEMINI_MODEL")
+    assert client.get("/coach/status").json()["models"] == [coach.DEFAULT_MODEL]
+
+
+def test_a_blank_key_counts_as_off(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "   ")
+    assert client.get("/coach/status").json()["configured"] is False

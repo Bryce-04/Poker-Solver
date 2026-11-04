@@ -181,7 +181,8 @@ lessons still use the one-shot `POST /coach`. `GEMINI_MODEL` may be a comma-sepa
 `apps/api`'s `POST /coach` (`app/coach.py`): a model (Gemini free tier, `GEMINI_API_KEY` /
 `GEMINI_MODEL` env vars, unset = off) explains from the facts the lesson computed and never decides
 what's right; any failure, no key, or a rate limit falls back to the app's own explanation. Sign-in
-required. See `docs/decisions.md` (including the unverified-model-name caveat).
+required. `GET /coach/status` (open, free) says whether a key is set on the deployment. See
+`docs/decisions.md` (including the unverified-model-name caveat).
 
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
