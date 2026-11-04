@@ -220,6 +220,8 @@ describe("Ask the coach", () => {
     await user.click(screen.getByRole("button", { name: /why isn.t the other choice better/i }));
 
     expect(await screen.findByText("AQo is strong enough to open.")).toBeInTheDocument();
+    // Said under what the model wrote, so it is never mistaken for what is graded.
+    expect(screen.getByText(/AI-written from the facts above\. The solver and the charts, not the AI, decide what is right\./i)).toBeInTheDocument();
     const [question, context] = mockAsk.mock.calls[0];
     expect(question).toBe("Why isn't the other choice better?");
     expect(context).toMatchObject({
@@ -249,6 +251,8 @@ describe("Ask the coach", () => {
     await user.click(screen.getByRole("button", { name: /explain this in simpler words/i }));
     expect(await screen.findByText("Built-in explanation.")).toBeInTheDocument();
     expect(screen.getByText(/asked a lot of questions this hour/i)).toBeInTheDocument();
+    // The app's own explanation is not AI-written, so it carries no such line.
+    expect(screen.queryByText(/AI-written/i)).not.toBeInTheDocument();
   });
 
   it("reports a network failure without losing the lesson", async () => {
