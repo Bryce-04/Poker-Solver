@@ -6,6 +6,52 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-03 — Mobile redesign Phase 5: the Library on phones
+
+**Status:** proposed.
+
+**Context.** `docs/mobile-redesign.md` §6: replace `SavedSpotsPage` on phones
+with a list of cards and a detail sheet, using the open / rename / duplicate /
+delete actions the desktop Library added. This is the last phase.
+
+**Decisions.**
+- **One data hook, two layouts.** The list fetch (tagged by account, so a
+  previous account's list never shows), search, the All / Preflop / Postflop
+  filter and the four actions moved from `LibraryWorkspace.tsx` into
+  `pages/library/useLibrary.ts`, unchanged. Each action now returns
+  `{ ok, spot? }` or the message to show, and each layout reacts in its own
+  way (desktop's table and preview panel are as before). Opening from a
+  phone sheet replaces the sheet's history entry, as Solve's steps do.
+- **`pages/library/LibraryPhone.tsx`**: search, the filter, and cards (name,
+  a green Preflop or amber Postflop pill, "BTN · 100bb · Oct 7", a chevron).
+  A card opens its sheet: the pill and name, desktop's description line, a
+  150px mini range with "% of hands / combos" or the board cards with "Saved
+  setup only. Open it and tap Solve to see the strategy again.", then Open in
+  Ranges / Solve, and Duplicate / Rename / Delete. Rename and the delete
+  confirmation happen inside the sheet; a duplicate opens the copy's sheet.
+- **Cards show only the day** ("Oct 7"), as the mockup does; the sheet keeps
+  desktop's fuller "saved Oct 7, 11:00 AM".
+- **Signed out**: the bookmark in a circle, "Your saved spots live here",
+  and Sign in, which opens the account sheet. Empty: "No saved spots yet.
+  Save a chart from Ranges or a setup from Solve."
+- **Opening saved spots works on phones now**: a chart lands in Ranges with
+  its saved range (Phase 4), a setup in Solve on its first open step, usually
+  Ready (Phase 2).
+- **Deleted**: `SavedSpotsPage` and its test. What it tested (readable names,
+  empty, unreachable vs error, signed out without a request, waiting for auth,
+  refetching on an account switch) is in `LibraryPhone.test.tsx`, with the
+  cards, search, filter and every sheet action.
+
+**Checked.** Build, lint, 370 tests. Desktop at 1440px pixel-identical to the
+Phase 4 build, including the Library signed in with a list and a preview.
+Phone screenshots of the list, the detail sheet and the signed-out screen
+match the mockup. To get a signed-in screenshot without touching Supabase,
+the screenshot build pointed at a fake Supabase address with a fake session in
+local storage, and a stubbed API served placeholder spots. Not checked on a
+real device.
+
+---
+
 ## 2026-11-03 — Mobile redesign Phase 4: the Ranges tab on phones
 
 **Status:** proposed.

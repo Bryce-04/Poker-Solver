@@ -325,7 +325,7 @@ category labels and "Why?" (Phase 6).
   honesty note ("the percentages come from the solve; the explanation is a
   rule of thumb").
 
-**Mobile redesign (agreed 2026-11-03; Phase 0 done)**: `docs/mobile-redesign.md`
+**Mobile redesign (agreed 2026-11-03; all six phases, 0-5, done)**: `docs/mobile-redesign.md`
 is the spec for everything under 1024px except the Drill, with the design as
 clickable HTML plus screenshots in `docs/mobile-redesign/mockup/`. Read both
 before touching phone layout. Phases 0-5 are built in order as one commit each
@@ -446,6 +446,22 @@ one file per step: `HandStep`, `BoardStep`, `RangesStep`, `ReadyStep`, and
   `phone.css` to `components/mobile/mobile.css`. Use them on new phone pages.
 - `ActionBar` takes a `backLabel`, so its secondary button can say something
   other than "Back" ("Save").
+
+**Phase 5 (Library) is done**: on phones `/library` is
+`pages/library/LibraryPhone.tsx`: search, the All / Preflop / Postflop filter,
+and spot cards. A card opens a sheet with a preview, Open in Ranges / Solve,
+and Duplicate / Rename / Delete (delete asks first).
+- Signed out, the page offers Sign in, which opens the account sheet.
+- **Opening a saved spot works on phones now.**
+- **Shared with desktop**: the data and actions live in
+  `pages/library/useLibrary.ts`, used by both layouts. Each action returns
+  `{ ok, spot? }` or the message to show.
+- `SavedSpotsPage` is deleted, and its test cases moved to
+  `LibraryPhone.test.tsx`.
+- **What's left for the redesign**: real-device checks (status and gesture
+  bars, Android back, the keyboard over inputs) and the single PR. These
+  optional extras aren't done: swipe-down to close a sheet, haptics, and hiding
+  the tab bar while the keyboard is open.
 
 ## Commands
 

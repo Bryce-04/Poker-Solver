@@ -5,7 +5,7 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import App from './App'
 import { listSpots } from './lib/api'
 
-// SavedSpotsPage calls listSpots() on mount -- mock the api module directly
+// The Library calls listSpots() on mount -- mock the api module directly
 // (same convention as SpotBuilder.test.tsx) rather than the transport
 // underneath it, so this test doesn't care whether that's fetch or
 // CapacitorHttp. POST/GET /spots is live (see docs/decisions.md); stub an
@@ -72,9 +72,9 @@ describe('<App />', () => {
     expect(window.location.search).toBe('')
 
     // Signed out (see the auth mock above), so Library shows its sign-in
-    // notice rather than fetching -- GET /spots requires sign-in.
+    // screen rather than fetching -- GET /spots requires sign-in.
     await user.click(screen.getByRole('link', { name: /^library$/i }))
-    expect(await screen.findByText(/not signed in/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /your saved spots live here/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: /^solve$/i }))
     expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
