@@ -133,11 +133,15 @@ def test_no_key_gives_the_apps_own_explanation(monkeypatch):
     ]
 
 
-def test_a_model_down_before_its_first_word_falls_back_and_logs_why(monkeypatch, caplog):
+def test_a_model_down_before_its_first_word_falls_back_and_logs_why(monkeypatch):
+    # Read the logger through a stand-in, not caplog: the full suite runs Alembic first (conftest),
+    # whose logging config disables every existing logger, so caplog sees nothing there.
+    logged = []
+    monkeypatch.setattr(coach, "log", type("L", (), {"warning": lambda self, msg, *args: logged.append(msg % args)})())
     use(monkeypatch, FakeStream(fail_first=coach.CoachUnavailable("HTTP 503: high demand")))
     got = events(chat())
     assert got[0] == {"fallback": "unavailable"} and got[1] == {"delta": CONTEXT["explanation"]}
-    assert "high demand" in caplog.text
+    assert any("high demand" in line for line in logged)
 
 
 def test_a_model_that_says_nothing_falls_back(monkeypatch):
