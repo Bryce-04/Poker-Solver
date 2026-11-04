@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  GROUP_ORDER,
   LESSONS,
   questionFor,
   recommendNext,
@@ -107,28 +108,37 @@ function TrainHub({
           Lessons
         </h2>
         <p className="train__hint">Start here if you know the hand rankings. Each lesson is a few short cards and some questions.</p>
-        <ul className="train__list">
-          {LESSONS.map((lesson) => {
-            const p = progress[lesson.id];
-            return (
-              <li key={lesson.id}>
-                <button type="button" className="train__card" onClick={() => onOpen(lesson.id)}>
-                  <span className="train__card-main">
-                    <span className="train__card-title">{lesson.title}</span>
-                    <span className="train__card-sub">{lesson.summary}</span>
-                    <span className="train__card-meta">
-                      {lesson.minutes} min
-                      {p?.done ? ` · done, ${p.correct}/${p.total} right` : ""}
-                    </span>
-                  </span>
-                  <span className="train__chevron" aria-hidden="true">
-                    {p?.done ? "✓" : "›"}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {GROUP_ORDER.map((group) => {
+          const inGroup = LESSONS.filter((l) => l.group === group);
+          if (inGroup.length === 0) return null;
+          return (
+            <div key={group} className="train__group">
+              <h3 className="train__group-title">{group}</h3>
+              <ul className="train__list">
+                {inGroup.map((lesson) => {
+                  const p = progress[lesson.id];
+                  return (
+                    <li key={lesson.id}>
+                      <button type="button" className="train__card" onClick={() => onOpen(lesson.id)}>
+                        <span className="train__card-main">
+                          <span className="train__card-title">{lesson.title}</span>
+                          <span className="train__card-sub">{lesson.summary}</span>
+                          <span className="train__card-meta">
+                            {lesson.minutes} min
+                            {p?.done ? ` · done, ${p.correct}/${p.total} right` : ""}
+                          </span>
+                        </span>
+                        <span className="train__chevron" aria-hidden="true">
+                          {p?.done ? "✓" : "›"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </section>
 
       <section aria-labelledby="train-practice">

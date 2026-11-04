@@ -1,8 +1,7 @@
 import opens from "../data/open-ranges.json";
 import pairData from "../data/preflop-pairs.json";
 import { RANKS } from "./hands";
-import { explainOpen } from "./lessons";
-import type { OpenSeat } from "./openRanges";
+import { cardsFor, explainOpen, type OpenSeat } from "./openRanges";
 import { The, openPrompt, seatPhrase, the } from "./seats";
 
 // The 6-max practice table's engine: pure logic, no React. A hand is dealt, the
@@ -34,7 +33,7 @@ export const FOUR_BET_TO = 22;
 
 const OPEN_RANGES = opens as Record<OpenSeat, string[]>;
 
-interface PairRanges {
+export interface PairRanges {
   flat: string[];
   threeBet: string[];
   callVs3: string[];
@@ -42,7 +41,10 @@ interface PairRanges {
   callVs4: string[];
 }
 const PAIRS = pairData as Record<string, PairRanges>;
-const pairFor = (opener: Seat, defender: Seat): PairRanges | undefined => PAIRS[`${opener}>${defender}`];
+export const pairFor = (opener: Seat, defender: Seat): PairRanges | undefined => PAIRS[`${opener}>${defender}`];
+
+/** Every (opener, defender) pair the charts cover. */
+export const PAIR_KEYS: readonly [Seat, Seat][] = Object.keys(PAIRS).map((k) => k.split(">") as [Seat, Seat]);
 
 export type Rng = () => number;
 
@@ -233,6 +235,52 @@ function vs4betNode(deal: Deal, table: TableState, opener: Seat, pair: PairRange
     toMatch: FOUR_BET_TO,
     raiseTo: null,
   };
+}
+
+/** A decision named by what it is, without dealing a table: what a lesson asks. */
+export interface SpotRef {
+  kind: NodeKind;
+  hero: Seat;
+  /** The bot you face: the opener (vs-open, vs-4bet) or the 3-bettor (vs-3bet); null when first in. */
+  opponent: Seat | null;
+  /** A 169-type label, "KJo". */
+  hand: string;
+}
+
+/**
+ * The decision for a given hand at a given spot, graded exactly as it is at the table. The lessons
+ * (lib/generatedLessons.ts) use it, so a lesson question and a table hand can never disagree.
+ */
+export function nodeFor(ref: SpotRef): HeroNode {
+  const hands = Object.fromEntries(SEATS.map((s) => [s, cardsFor("72o")])) as Deal["hands"];
+  hands[ref.hero] = cardsFor(ref.hand);
+  const deal: Deal = { hero: ref.hero, hands };
+  const blinds = freshTable();
+  const opp = ref.opponent as Seat;
+  const need = (opener: Seat, defender: Seat): PairRanges => {
+    const pair = pairFor(opener, defender);
+    if (!pair) throw new Error(`no chart for ${opener} against ${defender}`);
+    return pair;
+  };
+  switch (ref.kind) {
+    case "open":
+      return openNode(deal, blinds);
+    case "vs-open":
+      return vsOpenNode(deal, raise(blinds, opp, OPEN_TO, "raises"), opp, need(opp, ref.hero));
+    case "vs-3bet": {
+      const t = raise(raise(blinds, ref.hero, OPEN_TO, "raise", "You"), opp, THREE_BET_TO, "3-bets");
+      return vs3betNode(deal, t, opp, need(ref.hero, opp));
+    }
+    case "vs-4bet": {
+      const t = raise(
+        raise(raise(blinds, opp, OPEN_TO, "raises"), ref.hero, THREE_BET_TO, "3-bet", "You"),
+        opp,
+        FOUR_BET_TO,
+        "4-bets",
+      );
+      return vs4betNode(deal, t, opp, need(opp, ref.hero));
+    }
+  }
 }
 
 /**

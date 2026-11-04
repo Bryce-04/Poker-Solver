@@ -6,6 +6,57 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — Generated lessons, postflop lessons, squeezing, and "the baseline is not the rule"
+
+**Status:** proposed. The two hand-written lessons need a poker-literate review.
+
+**What.** The course grew from 4 lessons to 18, grouped on the Train hub (Basics, Opening, Defending,
+Against re-raises, After the flop, Beyond the baseline). "Up next" walks them in that order.
+
+- **Generated from the data (10 lessons).** One per first-in seat (UTG, HJ, CO, BTN, SB), one per
+  defending seat (BB, SB, BTN), "Facing a 3-bet" and "Facing a 4-bet". `lib/generatedLessons.ts`
+  builds them at load, seeded by the lesson id (the same every time). The right answers and
+  explanations come from the practice table's own grading (`practiceTable.nodeFor`, so a lesson and the
+  table can never disagree) and the percentages quoted are computed from the ranges. What is typed is
+  only the framing. Hands are chosen to be instructive: at the edge of a range (what a seat adds over
+  the tighter one, what the looser one adds), and only hands you could really hold at the spot (you
+  can only face a 3-bet with a hand you opened, a 4-bet with one you 3-bet).
+- **Postflop (2 lessons), from the Drill's solved deck.** "Out of position on the flop" (check or bet)
+  and "Facing a bet on the flop" (fold, call or raise), for the one matchup we have solved (BB vs BTN,
+  single-raised, 100bb). Same rule as the continuation-bet lesson: only hands the solver plays one way at
+  least 60% of the time are asked (a near-50/50 hand has no one right answer); the explanation quotes the
+  solver's shares for that exact hand.
+- **Two hand-written lessons**: "The squeeze" and "Playing against tendencies". They are principles, not solver
+  output, and say so on their first card (the app has no solver-built squeeze ranges and no
+  opponent-modelling yet). **They were written by the assistant and are unreviewed**: a team member who plays
+  should read them, especially the squeeze sizing guide (about 4x the open in position, more out of
+  position, one more open-size per extra caller) and the tendencies adjustments.
+
+**The baseline is not the rule.** The solver's play is the best play against a *balanced* opponent;
+against a real player with a leak, another play wins more. Every generated lesson says its numbers are
+a baseline and points at "Playing against tendencies", and the postflop lessons spell out the adjustment
+for players who never fold or who fold too much. What the app cannot do yet is *compute* an exploitative
+play: that needs the solver to fix an opponent's tendency and solve for the best response (the
+best-response pass exists; the "node-locking" does not). Until then the exploitative advice is taught as
+principle and clearly not graded.
+
+**Also.** The coach panel now says "AI-written from the facts above. The solver and the charts, not the
+AI, decide what is right." under any answer the model wrote (not under the app's own explanation).
+`explainOpen` moved to `lib/openRanges.ts` (with the data it explains) so lessons and the table don't
+import each other.
+
+**Not done.** The practice table still stops at "you see a flop": continuing the *same* hand postflop would
+need a live solve of that exact hand on a random flop (13 s warm, 52 s cold on Render), so the flop is
+practised in the Drill and in these lessons instead. No solver-graded squeeze ranges. Hands asked are
+random within the instructive pool, not adaptive to what a learner keeps missing.
+
+**Tests.** `lib/generatedLessons.test.ts` (17: answers come from the data, only holdable hands, no repeats,
+quoted percentages recomputed independently, the same every time, flop answers are clear majorities, every
+generated lesson carries the baseline note; five deliberate breaks of the generator are caught) and the hub
+tests in `TrainPage.test.tsx` (grouping, playing a generated lesson through to its drill).
+
+---
+
 ## 2026-11-05 — The lessons' coach retries across the model list, and `/coach/status` says why a call failed
 
 **Why.** With the key set on Render, a lesson question still answered "The AI coach couldn't be

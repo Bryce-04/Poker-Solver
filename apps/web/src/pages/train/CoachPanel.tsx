@@ -10,6 +10,9 @@ const QUICK_QUESTIONS = [
   "What should I look for next time?",
 ];
 
+/** Said under every answer the model wrote, so what is AI-written is never mistaken for what is graded. */
+export const AI_NOTE = "AI-written from the facts above. The solver and the charts, not the AI, decide what is right.";
+
 const FALLBACK_NOTE: Record<string, string> = {
   not_configured: "The AI coach isn't switched on yet, so this is the app's own explanation.",
   rate_limited: "You've asked a lot of questions this hour, so this is the app's own explanation. Try again later.",
@@ -19,7 +22,7 @@ const FALLBACK_NOTE: Record<string, string> = {
 type CoachState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "answer"; text: string; note: string | null }
+  | { kind: "answer"; text: string; note: string | null; ai: boolean }
   | { kind: "error"; message: string };
 
 /**
@@ -41,7 +44,12 @@ export function CoachPanel({ context }: { context: CoachContext }) {
     const result = await askCoach(q, context);
     if (result.kind === "answer") {
       const { answer, source, reason } = result.data;
-      setState({ kind: "answer", text: answer, note: source === "fallback" && reason ? (FALLBACK_NOTE[reason] ?? null) : null });
+      setState({
+        kind: "answer",
+        text: answer,
+        note: source === "fallback" && reason ? (FALLBACK_NOTE[reason] ?? null) : null,
+        ai: source === "ai",
+      });
     } else if (result.kind === "signed-out") {
       setState({ kind: "error", message: "Sign in to ask the coach." });
     } else if (result.kind === "network-error") {
@@ -102,6 +110,7 @@ export function CoachPanel({ context }: { context: CoachContext }) {
           <>
             <p className="train__text train__coach-answer">{state.text}</p>
             {state.note && <p className="train__hint">{state.note}</p>}
+            {state.ai && <p className="train__hint">{AI_NOTE}</p>}
           </>
         )}
         {state.kind === "error" && <p className="train__hint">{state.message}</p>}

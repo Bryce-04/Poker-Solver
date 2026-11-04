@@ -295,3 +295,17 @@
   align-items: center;
   text-decoration: none;
 }
+
+.train__group {
+  margin-top: 18px;
+}
+
+.train__group-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
