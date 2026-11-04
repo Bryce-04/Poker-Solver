@@ -169,6 +169,14 @@ a test fails if it drifts). "The continuation bet" is graded by the Drill deck's
 (`lib/cbetLesson.ts`). See `docs/decisions.md` for what's planned next (an AI coach, a lesson guide,
 ranked play, opponent types).
 
+**Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
+`done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own
+explanation, never an error) and takes the conversation so far, so the learner can ask follow-ups.
+The Drill's answer screen uses it (`components/CoachChat`, `lib/coach.ts` builds the context); the
+lessons still use the one-shot `POST /coach`. `GEMINI_MODEL` may be a comma-separated list and
+`GEMINI_THINKING_BUDGET` defaults to 0 (see docs/decisions.md for why, and for local-dev traps:
+`SUPABASE_URL` and root certificates).
+
 **AI coach (2026-11-05)**: each answered Train question has "Ask the coach", backed by
 `apps/api`'s `POST /coach` (`app/coach.py`): a model (Gemini free tier, `GEMINI_API_KEY` /
 `GEMINI_MODEL` env vars, unset = off) explains from the facts the lesson computed and never decides

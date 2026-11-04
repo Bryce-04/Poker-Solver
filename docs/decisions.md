@@ -6,6 +6,56 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — The coach as a streamed chat, and the Drill's "Ask the coach"
+
+**What.** `POST /coach/chat` (`apps/api/app/coach.py`, `routes/coach.py`): the same grounded coach as
+`POST /coach` below, but the answer streams (Server-Sent Events) and the learner can ask follow-ups.
+The Drill's answer screen gets an "Ask the coach to explain" box (`components/CoachChat`) with three
+suggested questions and a text box. `POST /coach` and the lessons' coach are unchanged.
+
+**Why one coach, not two.** A Drill hand fits the existing `CoachContext` (the hand, the board, what
+the learner chose, the solver's most frequent action, and an explanation computed from the solver),
+so the Drill reuses the same facts prompt, sign-in, limiter and provider. `lib/coach.ts` builds that
+context from a Drill spot; the whole solver mix goes into `explanation`, because a mixed strategy
+has no single "correct" action and the model must be able to say so.
+
+**Rules kept.** The solver decides, the model explains, from the given facts only. The coach never
+dead-ends: when the model isn't configured, is over the limit, or fails before its first word, the
+reply is the app's own explanation (`{"fallback": reason}` then that text as the one delta), and the
+UI says so in the same words as the lessons. Only a break *after* words have started is an error
+(`{"error": true}`; the UI keeps the partial answer's absence and offers to try again). Each chat
+message counts against the hourly and daily limits, so a conversation uses several: raise
+`COACH_PER_HOUR` if 20 feels tight. The server keeps no conversation; each call carries the history
+(at most 12 messages, opening with the coach's answer).
+
+**Speed and reliability on the free tier** (found by running it against the real service, which the
+entry below says hadn't happened yet):
+- Most of the wait was Gemini 2.5's silent "thinking", not the answer. `GEMINI_THINKING_BUDGET`
+  defaults to `0` (off); `default` leaves the model's behaviour alone. A model that rejects the
+  setting (HTTP 400) is retried without it. Streaming shows the first words in about a second.
+- Free-tier models are often "high demand" (HTTP 503). `GEMINI_MODEL` may be a comma-separated list;
+  each is tried in order, and the whole list a second time after a 2 s pause, until the first word
+  arrives. 404 (a retired name) and 429 also move on to the next; a bad key (401/403) does not.
+- Model names go stale. `gemini-2.5-flash` answered 404 for the project this was tried with, while
+  the alias `gemini-flash-latest` existed (it was merely busy). The default is left as it was; set
+  `GEMINI_MODEL=gemini-flash-latest,gemini-flash-lite-latest` (or what AI Studio lists) and read the
+  server log: every failed call logs the provider's own reason.
+- Local-dev traps that look like coach bugs: the API needs `SUPABASE_URL` (the same project URL as
+  the web app's `VITE_SUPABASE_URL`) or every sign-in check crashes into a 500 the browser reports as
+  "couldn't reach the server"; and a python.org Python with no root certificates fails the sign-in
+  check with `CERTIFICATE_VERIFY_FAILED` (a 503). Fix with
+  `SSL_CERT_FILE=$(python -c 'import certifi;print(certifi.where())')`. Docker images are not affected.
+
+**Not done.** The lessons' coach still uses the one-shot `POST /coach` (no streaming, one question);
+moving it to `/coach/chat` is a small change. No saved conversations, no "describe a spot in words"
+coach (the mockup in the design review), no leak finder.
+
+**Tests.** `apps/api/tests/test_coach_chat.py` (25, no network: conversation shape and limits, every
+fallback, the limiter, the stream cutting off, and Gemini's streaming transport through
+`httpx.MockTransport`: model list, retry rounds, the thinking setting). Web: `CoachChat.test.tsx`,
+`coachApi.test.ts` (SSE parsing across chunk boundaries), `coach.test.ts`, and the Drill's keyboard
+guard (Space/Enter typed into the coach must not skip the hand).
+
 ## 2026-11-05 — Train tab: the AI coach (Gemini free tier, grounded, with a fallback)
 
 **Status:** proposed.
