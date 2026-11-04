@@ -4,6 +4,7 @@
 
 import { betFrequency, CLEAR_MAJORITY, explainCbet, pickCbetSpots } from "./cbetLesson";
 import type { DrillSpot } from "./drill";
+import type { PracticeFilter } from "./practiceTable";
 import { cardsFor as cardsForHand, earliestOpeningSeat, inOpenRange, openPercent, type OpenSeat } from "./openRanges";
 
 export interface Choice {
@@ -39,6 +40,8 @@ export interface Lesson {
   title: string;
   summary: string;
   minutes: number;
+  /** The practice-table drill that goes with this lesson, offered when it ends. */
+  practice?: PracticeFilter;
   steps: LessonStep[];
 }
 
@@ -163,6 +166,7 @@ export const LESSONS: Lesson[] = [
     title: "Which hands to open",
     summary: "When it's folded to you, which hands are worth a raise from each seat.",
     minutes: 6,
+    practice: "open",
     steps: [
       {
         kind: "read",

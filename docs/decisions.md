@@ -6,6 +6,55 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — The 6-max practice table (preflop-first)
+
+**Status:** proposed.
+
+**Why.** The Train tab taught and graded, but there was nowhere to *apply* a lesson at a table. Ranked
+play (planned) tests skill; this is where you practice it first.
+
+**Decision (agreed with the team lead): preflop-first, bots from the charts, honest about the limit.**
+Our solver handles two players on one street, so a solver-driven 6-max table is not possible, and
+pretending otherwise would break the rule that the solver decides what is right. So the table
+(`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`, reached from Train as "6-max
+practice table", `/train?practice=<mixed|open|defend>`):
+
+- Six seats, you at the bottom, 100bb. A hand is dealt; the bots in front of you act from the
+  reference charts (the first seat whose hand is in its opening range raises, the seats behind it
+  fold), you decide, the bots answer from the same charts, and **every decision of yours is graded
+  against the charts** with an explanation worked out from them.
+- It plays the whole preflop chain the data supports: open or fold; facing an open (fold / call /
+  3-bet) in the nine charted (opener, defender) pairs; facing a 3-bet after your open (fold / call /
+  4-bet); facing a 4-bet after your 3-bet (fold / call). It stops where the charts run out (a call,
+  a fold, or a 4-bet answered). 5-bets are not covered.
+- Spots the charts can't grade (a seat with no chart against that opener; the big blind when nobody
+  raised) are simply dealt again, so every hand has exactly one right answer at every decision.
+- **No solver, no postflop, no chips.** Bet sizes (2.5 / 9 / 22bb) are for display; grading is
+  range-based. Bots never cold-call or 3-bet before you act (a simplification). The pot and the
+  stacks are illustrative. Each question has the same "Ask the coach" panel as the lessons
+  (`pages/train/CoachPanel.tsx`, extracted from the Train page, unchanged).
+- Lessons link in: "Which hands to open" ends with "Practice this at the table" (`Lesson.practice`).
+
+**Data.** `apps/web/src/data/preflop-pairs.json`, written by `apps/api/scripts/make_preflop_pairs.py`
+from `preflop_ranges.py` (the same pattern as the opening ranges and the Drill deck, so the table
+works offline). `apps/api/tests/test_preflop_pairs_data.py` fails if it drifts from the charts, and
+checks the invariants the engine relies on: at each node the ranges are disjoint (one action per
+hand) and you can only hold hands you could have reached the node with. Rerun the script after
+changing the charts. The ranges are the app's approximate reference charts, and the table says so.
+
+**Tests.** `lib/practiceTable.test.ts` (23: labelling, how the bots act, every grading node, every
+chart pair played through, seeded dealing; three deliberate breaks of the engine are caught) and
+`pages/train/PracticeTable.test.tsx` (the table, answering, scoring, the coach, filters, the Train
+tab hand-off, the lesson link).
+
+**Next (agreed): more lessons, generated from the data.** One lesson per seat and per spot type
+(opening, defending the blinds, 3-bet, facing a 3-bet), with the practice questions drawn from the
+ranges and the explanation cards drafted by the AI for the team to review and edit, never
+written live (nothing would check them). Then postflop practice for the one matchup we have solved
+(BB vs BTN, the Drill deck), then ranked play.
+
+---
+
 ## 2026-11-05 — The coach as a streamed chat, and the Drill's "Ask the coach"
 
 **What.** `POST /coach/chat` (`apps/api/app/coach.py`, `routes/coach.py`): the same grounded coach as
