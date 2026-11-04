@@ -4,17 +4,25 @@ import { MemoryRouter } from "react-router-dom";
 import { PracticeTable } from "./PracticeTable";
 import { TrainPage } from "../TrainPage";
 import { actionLabel, dealHand, mulberry32, type PracticeFilter } from "../../lib/practiceTable";
-import { askCoach } from "../../lib/api";
+import { askCoach, fetchProgress, putProgress } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
 vi.mock("../../lib/api", () => ({ askCoach: vi.fn(), fetchProgress: vi.fn(), putProgress: vi.fn() }));
 vi.mock("../../lib/auth", () => ({ useAuth: vi.fn() }));
 const mockAsk = vi.mocked(askCoach);
+const mockFetchProgress = vi.mocked(fetchProgress);
+const mockPutProgress = vi.mocked(putProgress);
 const mockUseAuth = vi.mocked(useAuth);
 
 beforeEach(() => {
   window.localStorage.clear();
   mockAsk.mockReset();
+  // The Train hub syncs lesson progress when someone is signed in; give it a server that has none,
+  // so it never runs against an unset mock (which crashed in the background after a test ended).
+  mockFetchProgress.mockReset();
+  mockFetchProgress.mockResolvedValue({ kind: "ok", lessons: {} });
+  mockPutProgress.mockReset();
+  mockPutProgress.mockResolvedValue({ kind: "saved", stored: { done: true, correct: 0, total: 0, at: 0 } });
   mockUseAuth.mockReset();
   mockUseAuth.mockReturnValue({ status: "signed-in", email: "a@b.c" });
 });
