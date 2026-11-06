@@ -102,6 +102,14 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   seq = 0;
+  // This file is the desktop layout (CoachPhone.test.tsx has the phone's);
+  // jsdom has no matchMedia, so without this it would render the phone one.
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === "(min-width: 1024px)",
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
   // reset, not clear: a one-time answer a failed test never used must not leak into the next.
   vi.resetAllMocks();
   mockUseAuth.mockReturnValue({ status: "signed-in", email: "p@example.com" } as ReturnType<typeof useAuth>);
@@ -114,6 +122,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("CoachPage", () => {
@@ -218,7 +227,7 @@ describe("CoachPage", () => {
 
     const result = screen.getByRole("region", { name: "Solver result" });
     expect(within(result).getByText("Solver's play with A♥ Q♦")).toBeInTheDocument();
-    expect(within(result).getByText("Very accurate · solved in 21s")).toBeInTheDocument();
+    expect(within(result).getByText(/Very accurate/)).toHaveTextContent("Very accurate · solved in 21s");
     expect(within(result).getByText("Bet small (1.38bb)")).toBeInTheDocument();
     expect(within(result).getByText("55%")).toBeInTheDocument();
 

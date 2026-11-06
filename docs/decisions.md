@@ -6,6 +6,72 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-06 — The Coach page, Phase 5: phones
+
+Status: **proposed**. Spec: `docs/coach.md` §9, design in `docs/coach/mockup/phone-*.html`.
+
+**What.** On phones, Coach is the fifth tab: Solve / Ranges / Coach / Library / Train (the mockup's
+fifth tab, Drill, now lives inside Train). `pages/coach/CoachPhone.tsx` runs on the same `useCoach`
+as desktop. `CoachPage` is now only the layout switch; the desktop page moved to `CoachWorkspace`.
+- **`/coach` is the empty state on phones** (spec §9). Desktop opens the most recent conversation
+  instead (`useCoach`'s `openRecent`).
+- **`/coach/saved`** is the saved-conversations list: New conversation, search, and the list. The
+  top bar's history button opens it.
+- **A conversation** has the top bar's back arrow (to the saved list) and its title.
+- **The cards are the desktop's components, reshaped by `CoachPhone.css`** (all under 1024px):
+  - the spot card is one row ("The spot I understood · Open in Solve") that opens;
+  - result bars sit under their label and %;
+  - the pill drops "solved in Ns";
+  - suggestions scroll sideways.
+- **The message bar** (cards button, text box, round send) is fixed above the tab bar, with
+  "Study tool, for after you play · Processed by Google Gemini · N messages left this hour" under
+  it. **Enter is a new line on phones; the send button sends.**
+- **"Add cards"** is a sheet: a My hand | Board switch, then rank then suit (at most 2 cards for a
+  hand, 5 for a board), then Done, which writes "my hand: A♥ Q♦" into the message.
+
+**Choices (the team's).**
+- **The Coach stays mounted on phones** behind other tabs (`App.tsx`'s `CoachKeepAlive`, like
+  Solve's). A turn keeps polling, a half-typed message survives a tab switch, and the Coach tab
+  shows a dot while it answers or when an answer hasn't been seen. The dot uses a new
+  `CoachBadgeContext`, next to Solve's `SolveBadgeContext`, so Solve's code is untouched. The Coach
+  mounts the first time it's opened, so nothing is fetched for a tab you haven't visited. Desktop
+  keeps the usual behavior and unmounts when you leave.
+- **Pasting a hand history** comes from the empty screen ("Or paste a hand history") and from the
+  Add cards sheet ("Paste a hand history instead"). The message bar keeps the mockup's single
+  cards button.
+
+**Shared now.** Solve's rank-then-suit card picker moved to `components/mobile/RankSuitPicker`
+(with its CSS), and Solve's board step renders through it unchanged; its 42 phone tests pass as
+before. The Coach's sheet adds `clearAfterPick`. The hand-history helpers (`readHistory`,
+`withHistory`) moved to `coachText.ts`, shared by both message boxes.
+
+**Navigation.** Phase 4's `desktopOnly` flag and `PHONE_NAV_ITEMS` are gone: `NAV_ITEMS` is the
+same five for both widths.
+
+**Checked against the mockup:** phone screenshots in headless Chrome. Desktop Chrome won't make a
+window under ~500px wide, so the app was framed in a 390×844 iframe. The empty state, an answer,
+can't-solve and the saved list all match. The first try caught two bugs:
+- the desktop button roles do nothing under 1024px, where a bare button is accent-filled, so
+  suggestions came out purple;
+- the spot card's toggle was unreadable.
+
+Both now have phone styles.
+
+**Tests:**
+- `pages/coach/CoachPhone.test.tsx`, inside the phone shell's real contexts:
+  - the empty state and its starters;
+  - the history button, the saved list and the back arrow;
+  - the compact spot card;
+  - Enter vs Send;
+  - Add cards (rank then suit, the 2-card cap);
+  - pasting from the cards sheet;
+  - the tab dot;
+  - signed out.
+- `CoachPage.test.tsx` now stubs desktop width, since it's the desktop layout's.
+- `App.test.tsx`: five tabs on phones and in the sidebar.
+
+---
+
 ## 2026-11-06 — The Coach page, Phase 4: the desktop UI
 
 Status: **proposed**. Spec: `docs/coach.md` §7-8, design in `docs/coach/mockup/desktop.html`.

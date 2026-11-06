@@ -3,10 +3,7 @@ import type { Spot } from "@poker-solver/schema";
 import { CardPicker } from "../../components/CardPicker/CardPicker";
 import { SegmentedControl } from "../../components/SegmentedControl/SegmentedControl";
 import type { CoachUsage } from "../../lib/api";
-import { parseHandHistoryToPostflopSetup } from "../../lib/parseHandHistory";
-import { LOW_USAGE, MAX_TEXT, cardsText, spotFromHistory } from "./coachText";
-
-type Attached = { spot: Spot; summary: string; text: string };
+import { LOW_USAGE, MAX_TEXT, cardsText, readHistory, withHistory, type AttachedHistory } from "./coachText";
 
 export function Composer({
   value,
@@ -33,7 +30,7 @@ export function Composer({
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [pasteProblem, setPasteProblem] = useState<string | null>(null);
-  const [attached, setAttached] = useState<Attached | null>(null);
+  const [attached, setAttached] = useState<AttachedHistory | null>(null);
   const [geminiNote, setGeminiNote] = useState(false);
 
   useEffect(() => {
@@ -50,12 +47,7 @@ export function Composer({
 
   async function submit() {
     if (busy) return;
-    let text = value.trim();
-    if (attached) {
-      // The model reads the user's seat and cards from the history itself.
-      const question = text || "Here's a hand I played. What should I have done at the end?";
-      text = `${question}\n\nHand history:\n${attached.text}`.slice(0, MAX_TEXT);
-    }
+    const text = withHistory(value, attached);
     if (!text) return;
     const sent = await onSend(text, attached?.spot);
     if (sent) {
@@ -81,19 +73,12 @@ export function Composer({
   }
 
   function usePastedHand() {
-    const result = parseHandHistoryToPostflopSetup(pasteText);
-    if (result.kind !== "ok") {
-      setPasteProblem(
-        `${result.reason} You can still send it as text: paste it into the message box and the Coach will read it.`,
-      );
+    const read = readHistory(pasteText);
+    if ("problem" in read) {
+      setPasteProblem(read.problem);
       return;
     }
-    const s = result.setup;
-    setAttached({
-      spot: spotFromHistory(s),
-      summary: `${s.oopPosition} vs ${s.ipPosition}, ${cardsText(s.board)}`,
-      text: pasteText.trim(),
-    });
+    setAttached(read.attached);
     setPasteOpen(false);
     setPasteText("");
     setPasteProblem(null);

@@ -1,6 +1,6 @@
 // Plain helpers for the Coach page (no components, so they're testable on their own).
 import type { Spot, Street } from "@poker-solver/schema";
-import type { PostflopSetup } from "../../lib/parseHandHistory";
+import { parseHandHistoryToPostflopSetup, type PostflopSetup } from "../../lib/parseHandHistory";
 
 export const SUIT_SYMBOL: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
 
@@ -54,3 +54,33 @@ export function whenText(iso: string, now = new Date()): string {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+
+/** A pasted hand history the app could read: the spot the backend uses as it
+ * is, a one-line summary for the chip, and the text the model reads. */
+export type AttachedHistory = { spot: Spot; summary: string; text: string };
+
+/** Reads a pasted hand history, or says why it couldn't. */
+export function readHistory(text: string): { attached: AttachedHistory } | { problem: string } {
+  const result = parseHandHistoryToPostflopSetup(text);
+  if (result.kind !== "ok") {
+    return {
+      problem: `${result.reason} You can still send it as text: paste it into the message box and the Coach will read it.`,
+    };
+  }
+  const s = result.setup;
+  return {
+    attached: {
+      spot: spotFromHistory(s),
+      summary: `${s.oopPosition} vs ${s.ipPosition}, ${cardsText(s.board)}`,
+      text: text.trim(),
+    },
+  };
+}
+
+/** The message sent with an attached history: the question, then the history
+ * itself, so the model can read the user's seat and cards from it. */
+export function withHistory(question: string, attached: AttachedHistory | null): string {
+  if (!attached) return question.trim();
+  const ask = question.trim() || "Here's a hand I played. What should I have done at the end?";
+  return `${ask}\n\nHand history:\n${attached.text}`.slice(0, MAX_TEXT);
+}

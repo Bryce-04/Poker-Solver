@@ -48,7 +48,8 @@ function lastSeqOf(thread: ThreadState | undefined): number {
 
 /**
  * The Coach page's data: the conversation list, the open conversation (by
- * route id; `/coach` opens the most recent, `/coach/new` an empty one),
+ * route id; `/coach` opens the most recent with `openRecent` (desktop) or is
+ * the empty state without it (phones), `/coach/new` is always empty),
  * sending, and polling while a turn runs. Polling pauses while the browser
  * tab is hidden and picks up from the last message seen.
  *
@@ -56,7 +57,7 @@ function lastSeqOf(thread: ThreadState | undefined): number {
  * tagged with its conversation's id, so switching conversations never shows
  * the previous one's: an untagged value reads as loading or unset.
  */
-export function useCoach(routeId: string | undefined) {
+export function useCoach(routeId: string | undefined, { openRecent = true }: { openRecent?: boolean } = {}) {
   const auth = useAuth();
   const navigate = useNavigate();
   const account = auth.status === "signed-in" ? (auth.email ?? "") : null;
@@ -74,8 +75,10 @@ export function useCoach(routeId: string | undefined) {
     [listFor, account],
   );
   const thread: ThreadState = useMemo(
-    () => forRoute(threadFor, routeId) ?? (routeId === NEW_CONVERSATION ? { kind: "empty" } : { kind: "loading" }),
-    [threadFor, routeId],
+    () =>
+      forRoute(threadFor, routeId) ??
+      (routeId === NEW_CONVERSATION || (routeId === undefined && !openRecent) ? { kind: "empty" } : { kind: "loading" }),
+    [threadFor, routeId, openRecent],
   );
   const notice = forRoute(noticeFor, routeId) ?? null;
   const pending = forRoute(pendingFor, routeId) ?? null;
@@ -124,10 +127,10 @@ export function useCoach(routeId: string | undefined) {
 
   // `/coach` with no id: open the most recent conversation, or start empty.
   useEffect(() => {
-    if (!signedIn || routeId !== undefined || list.kind !== "ok") return;
+    if (!openRecent || !signedIn || routeId !== undefined || list.kind !== "ok") return;
     const recent = list.conversations[0];
     navigate(`/coach/${recent ? recent.id : NEW_CONVERSATION}`, { replace: true });
-  }, [signedIn, routeId, list, navigate]);
+  }, [openRecent, signedIn, routeId, list, navigate]);
 
   // Load the open conversation, unless this route already has it (send()
   // just created it: a reload could land before the message is stored, read
@@ -284,3 +287,5 @@ export function useCoach(routeId: string | undefined) {
     retry,
   };
 }
+
+export type CoachData = ReturnType<typeof useCoach>;

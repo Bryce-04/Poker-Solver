@@ -1,21 +1,17 @@
 /**
- * The app's destinations (docs/desktop-redesign.md §3), in nav order. The
- * desktop sidebar renders all of them; the phone tab bar renders
- * PHONE_NAV_ITEMS, which leaves out the `desktopOnly` ones. The Coach is
- * desktop-only until its phone layout ships (docs/coach.md §9, Phase 5).
+ * The app's five destinations (docs/desktop-redesign.md §3, docs/coach.md §7
+ * and §9), in nav order. Both the phone tab bar and the desktop sidebar
+ * render from this list.
  */
 export const NAV_ITEMS = [
   { id: "solve", to: "/solve", label: "Solve", subtitle: "Best play after the flop" },
   { id: "ranges", to: "/ranges", label: "Ranges", subtitle: "Which hands to play preflop" },
-  { id: "coach", to: "/coach", label: "Coach", subtitle: "Ask about a spot", desktopOnly: true },
+  { id: "coach", to: "/coach", label: "Coach", subtitle: "Ask about a spot" },
   { id: "library", to: "/library", label: "Library", subtitle: "Your saved spots" },
   { id: "train", to: "/train", label: "Train", subtitle: "Lessons and practice" },
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];
-
-/** The phone tab bar's destinations: NAV_ITEMS without the desktop-only ones. */
-export const PHONE_NAV_ITEMS = NAV_ITEMS.filter((item) => !("desktopOnly" in item && item.desktopOnly));
 
 /** The page header for a path. A conversation (/coach/:id) shares /coach's. */
 export function pageHeaderFor(pathname: string) {

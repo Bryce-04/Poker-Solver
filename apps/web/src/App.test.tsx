@@ -46,10 +46,10 @@ describe('<App />', () => {
     expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
   })
 
-  it('has exactly the four nav destinations', () => {
+  it('has exactly the five nav destinations', () => {
     render(<App />)
     const links = screen.getAllByRole('link').map((link) => link.textContent)
-    expect(links).toEqual(['Solve', 'Ranges', 'Library', 'Train'])
+    expect(links).toEqual(['Solve', 'Ranges', 'Coach', 'Library', 'Train'])
   })
 
   it('navigates to Ranges (all three modes), Library and Solve without throwing', async () => {
@@ -205,8 +205,6 @@ describe('<App />', () => {
         'aria-current',
         'page',
       )
-      // The phone's four destinations plus the Coach, which is desktop-only until
-      // its phone layout ships (docs/coach.md §9).
       expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual([
         expect.stringMatching(/^Solve/),
         expect.stringMatching(/^Ranges/),

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
 import { PlayingCard } from "../../components/PlayingCard/PlayingCard";
@@ -99,18 +99,44 @@ function Cards({ hand }: { hand: string }) {
   return <span className="coach-spot__hand-type">{hand}</span>;
 }
 
-export function SpotCard({ payload, onEdit }: { payload: SpotCardPayload; onEdit: () => void }) {
+export function SpotCard({
+  payload,
+  onEdit,
+  compact = false,
+}: {
+  payload: SpotCardPayload;
+  onEdit: () => void;
+  /** Phones (docs/coach.md §9): one row that opens to show the details. */
+  compact?: boolean;
+}) {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(!compact);
   const half = Math.ceil(payload.facts.length / 2);
   return (
     <Indented>
-      <section className="coach-card coach-spot" aria-label="The spot I understood">
+      <section
+        className={`coach-card coach-spot${compact ? " coach-spot--compact" : ""}`}
+        aria-label="The spot I understood"
+      >
         <header className="coach-card__header">
-          <span className="section-label">The spot I understood</span>
-          <span className="coach-card__actions">
-            <button type="button" className="btn-ghost" onClick={onEdit}>
-              Edit
+          {compact ? (
+            <button
+              type="button"
+              className="coach-spot__toggle section-label"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+            >
+              The spot I understood
             </button>
+          ) : (
+            <span className="section-label">The spot I understood</span>
+          )}
+          <span className="coach-card__actions">
+            {open && (
+              <button type="button" className="btn-ghost" onClick={onEdit}>
+                Edit
+              </button>
+            )}
             {/* Opens it the way the Library opens a saved setup: Solve replays
                 the hand and loads the ranges itself. */}
             <button
@@ -122,6 +148,8 @@ export function SpotCard({ payload, onEdit }: { payload: SpotCardPayload; onEdit
             </button>
           </span>
         </header>
+        {open && (
+        <>
         <div className="coach-spot__body">
           {payload.hero_hand && (
             <div className="coach-spot__group">
@@ -154,6 +182,8 @@ export function SpotCard({ payload, onEdit }: { payload: SpotCardPayload; onEdit
         </div>
         {payload.assumptions.length > 0 && (
           <p className="coach-spot__assumptions">Assumed: {payload.assumptions.join(", ")}</p>
+        )}
+        </>
         )}
       </section>
     </Indented>
@@ -199,7 +229,8 @@ function AccuracyPill({ pct, converged, seconds }: { pct: number; converged: boo
           <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         </svg>
       )}
-      {word} · solved in {Math.round(seconds)}s
+      {word}
+      <span className="coach-pill__time"> · solved in {Math.round(seconds)}s</span>
     </span>
   );
 }
@@ -345,6 +376,7 @@ export function MessageList({
   onSend,
   onRetry,
   onEdit,
+  compact = false,
 }: {
   messages: CoachMessage[];
   status: CoachStatus;
@@ -353,6 +385,8 @@ export function MessageList({
   onSend: (text: string) => void;
   onRetry: () => void;
   onEdit: () => void;
+  /** Phones: compact spot cards (docs/coach.md §9). */
+  compact?: boolean;
 }) {
   const running = status === "working" || status === "waiting_for_solver";
   const lastIndex = messages.length - 1;
@@ -374,7 +408,9 @@ export function MessageList({
               />
             );
           case "spot_card":
-            return <SpotCard key={m.seq} payload={p as unknown as SpotCardPayload} onEdit={onEdit} />;
+            return (
+              <SpotCard key={m.seq} payload={p as unknown as SpotCardPayload} onEdit={onEdit} compact={compact} />
+            );
           case "result_card":
             return <ResultCard key={m.seq} payload={p as unknown as ResultCardPayload} />;
           case "preflop_card":
