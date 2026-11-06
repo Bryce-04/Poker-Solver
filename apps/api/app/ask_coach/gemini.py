@@ -37,19 +37,23 @@ def _as_text(m: CoachMessageRow) -> tuple[str, str] | None:
     if m.kind == "user_text":
         text = p.get("text", "")
         if p.get("attached_spot"):
-            text += "\n[The user attached a hand history; the app parsed it into the spot.]"
+            text += "\n(App note: the user attached a hand history; the app parsed it into the spot.)"
         return "user", text
     if m.kind == "coach_text":
         return "model", "\n\n".join(p.get("paras", []))
+    # Cards are described as app notes, not in a form the model could copy into
+    # its own text (it once wrote "[General advice box: ...]" as plain text). The
+    # advice's content is left out for the same reason. runner.py drops any
+    # reply paragraph that imitates a note anyway.
     if m.kind == "spot_card":
-        return "model", f"[Spot card shown: {p.get('summary', '')}]"
+        return "model", f"(App note: showed the spot card: {p.get('summary', '')})"
     if m.kind == "general_advice":
-        return "model", "[General advice box shown: " + " ".join(p.get("paras", [])) + "]"
+        return "model", "(App note: showed a general advice box, labeled not from the solver.)"
     if m.kind == "suggestions":
-        return "model", "[Follow-ups offered: " + " | ".join(p.get("items", [])) + "]"
+        return "model", "(App note: offered follow-ups: " + " | ".join(p.get("items", [])) + ")"
     if m.kind in ("result_card", "preflop_card"):
         rows = ", ".join(f"{r.get('label') or r.get('action')} {round(100 * r.get('freq', 0))}%" for r in p.get("rows", []))
-        return "model", f"[Solver result shown for {p.get('hero_hand') or 'the hand'}: {rows}]"
+        return "model", f"(App note: showed the solver's result for {p.get('hero_hand') or 'the hand'}: {rows})"
     return None  # solving, error: nothing the model needs
 
 

@@ -677,12 +677,22 @@ def _summary(d: Described, villain: str, line: str, state: StreetState) -> str:
 
 
 def _unique(items: list[str]) -> list[str]:
+    """Drops repeats, including ones worded slightly differently: the model's
+    "2.5bb open" and the backend's "a 2.5bb open" are the same assumption."""
     seen, out = set(), []
     for item in items:
-        if item.lower() not in seen:
-            seen.add(item.lower())
+        key = _assumption_key(item)
+        if key and key not in seen:
+            seen.add(key)
             out.append(item)
     return out
+
+
+def _assumption_key(text: str) -> str:
+    words = re.sub(r"[^a-z0-9.+ ]", " ", text.lower()).split()
+    while words and words[0] in ("a", "an", "the", "standard"):
+        words = words[1:]
+    return " ".join(w.rstrip(".") for w in words)
 
 
 def title_for(hero_position: str | None, hero_hand: str | None, villain: str | None, board: list[str]) -> str:

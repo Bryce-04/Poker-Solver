@@ -24,6 +24,7 @@ never message text (§6).
 from __future__ import annotations
 
 import logging
+import re
 from concurrent.futures import Future, ThreadPoolExecutor
 from uuid import UUID
 
@@ -117,6 +118,7 @@ def _run(conversation_id: UUID) -> UUID | None:
     )
     contents = gemini.build_contents(messages)
     stored_text = False
+    said: list[str] = []  # this turn's coach text so far: the model often repeats it at the end
 
     for round_ in range(MAX_TOOL_ROUNDS + 1):
         allow_tools = round_ < MAX_TOOL_ROUNDS
@@ -128,10 +130,25 @@ def _run(conversation_id: UUID) -> UUID | None:
             raise _Refunded("gemini_busy", BUSY_TEXT, owner) from e
         text = "\n\n".join(p["text"] for p in parts if "text" in p and not p.get("thought")).strip()
         calls = [p["functionCall"] for p in parts if "functionCall" in p] if allow_tools else []
-        if text:
+        paras, imitated_advice, bulleted = _split_imitations(_paras(text))
+        paras = _without_repeats(
+            paras,
+            said
+            + ctx.advice_paras
+            + [str(a) for c in calls if c.get("name") == "give_general_advice" for a in (c.get("args") or {}).get("paras") or []],
+        )
+        said += paras
+        if paras:
             # Text that comes with tool calls ("I'm assuming...") goes before their cards.
-            _store(conversation_id, "coach_text", {"paras": _paras(text)}, None)
+            _store(conversation_id, "coach_text", {"paras": paras}, None)
             stored_text = True
+        if imitated_advice:
+            # Advice the model wrote as text dressed up as the box becomes the real,
+            # labeled box: the label comes from the backend, never from the model.
+            tools.execute("give_general_advice", {"paras": imitated_advice}, ctx)
+        if bulleted and "suggest_followups" not in ctx.called:
+            # Follow-ups written as a bullet list become the tappable suggestions.
+            tools.execute("suggest_followups", {"items": bulleted}, ctx)
         if not calls:
             break
         contents.append({"role": "model", "parts": parts})
@@ -151,7 +168,73 @@ def _run(conversation_id: UUID) -> UUID | None:
     return owner
 
 
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9']+", text.lower()))
+
+
+_IMITATED_ADVICE = re.compile(r"^[\[(]\s*general advice[^:\])]*:\s*(.+?)[\])]?$", re.IGNORECASE | re.DOTALL)
+_IMITATED_NOTE = re.compile(
+    r"^[\[(]\s*(app note|spot card|follow-ups|suggested follow-ups|solver result|general advice)", re.IGNORECASE
+)
+
+
+_BULLET = re.compile(r"(?:^|\s)[*\-•]\s+")
+
+
+def _split_imitations(paras: list[str]) -> tuple[list[str], list[str], list[str]]:
+    """(paragraphs to keep, advice to show as a real box, follow-ups). The model
+    sometimes writes in its text what belongs in a card: "[General advice box:
+    ...]" becomes a real general_advice card, a bullet list of short questions
+    becomes the suggestions, and any other imitated app note is dropped."""
+    kept, advice, bullets = [], [], []
+    for para in paras:
+        m = _IMITATED_ADVICE.match(para)
+        if m:
+            advice.append(m.group(1).strip())
+            continue
+        if _IMITATED_NOTE.match(para):
+            continue
+        if _BULLET.match(para):
+            items = [i.strip() for i in _BULLET.split(para) if i.strip()]
+            if items and all(len(i) <= 40 for i in items):
+                bullets += items
+                continue
+        kept.append(para)
+    return kept, advice, bullets
+
+
+_LABEL_WORDS = {"general", "advice", "not", "from", "the", "solver"}
+
+
+def _without_repeats(paras: list[str], earlier: list[str]) -> list[str]:
+    """Drops paragraphs that repeat something already shown this turn: the
+    general advice (the model echoes the labeled box as its own, unlabeled
+    text, against spec rule 4) or its own earlier text (it often restates
+    "I'm assuming..." at the end)."""
+    shown = [_words(a) for a in earlier if a.strip()]
+    kept = []
+    for para in paras:
+        words = _words(para)
+        if words and any(len(words & a) >= 0.6 * len(words) for a in shown):
+            continue
+        if words and words <= _LABEL_WORDS:  # a copy of the advice box's label, on its own
+            continue
+        kept.append(para)
+    return kept
+
+
+_TAG = re.compile(r"<[^>]{0,300}>")
+_BLOCK_TAG = re.compile(r"</?(p|div|br|li|ul|ol|h[1-6])\b[^>]{0,300}>", re.IGNORECASE)
+
+
 def _paras(text: str) -> list[str]:
+    """The model's text as plain paragraphs. The Coach shows plain text, and the
+    model sometimes writes HTML or Markdown (once, its own "Not from the solver"
+    box): tags and emphasis marks are removed, block tags become paragraph
+    breaks."""
+    text = _BLOCK_TAG.sub("\n\n", text)
+    text = _TAG.sub("", text)
+    text = re.sub(r"(\*\*|__|^#+\s*)", "", text, flags=re.MULTILINE)
     text = text[:MAX_REPLY_CHARS]
     return [" ".join(p.split()) for p in text.split("\n\n") if p.strip()]
 

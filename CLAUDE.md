@@ -210,7 +210,9 @@ one usage limit**. One PR per phase.
   Postgres. `test_ask_coach_spot_builder.py`, `test_ask_coach_gemini.py` and
   `test_coach_eval_cases.py` don't.
 - **With a key** (`GEMINI_API_KEY` in the repo-root `.env`), from `apps/api`:
-  `python scripts/coach_smoke.py` checks it, and `python scripts/coach_eval.py` scores the model on
+  `python scripts/coach_try.py "a spot" "a follow-up"` runs real turns against the LOCAL database
+  (no sign-in, no UI needed) and prints the cards, `python scripts/coach_smoke.py` checks the key,
+  and `python scripts/coach_eval.py` scores the model on
   `coach_eval/cases.jsonl`. Run the eval before and after any prompt change; the target is 90%.
   `--check-cases` validates the cases without a key. **Last result: 84% (43 of 51), below the 90%
   target**; the misses are listed in `docs/decisions.md`. `main`'s default `gemini-2.5-flash` is a 404

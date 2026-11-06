@@ -157,6 +157,9 @@ class ToolContext:
     # Everything the user has written in this conversation, to check the model
     # didn't invent the suits of their hand (spot_builder.keep_only_written_suits).
     user_texts: list[str] = field(default_factory=list)
+    # The general advice shown this turn, so the runner can drop the model
+    # repeating it as its own (unlabeled) text.
+    advice_paras: list[str] = field(default_factory=list)
     called: list[str] = field(default_factory=list)
 
 
@@ -241,6 +244,7 @@ def _give_general_advice(args: dict, ctx: ToolContext) -> dict:
     if not paras:
         return {"ok": False, "reason": "No advice given."}
     ctx.store("general_advice", {"paras": paras}, None)
+    ctx.advice_paras += paras
     return {"ok": True}
 
 

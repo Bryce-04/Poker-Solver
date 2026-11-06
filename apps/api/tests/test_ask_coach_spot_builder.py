@@ -346,3 +346,8 @@ def test_cards_in_any_form(raw, card):
 def test_malformed_arguments_are_questions_not_crashes(change):
     d = sb.describe({**BTN_VS_BB_FLOP, **change})
     assert not d.ok and d.problems
+
+
+def test_the_same_assumption_worded_differently_is_listed_once():
+    d = sb.describe({**BTN_VS_BB_FLOP, "assumptions": ["2.5bb open", "100bb stacks", "standard ranges"]})
+    assert d.assumptions == ["2.5bb open", "100bb stacks", "standard ranges"]

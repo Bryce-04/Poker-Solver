@@ -6,6 +6,34 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — The Coach: what real conversations showed
+
+Status: **proposed**. `apps/api/scripts/coach_try.py` runs real Coach turns from a terminal (real
+Gemini, the local database only, no sign-in) and prints what's stored. The first real conversations
+broke spec rule 4 ("anything not from the solver is labeled") in ways the tests and the eval
+couldn't see:
+- **The model repeated its general advice as its own, unlabeled text.**
+- **It wrote advice as plain text with a fake label**, "[General advice box: ...]", copying how cards
+  were summarized in the history it's sent.
+- **Its replies included HTML** (a homemade "Not from the solver" box) **and Markdown.**
+- **It restated its opening sentences at the end**, and wrote follow-ups as a bullet list.
+
+The fixes are structural, in `runner.py`, so they don't depend on the model obeying the prompt:
+- Text becomes plain paragraphs (tags and emphasis removed).
+- A paragraph that repeats the advice shown this turn, or the Coach's own earlier text, is dropped.
+- A fake advice box becomes the real labeled card; any other imitated app note is dropped.
+- A bullet list of short questions becomes the tappable suggestions.
+- The history now describes cards as "(App note: ...)" and leaves out the advice's content, so
+  there's nothing to copy.
+- The prompt forbids strategy advice in the Coach's own text.
+- Assumptions are de-duplicated by meaning ("2.5bb open" and "a 2.5bb open" are one).
+
+**Still open:** while the solver tools answer "not connected", the model sometimes adds one sentence
+of unlabeled advice ("betting is a strong option"). Phase 3 gives it a real solver answer to explain
+instead; re-check with `coach_try.py` after it.
+
+---
+
 ## 2026-11-04 — The Coach page, Phase 2: Gemini, describe_spot, one client and one limit for the app
 
 Status: **proposed**. Spec: `docs/coach.md` §2-5 and §11.

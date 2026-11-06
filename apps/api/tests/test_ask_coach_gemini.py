@@ -147,10 +147,11 @@ def test_contents_summarize_cards_merge_roles_and_start_with_the_user():
     assert [c["role"] for c in contents] == ["user", "model", "user"]
     assert [p["text"] for p in contents[1]["parts"]] == [
         "I'm assuming 100bb.",
-        "[Spot card shown: You (BTN, AhQd) vs BB]",
-        "[General advice box shown: Be careful.]",
-        "[Follow-ups offered: What if he bets?]",
+        "(App note: showed the spot card: You (BTN, AhQd) vs BB)",
+        "(App note: showed a general advice box, labeled not from the solver.)",
+        "(App note: offered follow-ups: What if he bets?)",
     ]
+    assert "Be careful" not in str(contents)  # the advice itself isn't sent back
 
 
 def test_contents_keep_only_the_last_messages():

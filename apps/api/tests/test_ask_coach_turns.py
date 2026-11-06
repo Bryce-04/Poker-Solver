@@ -131,6 +131,78 @@ def test_general_advice_is_its_own_card(auth_headers, model):
     assert body["messages"][2]["payload"] == {"paras": ["One.", "Two.", "Three."]}
 
 
+def test_advice_the_model_repeats_as_its_own_text_is_dropped(auth_headers, model):
+    advice = "Top pair with the best kicker usually wants to bet for value on this board."
+    model.turns += [
+        [call("give_general_advice", paras=[advice])],
+        [text("The solver isn't available for this spot."), text(advice)],
+    ]
+    _, body = ask(auth_headers)
+    coach_texts = [p for m in body["messages"] if m["kind"] == "coach_text" for p in m["payload"]["paras"]]
+    assert coach_texts == ["The solver isn't available for this spot."]
+    assert [m["kind"] for m in body["messages"]] == ["user_text", "general_advice", "coach_text"]
+
+
+def test_advice_echoed_in_the_same_reply_as_the_call_is_dropped(auth_headers, model):
+    advice = "Most players prefer a small continuation bet here with top pair."
+    model.turns += [[text("I can't solve this."), text(advice), call("give_general_advice", paras=[advice])], []]
+    _, body = ask(auth_headers)
+    assert body["messages"][1]["payload"] == {"paras": ["I can't solve this."]}
+
+
+def test_the_model_restating_itself_at_the_end_is_dropped(auth_headers, model):
+    model.turns += [
+        [text("I'm assuming 100bb stacks."), call("describe_spot", **BTN_AQ)],
+        [text("OK. I'm assuming 100bb stacks."), text("Something new.")],
+    ]
+    _, body = ask(auth_headers)
+    coach_texts = [p for m in body["messages"] if m["kind"] == "coach_text" for p in m["payload"]["paras"]]
+    assert coach_texts == ["I'm assuming 100bb stacks.", "Something new."]
+
+
+def test_html_and_markdown_become_plain_text_and_a_copied_box_is_dropped(auth_headers, model):
+    advice = "On a queen-high board you want to bet often to get value from weaker queens and draws."
+    model.turns += [
+        [call("give_general_advice", paras=[advice])],
+        [
+            text("**Bet** is the main idea."),
+            text(f'<div style="border: 1px solid"><strong>Not from the solver</strong><p>{advice}</p></div>'),
+        ],
+    ]
+    _, body = ask(auth_headers)
+    coach_texts = [p for m in body["messages"] if m["kind"] == "coach_text" for p in m["payload"]["paras"]]
+    assert coach_texts == ["Bet is the main idea."]
+
+
+def test_advice_written_as_a_fake_box_becomes_the_real_labeled_box(auth_headers, model):
+    model.turns += [
+        [
+            text("I can't solve three-way pots."),
+            text("[General advice box: Be careful with one pair in multi-way pots.]"),
+            text("(App note: showed the spot card: whatever)"),
+            text("Want a heads-up version?"),
+        ],
+    ]
+    _, body = ask(auth_headers, "Three-way pot with KK on A73")
+    assert [m["kind"] for m in body["messages"]] == ["user_text", "coach_text", "general_advice"]
+    assert body["messages"][1]["payload"] == {"paras": ["I can't solve three-way pots.", "Want a heads-up version?"]}
+    assert body["messages"][2]["payload"] == {"paras": ["Be careful with one pair in multi-way pots."]}
+
+
+def test_a_bullet_list_of_follow_ups_becomes_the_suggestions(auth_headers, model):
+    model.turns += [[text("Want to go on?"), text("* What if he bets? * Turn ideas - Bet sizes")]]
+    _, body = ask(auth_headers)
+    assert [m["kind"] for m in body["messages"]] == ["user_text", "coach_text", "suggestions"]
+    assert body["messages"][2]["payload"] == {"items": ["What if he bets?", "Turn ideas", "Bet sizes"]}
+
+
+def test_a_bullet_list_of_long_points_stays_text(auth_headers, model):
+    long_point = "* " + "This is a long explanation that is clearly not a tappable question at all."
+    model.turns += [[text(long_point)]]
+    _, body = ask(auth_headers)
+    assert [m["kind"] for m in body["messages"]] == ["user_text", "coach_text"]
+
+
 def test_long_suggestions_are_dropped(auth_headers, model):
     model.turns += [[call("suggest_followups", items=["Short one", "x" * 41])], []]
     _, body = ask(auth_headers)
@@ -206,7 +278,7 @@ def test_follow_ups_carry_the_history_and_the_spot(auth_headers, model):
     sent = model.requests[0]
     flat = [p["text"] for c in sent["contents"] for p in c["parts"]]
     assert flat[0].startswith("BTN with AhQd")
-    assert any(t.startswith("[Spot card shown:") for t in flat)
+    assert any(t.startswith("(App note: showed the spot card:") for t in flat)
     assert "Bet small." in flat
     assert flat[-1] == "What if he bets instead?"
     assert [c["role"] for c in sent["contents"]] == ["user", "model", "user"]
