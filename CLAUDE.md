@@ -180,6 +180,101 @@ play the reference charts and every decision is graded against them (data in
 a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
 (generated lessons, postflop practice, ranked play, opponent types).
 
+**Coach page, Ask mode (spec agreed 2026-11-04; all six phases done)**: `docs/coach.md` is the
+spec, with the design as clickable HTML plus screenshots in `docs/coach/mockup/`. Read both before
+working on it, and `docs/decisions.md`'s Phase 1-6 entries: the spec predates the Train coach, so
+some of it was changed. It's a Coach page where a user describes a spot in plain words, and the
+solver decides while Gemini only explains (spec §1). It's separate from the Train coach's "Ask the
+coach" (below), which doesn't open a Coach conversation, but the two **share one Gemini client and
+one usage limit**. One PR per phase.
+- **The code is `apps/api/app/ask_coach/`**, not the spec's `app/coach/`, because `app/coach.py` is
+  the Train coach.
+  - `routes.py`: the endpoints. `store.py`: database helpers. `limits.py`: the shared limit.
+  - `runner.py`: one turn in the background. `prompt.py`: the system prompt. `tools.py`: tool
+    declarations and executors. `spot_builder.py`: `describe_spot`'s arguments to a `Spot`.
+    `gemini.py`: stored messages to Gemini contents. `solver_tools.py`: the preflop charts and
+    the live solver, behind `get_preflop_strategy` and `solve_current_spot`.
+- **Data**: tables `coach_conversations` / `coach_messages` (`app/db.py`, migration `0004`). A
+  message is `{seq, kind, payload}`; spec §3.1 lists the kinds. Spot cards also carry
+  `hero_position` and a `summary`, and errors can be `not_configured`.
+- **Endpoints**, all signed-in and owner-only (anyone else's conversation is a 404):
+  - `POST`/`GET /coach/conversations`
+  - `GET /coach/conversations/{id}?after=N` (the frontend polls it)
+  - `POST .../{id}/messages`: 202; 409 while a turn runs; 429 with body
+    `{used, limit, all_users_exhausted}`
+  - `PATCH`/`DELETE .../{id}`
+  - `GET /coach/usage`: `{used, limit, resets_at, all_users_exhausted}`, for this hour
+- **A turn** runs on a single-worker pool (`runner.submit`).
+  - It calls Gemini through `app/coach.py`'s `GeminiProvider.generate_turn`: function calling, the
+    same key and `GEMINI_MODEL` fallback list.
+  - At most 4 tool rounds, and each card is stored in its own transaction as it's made.
+  - `describe_spot` keeps the suits of the user's hand only if the user wrote them
+    (`keep_only_written_suits`); otherwise it uses the hand type.
+  - `describe_spot` computes the pot itself: `spot_builder.py` ports `handBuilder.ts`, and the two
+    are held together by `apps/web/src/lib/handBuilder.fixtures.json`. **Change both together.**
+  - `solve_current_spot` runs the Solve page's chain:
+    - ranges from the preflop line, narrowed through each earlier street, then the current street's
+      solve;
+    - the user's exact combo when the solve split it by suit;
+    - labels with the hand's REAL bet amounts, not the menu-rounded ones.
+
+    A busy solver puts the conversation in `waiting_for_solver`, and after 3 minutes the turn ends
+    with a `solver_busy` error.
+  - `get_preflop_strategy` reads the reference charts (approximate, not solved), and the card and
+    the prompt say "the charts".
+  - Text after a result carries the spec's source `note`.
+  - A conversation busy and untouched for 5 minutes is reset to `error` when it's next read.
+- **The limit** is the Train coach's `limiter` (`COACH_PER_HOUR` per user, `COACH_PER_DAY_TOTAL` for
+  everyone, in memory). A Coach message counts once. If Gemini is busy or there's no key, the
+  message is given back.
+- **Tests** never call Gemini. `tests/ask_coach_fakes.py`'s `FakeModel` replaces
+  `ask_coach.gemini.get_model`. `test_ask_coach.py` and `test_ask_coach_turns.py` need local
+  Postgres. `test_ask_coach_spot_builder.py`, `test_ask_coach_gemini.py` and
+  `test_coach_eval_cases.py` don't.
+- **With a key** (`GEMINI_API_KEY` in the repo-root `.env`), from `apps/api`:
+  `python scripts/coach_try.py "a spot" "a follow-up"` runs real turns against the LOCAL database
+  (no sign-in, no UI needed) and prints the cards, `python scripts/coach_smoke.py` checks the key,
+  and `python scripts/coach_eval.py` scores the model on
+  `coach_eval/cases.jsonl`. Run the eval before and after any prompt change; the target is 90%.
+  `--check-cases` validates the cases without a key. **Last results: 84%, then 76% after Phase 3
+  (same kinds of misses; runs vary by several points), below the 90% target**; the misses are listed in `docs/decisions.md`. That run used the Gemini 3 model list
+  that's now `app/coach.py`'s default.
+- **The UI is `apps/web/src/pages/coach/`** (Phases 4-5):
+  - `CoachPage` is the layout switch over one `useCoach` (the data; polls every 1.5s while a turn
+    runs).
+  - Desktop is `CoachWorkspace` with `Composer`; phones are `CoachPhone`, with its own message bar
+    and sheets.
+  - `CoachCards` has one component per message kind, shared, reshaped for phones by
+    `CoachPhone.css`. `coachText` has the helpers.
+  - `lib/api.ts` has the seven Coach calls. The usage line says "this hour".
+- **Routes:**
+  - `/coach`: the most recent conversation on desktop, the empty state on phones.
+  - `/coach/new`: empty.
+  - `/coach/saved`: the phone's saved list.
+  - `/coach/:id`: a conversation.
+
+  A conversation is created on its first message. `pageHeaderFor()` maps `/coach/*` to `/coach`'s
+  header.
+- **Coach is the fifth tab** (Solve / Ranges / Coach / Library / Train) at both widths.
+- **On phones it's kept mounted behind other tabs** (`App.tsx`'s `CoachKeepAlive`, like Solve's), so
+  a turn keeps polling. The tab dot uses `CoachBadgeContext`. It mounts only once the tab is first
+  opened.
+- **Enter sends on desktop but is a new line on phones**, where the button sends.
+- **Phone card picking is `components/mobile/RankSuitPicker`**, shared with Solve's board step.
+- **The root classes are `.coach-page` / `.m-coach`, never `.coach`**: `DrillPage.css` owns a
+  global `.coach`. On phones the desktop button roles do nothing, so give the Coach's buttons phone
+  styles (`CoachPhone.css`).
+- **The Library lists conversations** (Phase 6, `pages/library/useLibrary.ts`'s `items`):
+  - a Conversations filter ("Chats" on phones);
+  - a violet pill, and Open to `/coach/:id`;
+  - Rename and Delete through the Coach endpoints, and no duplicate.
+
+  Spots keep the server's order, with conversations slotted in by date.
+- **Before anyone outside the team uses it:**
+  - the eval reaching 90%;
+  - deploying (Render needs migration `0004`);
+  - a real-device check.
+
 **Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
 `done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own
 explanation, never an error) and takes the conversation so far, so the learner can ask follow-ups.

@@ -114,6 +114,18 @@
     color: var(--warning);
   }
 
+  /* Coach conversations (docs/coach.md §10): violet, the accent. */
+  .library__pill[data-kind="conversation"] {
+    background: var(--accent-subtle);
+    color: var(--accent);
+  }
+
+  .library__preview-quote {
+    margin: 0;
+    color: var(--text);
+    font-style: italic;
+  }
+
   .library__pill--start {
     align-self: flex-start;
   }

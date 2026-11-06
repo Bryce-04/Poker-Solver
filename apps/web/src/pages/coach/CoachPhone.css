@@ -1,0 +1,434 @@
+/* The Coach on phones (docs/coach.md §9; values from docs/coach/mockup/phone-*.html).
+   Everything here is under 1024px, so desktop can't change (the mirror of
+   the desktop redesign's rule). The shared cards' base styles are in
+   CoachPage.css; this file reshapes them for the narrow column. */
+@media (max-width: 1023px) {
+  .m-coach {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    font-size: 16px;
+  }
+
+  .m-coach__message {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 24px 4px;
+    color: var(--text);
+  }
+
+  .m-coach__message p {
+    margin: 0;
+  }
+
+  .m-coach__message-title {
+    font-weight: 650;
+    color: var(--text-strong);
+  }
+
+  .m-coach__notice {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--warning-subtle);
+    color: var(--text-strong);
+  }
+
+  /* Room for the fixed message bar, so the last message can scroll above it. */
+  .m-coach__spacer {
+    height: 112px;
+  }
+
+  /* --- the empty state ------------------------------------------------------------- */
+
+  .m-coach-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 8px;
+  }
+
+  .m-coach-empty__icon .coach-avatar {
+    width: 48px;
+    height: 48px;
+  }
+
+  .m-coach-empty__icon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .m-coach-empty__title {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.2;
+    color: var(--text-strong);
+  }
+
+  .m-coach-empty__body {
+    margin: 0;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  .m-coach-empty .m-label {
+    margin-top: 8px;
+  }
+
+  .m-coach-empty__starter {
+    text-align: left;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--chip-border);
+    background: var(--surface);
+    color: var(--text-strong);
+    font: 500 15px/1.4 var(--sans);
+  }
+
+  .m-coach-empty__paste {
+    align-self: flex-start;
+  }
+
+  /* --- the conversation: the shared cards, reshaped -------------------------------- */
+
+  .m-coach .coach-messages {
+    gap: 16px;
+  }
+
+  /* No avatar column on phones (the mockup): the Coach's text and cards run full width. */
+  .m-coach .coach-row {
+    gap: 0;
+  }
+
+  .m-coach .coach-row__gutter {
+    display: none;
+  }
+
+  .m-coach .coach-thinking .coach-row__gutter {
+    display: block;
+    flex-basis: 36px;
+  }
+
+  .m-coach .coach-text,
+  .m-coach .coach-advice {
+    font-size: 16px;
+  }
+
+  .m-coach .coach-user__bubble {
+    max-width: 88%;
+    font-size: 16px;
+    border-radius: 18px 18px 4px 18px;
+  }
+
+  .m-coach .coach-card__header {
+    padding: 10px 12px 10px 14px;
+  }
+
+  .m-coach .coach-spot--compact .coach-card__header {
+    border-bottom: 0;
+  }
+
+  .m-coach .coach-spot--compact .coach-card__header:has(+ .coach-spot__body) {
+    border-bottom: 1px solid var(--divider);
+  }
+
+  /* The desktop button roles (btn-secondary, btn-ghost) are inert under
+     1024px, where a bare button is accent-filled: the shared cards' buttons
+     get the phone's quiet button look here instead. */
+  .m-coach .coach-card__actions button,
+  .m-coach .coach-suggestions button,
+  .m-coach .coach-error button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--chip-border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-strong);
+    font: 600 14px/1.2 var(--sans);
+  }
+
+  .m-coach .coach-card__actions .btn-ghost {
+    border-color: transparent;
+    background: none;
+    color: var(--text);
+  }
+
+  .m-coach .coach-spot__toggle {
+    border: 0;
+    background: none;
+    padding: 8px 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  /* "Open in Solve" as a link-styled button in the compact row (the mockup). */
+  .m-coach .coach-spot--compact .coach-card__actions .btn-secondary {
+    border: 0;
+    background: none;
+    padding: 0 4px;
+    color: var(--accent);
+  }
+
+  .m-coach .coach-suggestions button {
+    flex: none;
+    border-radius: 999px;
+    min-height: 44px;
+    padding: 0 16px;
+  }
+
+  .m-coach .coach-spot__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .m-coach .coach-result {
+    padding: 14px;
+  }
+
+  /* Each action's label and % on one line, its bar under them. */
+  .m-coach .coach-bars__row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "label pct"
+      "track track";
+    gap: 6px 12px;
+    font-size: 16px;
+  }
+
+  .m-coach .coach-bars__label {
+    grid-area: label;
+  }
+
+  .m-coach .coach-bars__pct {
+    grid-area: pct;
+  }
+
+  .m-coach .coach-bars__track {
+    grid-area: track;
+  }
+
+  .m-coach .coach-result__range summary {
+    padding: 6px 0;
+  }
+
+  .m-coach .coach-pill__time {
+    display: none;
+  }
+
+  /* Suggestions scroll sideways instead of wrapping. */
+  .m-coach .coach-suggestions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-right: -16px;
+    padding-right: 16px;
+    scrollbar-width: none;
+  }
+
+  .m-coach .coach-error {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* --- saved conversations --------------------------------------------------------- */
+
+  .m-coach-saved__new {
+    align-self: stretch;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  input.m-coach-saved__search {
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text-strong);
+    font: inherit;
+  }
+
+  .m-coach-saved__items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .m-coach-saved__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--chip-border);
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .m-coach-saved__title {
+    font-weight: 650;
+    color: var(--text-strong);
+  }
+
+  .m-coach-saved__preview {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .m-coach-saved__time {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* --- the message bar, fixed above the tab bar -------------------------------------- */
+
+  .m-coach-composer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tab-bar-height, 0px) + var(--safe-bottom));
+    z-index: 15;
+    padding: 10px calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
+    background: var(--bg);
+    border-top: 1px solid var(--divider);
+  }
+
+  .m-coach-composer > * {
+    max-width: 536px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .m-coach-composer__warning {
+    margin-top: 0;
+    margin-bottom: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: var(--warning-subtle);
+    color: var(--warning);
+    font-size: 14px;
+  }
+
+  .m-coach-composer__attached {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: var(--accent-subtle);
+    color: var(--text-strong);
+    font-size: 14px;
+  }
+
+  .m-coach-composer__bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: 28px;
+    background: var(--surface);
+  }
+
+  .m-coach-composer__bar:focus-within {
+    border-color: var(--accent);
+  }
+
+  .m-coach-composer__cards {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  textarea.m-coach-composer__input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 120px;
+    box-sizing: border-box;
+    padding: 11px 4px;
+    border: 0;
+    background: transparent;
+    resize: none;
+    color: var(--text-strong);
+    font: 16px/1.4 var(--sans);
+  }
+
+  textarea.m-coach-composer__input:focus {
+    outline: none;
+  }
+
+  .m-coach-composer__send {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .m-coach-composer__cards svg,
+  .m-coach-composer__send svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .m-coach-composer__send:disabled {
+    opacity: 0.45;
+  }
+
+  .m-coach-composer__footer {
+    margin-top: 6px;
+    margin-bottom: 0;
+    font-size: 12px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  /* --- the sheets -------------------------------------------------------------------- */
+
+  .m-coach-cards__picked {
+    margin: 0;
+    color: var(--text-strong);
+  }
+
+  .m-coach-cards__paste {
+    align-self: center;
+  }
+
+  textarea.m-coach-paste__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text-strong);
+    font: 13px/1.45 var(--mono);
+  }
+
+  .m-coach-paste__problem {
+    margin: 0;
+    font-size: 14px;
+    color: var(--danger);
+  }
+}

@@ -207,58 +207,6 @@
   font-size: 20px;
 }
 
-.m-ranks {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.m-ranks .m-chip {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.m-suits {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.m-suit {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-height: 64px;
-  padding: 0;
-  border: 2px solid transparent;
-  border-radius: 12px;
-  background: var(--card-face);
-  color: var(--card-ink);
-  font: 700 28px/1 var(--sans);
-  cursor: pointer;
-}
-
-.m-suit[data-red] {
-  color: var(--card-red);
-}
-
-.m-suit:hover:not(:disabled) {
-  background: var(--card-face);
-  border-color: var(--accent);
-}
-
-.m-suit:disabled {
-  opacity: 0.3;
-}
-
-.m-suit__name {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text);
-}
-
 /* --- Step 4: summary, solving, done --- */
 
 .m-summary__row {

@@ -4,11 +4,12 @@ import { NavIcon } from "../NavIcon/NavIcon";
 import "./TabBar.css";
 
 /**
- * The phone bottom tab bar (docs/mobile-redesign.md §3.2): the four nav
+ * The phone bottom tab bar (docs/mobile-redesign.md §3.2): the five nav
  * destinations, each an icon over a label. `paths` is where each tab was
  * last left (App.tsx), so going back to a tab lands where you were; a tab
  * never visited goes to its root. `badges` puts a dot on a tab's icon (Solve,
- * while a solve runs or its result hasn't been seen).
+ * while a solve runs or its result hasn't been seen; Coach, while it answers
+ * or an answer hasn't been seen).
  */
 export function TabBar({
   paths,

@@ -46,10 +46,10 @@ describe('<App />', () => {
     expect(screen.getByRole('group', { name: 'Player 1' })).toBeInTheDocument()
   })
 
-  it('has exactly the four nav destinations', () => {
+  it('has exactly the five nav destinations', () => {
     render(<App />)
     const links = screen.getAllByRole('link').map((link) => link.textContent)
-    expect(links).toEqual(['Solve', 'Ranges', 'Library', 'Train'])
+    expect(links).toEqual(['Solve', 'Ranges', 'Coach', 'Library', 'Train'])
   })
 
   it('navigates to Ranges (all three modes), Library and Solve without throwing', async () => {
@@ -205,7 +205,13 @@ describe('<App />', () => {
         'aria-current',
         'page',
       )
-      expect(within(nav).getAllByRole('link')).toHaveLength(4)
+      expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual([
+        expect.stringMatching(/^Solve/),
+        expect.stringMatching(/^Ranges/),
+        expect.stringMatching(/^Coach/),
+        expect.stringMatching(/^Library/),
+        expect.stringMatching(/^Train/),
+      ])
       expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
       // The phone header (and its tagline) isn't rendered at all.
       expect(screen.queryByText(/manual hand builder/i)).not.toBeInTheDocument()

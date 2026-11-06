@@ -7,7 +7,8 @@ import { useOpenAccountSheet } from "../../lib/mobileShell";
 import { indexRange, totalCombos } from "../../lib/rangeCombos";
 import { TOTAL_COMBOS } from "../../lib/rangesSpot";
 import { displayName, shortSavedAt, spotKind } from "../../lib/spotText";
-import { LIBRARY_FILTERS, useLibrary } from "./useLibrary";
+import type { CoachConversationSummary } from "../../lib/api";
+import { LIBRARY_FILTERS, itemKind, itemName, useLibrary, type ItemKind, type LibraryData } from "./useLibrary";
 import "../../components/SpotBuilder/SpotBuilder.css";
 import "./LibraryPhone.css";
 
@@ -31,27 +32,42 @@ function metaLine(spot: Spot): string {
   return [who, `${spot.effective_stack_bb}bb`, saved].filter(Boolean).join(" · ");
 }
 
-function TypePill({ spot }: { spot: Spot }) {
-  const kind = spotKind(spot);
+const KIND_LABEL: Record<ItemKind, string> = { preflop: "Preflop", postflop: "Postflop", conversation: "Conversation" };
+
+/** The filter, with "Chats" for "Conversations": four labels share a phone's width. */
+const PHONE_FILTERS = LIBRARY_FILTERS.map((f) => (f.value === "conversations" ? { ...f, label: "Chats" } : f));
+
+function TypePill({ kind }: { kind: ItemKind }) {
   return (
     <span className="m-lib__pill" data-kind={kind}>
-      {kind === "preflop" ? "Preflop" : "Postflop"}
+      {KIND_LABEL[kind]}
     </span>
   );
 }
 
+/** "Coach · Nov 5": a conversation's card line. */
+function conversationMeta(c: CoachConversationSummary): string {
+  const date = new Date(c.updated_at);
+  const day = Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return ["Coach", day].filter(Boolean).join(" · ");
+}
+
 /**
- * The Library on phones and tablets (docs/mobile-redesign.md §6): search, an
- * All / Preflop / Postflop filter, and the saved spots as cards. Tapping one
- * opens its sheet: a preview, Open (in Ranges or Solve), and Duplicate /
- * Rename / Delete. The data and actions are useLibrary's, as desktop's.
+ * The Library on phones and tablets (docs/mobile-redesign.md §6, docs/coach.md
+ * §10): search, an All / Preflop / Postflop / Conversations filter, and the
+ * saved spots and Coach conversations as cards. Tapping a spot opens its
+ * sheet: a preview, Open (in Ranges or Solve), and Duplicate / Rename /
+ * Delete; a conversation's sheet has Open in Coach, Rename and Delete. The
+ * data and actions are useLibrary's, as desktop's.
  */
 export function LibraryPhone() {
   const library = useLibrary();
-  const { auth, state, spots, visible, query, setQuery, filter, setFilter } = library;
+  const { auth, state, spots, conversations, conversationsState, items, query, setQuery, filter, setFilter } = library;
   const openAccountSheet = useOpenAccountSheet();
   const [openId, setOpenId] = useState<string | null>(null);
   const opened = spots.find((s) => s.id === openId) ?? null;
+  const [openConversationId, setOpenConversationId] = useState<string | null>(null);
+  const openedConversation = conversations.find((c) => c.id === openConversationId) ?? null;
 
   if (auth.status === "signed-out") {
     return (
@@ -96,11 +112,11 @@ export function LibraryPhone() {
     );
   }
 
-  if (spots.length === 0) {
+  if (spots.length === 0 && conversations.length === 0) {
     return (
       <div className="m-lib__empty">
-        <h1 className="m-step__title">No saved spots yet</h1>
-        <p className="m-lib__empty-text">Save a chart from Ranges or a setup from Solve.</p>
+        <h1 className="m-step__title">Nothing saved yet</h1>
+        <p className="m-lib__empty-text">Save a chart from Ranges or a setup from Solve, or ask the Coach about a spot.</p>
       </div>
     );
   }
@@ -115,20 +131,28 @@ export function LibraryPhone() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <SegmentedControl label="Show" options={LIBRARY_FILTERS} value={filter} onChange={setFilter} stretch />
+      <SegmentedControl label="Show" options={PHONE_FILTERS} value={filter} onChange={setFilter} stretch />
 
-      {visible.length === 0 ? (
-        <p className="m-note">No spots match that search.</p>
+      {items.length === 0 ? (
+        <p className="m-note">Nothing matches that search.</p>
       ) : (
         <ul className="m-lib__list">
-          {visible.map((spot) => (
-            <li key={spot.id ?? displayName(spot)}>
-              <button type="button" className="m-lib__card" onClick={() => setOpenId(spot.id ?? null)}>
+          {items.map((item) => (
+            <li key={item.key}>
+              <button
+                type="button"
+                className="m-lib__card"
+                onClick={() =>
+                  item.type === "conversation"
+                    ? setOpenConversationId(item.conversation.id)
+                    : setOpenId(item.spot.id ?? null)
+                }
+              >
                 <span className="m-lib__card-text">
-                  <span className="m-lib__name">{displayName(spot)}</span>
+                  <span className="m-lib__name">{itemName(item)}</span>
                   <span className="m-lib__meta">
-                    <TypePill spot={spot} />
-                    {metaLine(spot)}
+                    <TypePill kind={itemKind(item)} />
+                    {item.type === "conversation" ? conversationMeta(item.conversation) : metaLine(item.spot)}
                   </span>
                 </span>
                 <svg className="m-lib__chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -139,7 +163,10 @@ export function LibraryPhone() {
           ))}
         </ul>
       )}
-      <p className="m-note m-note--small m-lib__foot">Only you can see your saved spots.</p>
+      {conversationsState.kind === "error" && (
+        <p className="m-note m-note--small">Couldn&rsquo;t load your Coach conversations. Your spots are all here.</p>
+      )}
+      <p className="m-note m-note--small m-lib__foot">Only you can see your saved spots and conversations.</p>
 
       {opened && (
         <SpotSheet
@@ -148,6 +175,14 @@ export function LibraryPhone() {
           library={library}
           onClose={() => setOpenId(null)}
           onShow={(spot) => setOpenId(spot.id ?? null)}
+        />
+      )}
+      {openedConversation && (
+        <ConversationSheet
+          key={openedConversation.id}
+          conversation={openedConversation}
+          library={library}
+          onClose={() => setOpenConversationId(null)}
         />
       )}
     </div>
@@ -162,7 +197,7 @@ function SpotSheet({
   onShow,
 }: {
   spot: Spot;
-  library: ReturnType<typeof useLibrary>;
+  library: LibraryData;
   onClose: () => void;
   /** Show another spot in the sheet (a fresh duplicate). */
   onShow: (spot: Spot) => void;
@@ -204,7 +239,7 @@ function SpotSheet({
       onClose={onClose}
       title={
         <span className="m-lib__sheet-title">
-          <TypePill spot={spot} />
+          <TypePill kind={kind} />
           <span>{name}</span>
         </span>
       }
@@ -288,6 +323,109 @@ function SpotSheet({
             <button type="button" className="m-btn m-btn--secondary" disabled={library.busy} onClick={() => void duplicate()}>
               Duplicate
             </button>
+            <button type="button" className="m-btn m-btn--secondary" onClick={() => setMode({ kind: "rename", draft: name })}>
+              Rename
+            </button>
+            <button type="button" className="m-btn m-lib__danger" onClick={() => setMode({ kind: "confirm-delete" })}>
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+
+      {notice && (
+        <p className="m-error" role="alert">
+          {notice}
+        </p>
+      )}
+    </BottomSheet>
+  );
+}
+
+/** One Coach conversation (docs/coach.md §10): Open in Coach, Rename, Delete. */
+function ConversationSheet({
+  conversation,
+  library,
+  onClose,
+}: {
+  conversation: CoachConversationSummary;
+  library: LibraryData;
+  onClose: () => void;
+}) {
+  const [mode, setMode] = useState<SheetMode>({ kind: "view" });
+  const [notice, setNotice] = useState<string | null>(null);
+  const name = conversation.title ?? "New conversation";
+
+  async function rename(draft: string) {
+    const result = await library.renameConversation(conversation, draft);
+    if (result.ok) setMode({ kind: "view" });
+    else setNotice(result.notice);
+  }
+
+  async function remove() {
+    const result = await library.removeConversation(conversation);
+    if (result.ok) onClose();
+    else setNotice(result.notice);
+  }
+
+  return (
+    <BottomSheet
+      open
+      onClose={onClose}
+      title={
+        <span className="m-lib__sheet-title">
+          <TypePill kind="conversation" />
+          <span>{name}</span>
+        </span>
+      }
+    >
+      <p className="m-note">{conversationMeta(conversation)}</p>
+      {conversation.preview && <p className="m-lib__quote">&ldquo;{conversation.preview}&rdquo;</p>}
+
+      {mode.kind === "rename" ? (
+        <form
+          className="m-section"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void rename(mode.draft);
+          }}
+        >
+          <label className="m-field">
+            New name
+            <input
+              type="text"
+              maxLength={120}
+              value={mode.draft}
+              onChange={(e) => setMode({ kind: "rename", draft: e.target.value })}
+            />
+          </label>
+          <div className="m-lib__actions">
+            <button type="submit" className="m-btn m-btn--primary" disabled={library.busy || mode.draft.trim() === ""}>
+              Save name
+            </button>
+            <button type="button" className="m-btn m-btn--secondary" onClick={() => setMode({ kind: "view" })}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      ) : mode.kind === "confirm-delete" ? (
+        <div className="m-section" role="alertdialog" aria-label={`Delete ${name}?`}>
+          <p className="m-note">Delete &ldquo;{name}&rdquo; and all its messages? This can&rsquo;t be undone.</p>
+          <div className="m-lib__actions">
+            <button type="button" className="m-btn m-lib__danger" disabled={library.busy} onClick={() => void remove()}>
+              Delete
+            </button>
+            <button type="button" className="m-btn m-btn--secondary" onClick={() => setMode({ kind: "view" })}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <button type="button" className="m-btn m-btn--primary" onClick={() => library.openConversation(conversation)}>
+            Open in Coach
+          </button>
+          <div className="m-lib__actions">
             <button type="button" className="m-btn m-btn--secondary" onClick={() => setMode({ kind: "rename", draft: name })}>
               Rename
             </button>

@@ -21,6 +21,7 @@ const ICONS: Record<NavId, ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  coach: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
   library: <path d="M6 3h12v18l-6-4-6 4V3z" />,
   train: (
     <>

@@ -10,15 +10,17 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { AuthProvider } from "./lib/auth";
 import {
   AccountSheetContext,
+  CoachBadgeContext,
   PageActiveContext,
   SolveBadgeContext,
   TopBarSlotContext,
   TopBarTitleContext,
   type TopBarTitleOverride,
 } from "./lib/mobileShell";
-import { NAV_ITEMS, PAGE_HEADERS, type NavId } from "./lib/navigation";
+import { NAV_ITEMS, pageHeaderFor, type NavId } from "./lib/navigation";
 import { readSavedSpot, readSolvePrefill, type SolvePrefill } from "./lib/solvePrefill";
 import { useIsDesktop } from "./lib/useIsDesktop";
+import { CoachPage } from "./pages/coach/CoachPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { RangesPage } from "./pages/RangesPage";
 import { TrainPage } from "./pages/TrainPage";
@@ -32,13 +34,14 @@ import "./App.css";
  * ("/solve/") is the same page, as it is to the router. */
 function tabFor(pathname: string): NavId | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
+  if (path.startsWith("/coach/")) return "coach";
   return NAV_ITEMS.find((item) => item.to === path)?.id;
 }
 
 /** Desktop: the bar at the top of the content area (docs/desktop-redesign.md
  * §4), unless the page renders its own to hold page actions. */
 function ShellPageHeader() {
-  const header = PAGE_HEADERS[useLocation().pathname];
+  const header = pageHeaderFor(useLocation().pathname);
   if (!header || header.ownHeader) return null;
   return <PageHeader title={header.title} description={header.description} />;
 }
@@ -83,6 +86,35 @@ function SolveKeepAlive() {
     <PageActiveContext.Provider value={onSolve}>
       <div style={{ display: onSolve ? "contents" : "none" }}>
         <SolvePage key={current.key} prefill={current.prefill} savedSpot={current.savedSpot} />
+      </div>
+    </PageActiveContext.Provider>
+  );
+}
+
+/**
+ * The Coach, kept mounted on phones while another tab is showing, the way
+ * Solve is (docs/coach.md §7): a conversation keeps polling for its answer,
+ * the Coach tab gets a dot when one arrives, and a half-typed message
+ * survives the trip. While hidden, the URL is another tab's, so it keeps the
+ * Coach path it was last on. Desktop keeps the usual behavior: it unmounts
+ * when you leave.
+ */
+function CoachKeepAlive() {
+  const isDesktop = useIsDesktop();
+  const match = useMatch("/coach/*");
+  const onCoach = match !== null;
+  const here = onCoach ? match.params["*"] ?? "" : null;
+  // The Coach path last shown (null until the Coach tab is first opened, so
+  // nothing is fetched for a tab you haven't visited).
+  const [last, setLast] = useState<string | null>(null);
+  if (here !== null && here !== last) setLast(here);
+  const sub = here ?? last;
+
+  if (sub === null || (isDesktop && !onCoach)) return null;
+  return (
+    <PageActiveContext.Provider value={onCoach}>
+      <div style={{ display: onCoach ? "contents" : "none" }}>
+        <CoachPage conversationId={sub === "" ? undefined : sub.split("/")[0]} />
       </div>
     </PageActiveContext.Provider>
   );
@@ -151,9 +183,10 @@ function Shell() {
   const [topBarSlot, setTopBarSlot] = useState<HTMLElement | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [solveBadge, setSolveBadge] = useState<string | null>(null);
+  const [coachBadge, setCoachBadge] = useState<string | null>(null);
   const [titleOverride, setTitleOverride] = useState<TopBarTitleOverride | null>(null);
 
-  const workspace = PAGE_HEADERS[pathname]?.workspace === true;
+  const workspace = pageHeaderFor(pathname)?.workspace === true;
   const tab = tabFor(pathname);
   const title = NAV_ITEMS.find((item) => item.id === tab)?.label ?? "Poker Solver";
   const mainClass = !isDesktop
@@ -165,6 +198,7 @@ function Shell() {
   return (
     <AccountSheetContext.Provider value={isDesktop ? null : () => setAccountOpen(true)}>
       <SolveBadgeContext.Provider value={isDesktop ? null : setSolveBadge}>
+      <CoachBadgeContext.Provider value={isDesktop ? null : setCoachBadge}>
       <TopBarSlotContext.Provider value={isDesktop ? null : topBarSlot}>
       <TopBarTitleContext.Provider value={isDesktop ? null : setTitleOverride}>
         <div className={isDesktop ? "app-shell" : "app"}>
@@ -187,6 +221,9 @@ function Shell() {
                   {/* Rendered by SolveKeepAlive below, so it can outlive a tab switch. */}
                   <Route path="/solve" element={null} />
                   <Route path="/ranges" element={<RangesPage />} />
+                  {/* Rendered by CoachKeepAlive below, so a conversation can keep
+                      polling for its answer while another tab is showing. */}
+                  <Route path="/coach/*" element={null} />
                   <Route path="/library" element={<LibraryPage />} />
                   <Route path="/train" element={<TrainPage />} />
                   {/* The Drill renders outside the shell (App, below). */}
@@ -196,14 +233,21 @@ function Shell() {
                   <Route path="/import" element={<Navigate to="/ranges?mode=paste" replace />} />
                 </Routes>
                 <SolveKeepAlive />
+                <CoachKeepAlive />
               </ErrorBoundary>
             </main>
           </div>
-          {!isDesktop && <TabBar paths={paths} badges={solveBadge ? { solve: solveBadge } : undefined} />}
+          {!isDesktop && (
+            <TabBar
+              paths={paths}
+              badges={{ ...(solveBadge ? { solve: solveBadge } : {}), ...(coachBadge ? { coach: coachBadge } : {}) }}
+            />
+          )}
           {!isDesktop && <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />}
         </div>
       </TopBarTitleContext.Provider>
       </TopBarSlotContext.Provider>
+      </CoachBadgeContext.Provider>
       </SolveBadgeContext.Provider>
     </AccountSheetContext.Provider>
   );

@@ -34,6 +34,12 @@ export function useOpenAccountSheet(): (() => void) | null {
  */
 export const SolveBadgeContext = createContext<((badge: string | null) => void) | null>(null);
 
+/**
+ * The same dot for the Coach tab (docs/coach.md §7: while it answers, or an
+ * answer arrived while you were on another tab). Null on desktop.
+ */
+export const CoachBadgeContext = createContext<((badge: string | null) => void) | null>(null);
+
 /** Marks the history entry an open BottomSheet pushes (so Back closes it). */
 export const SHEET_ENTRY = "bottomSheet";
 

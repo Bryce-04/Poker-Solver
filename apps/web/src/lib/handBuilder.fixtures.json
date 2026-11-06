@@ -1,0 +1,726 @@
+{
+  "_about": "Shared pot/stack fixtures for apps/web/src/lib/handBuilder.ts (summarizeHand) and apps/api/app/ask_coach/spot_builder.py (summarize_hand). Both test suites check every case; change both implementations together. Blinds 0.5/1bb. potBb/effectiveStackBb are the pot and stack ENTERING targetStreet; potNowBb includes that street's action so far.",
+  "cases": [
+    {
+      "name": "BTN opens 2.5, BB calls: flop",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 5.5
+      }
+    },
+    {
+      "name": "CO opens 2.5, BTN calls: both blinds are dead money",
+      "oop": "CO",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "CO",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BTN",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 6.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": null,
+        "toAct": "CO",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 6.5
+      }
+    },
+    {
+      "name": "SB opens 3, BB calls",
+      "oop": "SB",
+      "ip": "BB",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "SB",
+            "action": "raise",
+            "toBb": 3
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 6,
+        "effectiveStackBb": 97,
+        "blockedReason": null,
+        "toAct": "SB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 6
+      }
+    },
+    {
+      "name": "BTN opens, BB 3-bets to 10, BTN calls",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "raise",
+            "toBb": 10
+          },
+          {
+            "position": "BTN",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 20.5,
+        "effectiveStackBb": 90,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 20.5
+      }
+    },
+    {
+      "name": "CO opens, BTN 3-bets to 7.5, CO calls",
+      "oop": "CO",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "CO",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 7.5
+          },
+          {
+            "position": "CO",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 16.5,
+        "effectiveStackBb": 92.5,
+        "blockedReason": null,
+        "toAct": "CO",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 16.5
+      }
+    },
+    {
+      "name": "BTN opens, SB 3-bets to 11, BTN 4-bets to 24, SB calls",
+      "oop": "SB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "SB",
+            "action": "raise",
+            "toBb": 11
+          },
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 24
+          },
+          {
+            "position": "SB",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 49,
+        "effectiveStackBb": 76,
+        "blockedReason": null,
+        "toAct": "SB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 49
+      }
+    },
+    {
+      "name": "SB limps, BB checks",
+      "oop": "SB",
+      "ip": "BB",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "SB",
+            "action": "call"
+          },
+          {
+            "position": "BB",
+            "action": "check"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 2,
+        "effectiveStackBb": 99,
+        "blockedReason": null,
+        "toAct": "SB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 2
+      }
+    },
+    {
+      "name": "Flop BB checks, BTN bets 1.5, BB calls: turn",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 4,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          },
+          {
+            "position": "BTN",
+            "action": "bet",
+            "toBb": 1.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "turn",
+        "potBb": 8.5,
+        "effectiveStackBb": 96,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 8.5
+      }
+    },
+    {
+      "name": "Flop checks through: turn",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 4,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          },
+          {
+            "position": "BTN",
+            "action": "check"
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "turn",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 5.5
+      }
+    },
+    {
+      "name": "Flop bet 4, raise to 12, call: turn",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 4,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          },
+          {
+            "position": "BTN",
+            "action": "bet",
+            "toBb": 4
+          },
+          {
+            "position": "BB",
+            "action": "raise",
+            "toBb": 12
+          },
+          {
+            "position": "BTN",
+            "action": "call"
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "turn",
+        "potBb": 29.5,
+        "effectiveStackBb": 85.5,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 29.5
+      }
+    },
+    {
+      "name": "Preflop all-in and call",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "all_in"
+          },
+          {
+            "position": "BTN",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 200.5,
+        "effectiveStackBb": 0,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 200.5
+      }
+    },
+    {
+      "name": "Flop not finished but the board has a turn",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 4,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": "Finish the flop's action before moving on.",
+        "toAct": "BTN",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 5.5
+      }
+    },
+    {
+      "name": "Folded on the flop",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 4,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          },
+          {
+            "position": "BTN",
+            "action": "bet",
+            "toBb": 2
+          },
+          {
+            "position": "BB",
+            "action": "fold"
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": "The hand already ended: BB folded on the flop.",
+        "toAct": "BTN",
+        "isTerminal": true,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 7.5
+      }
+    },
+    {
+      "name": "Facing an open preflop",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 0,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "preflop",
+        "potBb": 0,
+        "effectiveStackBb": 100,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": true,
+        "toCallBb": 1.5,
+        "potNowBb": 4
+      }
+    },
+    {
+      "name": "Checked down to the river",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 5,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          },
+          {
+            "position": "BTN",
+            "action": "check"
+          }
+        ],
+        "turn": [
+          {
+            "position": "BB",
+            "action": "check"
+          },
+          {
+            "position": "BTN",
+            "action": "check"
+          }
+        ],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "river",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 5.5
+      }
+    },
+    {
+      "name": "Flop: BB checks, BTN to act",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "check"
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": null,
+        "toAct": "BTN",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 5.5
+      }
+    },
+    {
+      "name": "Flop: BB bets 2, BTN facing it",
+      "oop": "BB",
+      "ip": "BTN",
+      "startingStackBb": 100,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "BTN",
+            "action": "raise",
+            "toBb": 2.5
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [
+          {
+            "position": "BB",
+            "action": "bet",
+            "toBb": 2
+          }
+        ],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 5.5,
+        "effectiveStackBb": 97.5,
+        "blockedReason": null,
+        "toAct": "BTN",
+        "isTerminal": false,
+        "facingBet": true,
+        "toCallBb": 2,
+        "potNowBb": 7.5
+      }
+    },
+    {
+      "name": "40bb stacks, CO opens 2.2, BB calls",
+      "oop": "BB",
+      "ip": "CO",
+      "startingStackBb": 40,
+      "boardLength": 3,
+      "streets": {
+        "preflop": [
+          {
+            "position": "CO",
+            "action": "raise",
+            "toBb": 2.2
+          },
+          {
+            "position": "BB",
+            "action": "call"
+          }
+        ],
+        "flop": [],
+        "turn": [],
+        "river": []
+      },
+      "expected": {
+        "targetStreet": "flop",
+        "potBb": 4.9,
+        "effectiveStackBb": 37.8,
+        "blockedReason": null,
+        "toAct": "BB",
+        "isTerminal": false,
+        "facingBet": false,
+        "toCallBb": 0,
+        "potNowBb": 4.9
+      }
+    }
+  ]
+}

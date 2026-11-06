@@ -6,6 +6,284 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-06 — The Coach page, Phase 6: conversations in the Library
+
+Status: **proposed**. Spec: `docs/coach.md` §10.
+
+**What.** The Library lists Coach conversations beside the saved spots, on both layouts.
+- **The data:** `pages/library/useLibrary.ts` fetches them (`listConversations`) and gives both
+  layouts one `items` list of spots and conversations.
+- **The filter:** All shows both; Preflop and Postflop show spots; the new **Conversations** shows
+  conversations only. On phones that filter is labeled **"Chats"**, since four labels share the
+  phone's width and "Conversations" ran off the edge in the screenshot.
+- **Rows** get a violet "Conversation" pill and their updated date. Open goes to `/coach/:id`.
+  Rename and Delete use the Coach endpoints (`PATCH` / `DELETE /coach/conversations/{id}`).
+  Deleting confirms first and says it removes all the conversation's messages.
+- **No duplicate for conversations.** The spec doesn't ask for it, and a copied conversation has no
+  clear meaning.
+- **The sidebar subtitle is now "Saved spots and chats"**, held back from Phase 4 until the Library
+  actually listed conversations. The page description mentions them too.
+
+**Choices.**
+- **Order:** the spots keep the server's order (newest saved first), and each conversation goes in
+  before the first spot older than it. Sorting everything by date would have reordered the spots
+  whenever their dates disagree with the server's order, which the existing tests caught.
+- **If the conversations fail to load**, the Library still shows the spots, with a short note.
+- **Wording:** "Nothing saved yet" and "Nothing matches that search" replace the spot-only wording,
+  and the empty state mentions the Coach.
+
+**Checked:**
+- Desktop and phone screenshots against the mock API, with spots and conversations mixed.
+- `LibraryWorkspace.test.tsx` and `LibraryPhone.test.tsx` add conversation cases: the merged order
+  and pill, the filter, Open, Rename, delete after confirming, and a failed load.
+- The existing tests' `lib/api` mocks give the conversation calls resolved defaults, so nothing
+  resolves to `undefined` (CLAUDE.md's warning).
+- `pnpm check:web` exits 0.
+
+**This finishes the spec's six phases.** Still to do before anyone outside the team uses it:
+- **The evaluation:** it's under 90% (84%, then 76%).
+- **Not deployed:** Render needs migration `0004` and the new code.
+- **No real-device check:** the phone keyboard over the message bar, and Android back closing the
+  Coach's sheets.
+
+---
+
+## 2026-11-06 — The Coach page, Phase 5: phones
+
+Status: **proposed**. Spec: `docs/coach.md` §9, design in `docs/coach/mockup/phone-*.html`.
+
+**What.** On phones, Coach is the fifth tab: Solve / Ranges / Coach / Library / Train (the mockup's
+fifth tab, Drill, now lives inside Train). `pages/coach/CoachPhone.tsx` runs on the same `useCoach`
+as desktop. `CoachPage` is now only the layout switch; the desktop page moved to `CoachWorkspace`.
+- **`/coach` is the empty state on phones** (spec §9). Desktop opens the most recent conversation
+  instead (`useCoach`'s `openRecent`).
+- **`/coach/saved`** is the saved-conversations list: New conversation, search, and the list. The
+  top bar's history button opens it.
+- **A conversation** has the top bar's back arrow (to the saved list) and its title.
+- **The cards are the desktop's components, reshaped by `CoachPhone.css`** (all under 1024px):
+  - the spot card is one row ("The spot I understood · Open in Solve") that opens;
+  - result bars sit under their label and %;
+  - the pill drops "solved in Ns";
+  - suggestions scroll sideways.
+- **The message bar** (cards button, text box, round send) is fixed above the tab bar, with
+  "Study tool, for after you play · Processed by Google Gemini · N messages left this hour" under
+  it. **Enter is a new line on phones; the send button sends.**
+- **"Add cards"** is a sheet: a My hand | Board switch, then rank then suit (at most 2 cards for a
+  hand, 5 for a board), then Done, which writes "my hand: A♥ Q♦" into the message.
+
+**Choices (the team's).**
+- **The Coach stays mounted on phones** behind other tabs (`App.tsx`'s `CoachKeepAlive`, like
+  Solve's). A turn keeps polling, a half-typed message survives a tab switch, and the Coach tab
+  shows a dot while it answers or when an answer hasn't been seen. The dot uses a new
+  `CoachBadgeContext`, next to Solve's `SolveBadgeContext`, so Solve's code is untouched. The Coach
+  mounts the first time it's opened, so nothing is fetched for a tab you haven't visited. Desktop
+  keeps the usual behavior and unmounts when you leave.
+- **Pasting a hand history** comes from the empty screen ("Or paste a hand history") and from the
+  Add cards sheet ("Paste a hand history instead"). The message bar keeps the mockup's single
+  cards button.
+
+**Shared now.** Solve's rank-then-suit card picker moved to `components/mobile/RankSuitPicker`
+(with its CSS), and Solve's board step renders through it unchanged; its 42 phone tests pass as
+before. The Coach's sheet adds `clearAfterPick`. The hand-history helpers (`readHistory`,
+`withHistory`) moved to `coachText.ts`, shared by both message boxes.
+
+**Navigation.** Phase 4's `desktopOnly` flag and `PHONE_NAV_ITEMS` are gone: `NAV_ITEMS` is the
+same five for both widths.
+
+**Checked against the mockup:** phone screenshots in headless Chrome. Desktop Chrome won't make a
+window under ~500px wide, so the app was framed in a 390×844 iframe. The empty state, an answer,
+can't-solve and the saved list all match. The first try caught two bugs:
+- the desktop button roles do nothing under 1024px, where a bare button is accent-filled, so
+  suggestions came out purple;
+- the spot card's toggle was unreadable.
+
+Both now have phone styles.
+
+**Tests:**
+- `pages/coach/CoachPhone.test.tsx`, inside the phone shell's real contexts:
+  - the empty state and its starters;
+  - the history button, the saved list and the back arrow;
+  - the compact spot card;
+  - Enter vs Send;
+  - Add cards (rank then suit, the 2-card cap);
+  - pasting from the cards sheet;
+  - the tab dot;
+  - signed out.
+- `CoachPage.test.tsx` now stubs desktop width, since it's the desktop layout's.
+- `App.test.tsx`: five tabs on phones and in the sidebar.
+
+---
+
+## 2026-11-06 — The Coach page, Phase 4: the desktop UI
+
+Status: **proposed**. Spec: `docs/coach.md` §7-8, design in `docs/coach/mockup/desktop.html`.
+
+**What.** `/coach` (the most recent conversation, or an empty one) and `/coach/:id`, in
+`apps/web/src/pages/coach/`:
+- `CoachPage.tsx`: the page header with "New conversation", the conversation list with search, and
+  the conversation.
+- `CoachCards.tsx`: one component per message kind.
+- `Composer.tsx`: the message box.
+- `useCoach.ts`: the data and the polling.
+- `coachText.ts`: plain helpers.
+
+`lib/api.ts` gains the seven Coach calls, in the never-throws pattern. 409 and 429 are their own
+result kinds.
+
+**Choices.**
+- **Desktop-only navigation** (the team's call). Coach sits between Ranges and Library in the
+  sidebar. `NAV_ITEMS` marks it `desktopOnly`, and the phone tab bar renders `PHONE_NAV_ITEMS`, so
+  phones keep their four tabs until Phase 5. A phone that opens `/coach` directly still gets the page,
+  in the narrow column. The Library's subtitle stays "Your saved spots" until Phase 6 lists
+  conversations.
+- **The usage line says "this hour"**: "N of 20 messages left this hour", with the amber warning at
+  3 or fewer. Phase 2 made the limit the Train coach's hourly one. When everyone's daily total is
+  used up, it says so instead.
+- **A new conversation is created on its first message**, not by "New conversation", so empty
+  conversations never pile up. `/coach/new` is the empty state.
+- **Polling:**
+  - every 1.5s while the status is `working` or `waiting_for_solver`, from the last message seen;
+  - paused while the browser tab is hidden, resumed on focus;
+  - the list and the usage line refresh when a turn ends.
+
+  Each piece of per-conversation state is tagged with its conversation's id. A conversation just
+  created by sending isn't reloaded, which would race the message and could read "idle" and never
+  poll.
+- **The cards render the fields Phases 2-3 added:**
+  - the result card's `whose` (titled "BB's play (it's their turn)"), `range_rows` (a collapsed
+    "How your whole range plays here"), `narrowed` and `notes`;
+  - the preflop card's charts note ("The charts' play...", a "Reference chart" pill);
+  - `coach_text`'s source `note`.
+
+  A solving card shows only while its solve runs, and says "Waiting for the solver..." in
+  `waiting_for_solver`.
+- **"Open in Solve"** passes the spot card's `spot` as route state, the way the Library opens a saved
+  setup. The spot is encoded as Solve saves a clicked-through hand, so Solve replays it and loads the
+  ranges itself.
+- **Pasting a hand history:** the existing parser (`parseHandHistoryToPostflopSetup`) reads it, and
+  the result goes as `attached_spot`. The history text goes along too, so the model can read the
+  user's seat and cards. If the parser can't read the format, it says so, and the user can send the
+  text instead.
+- **The root class is `.coach-page`, never `.coach`.** `DrillPage.css` owns a global `.coach` (and
+  `.coach__*`) for the Drill's coach box. It padded and bordered this page until the screenshots
+  showed it.
+
+**Checked against the mockup:** the built page, served with the API mocked and a fake session (in
+the scratchpad, never shipped), screenshotted in headless Chrome at 1440×1000 in all four states. It
+matches on layout and values, with the app's tokens (light and dark). The placeholder numbers
+differ, as the mockup says they should.
+
+**Tests:**
+- `pages/coach/CoachPage.test.tsx`: signed out, opening the most recent conversation, the starters,
+  the hourly usage line, send then poll (fake timers), Shift+Enter, every card, the
+  solving/opponent/chart variants, Edit and Open in Solve, suggestions and Try again, 409/429, an
+  attached hand history, and search.
+- `coachText.test.ts`.
+- `App.test.tsx`: the desktop sidebar has Coach, and the phone tab bar still has four tabs.
+
+---
+
+## 2026-11-05 — The Coach page, Phase 3: the solver tools
+
+Status: **proposed**. Spec: `docs/coach.md` §4.2-4.3.
+
+**What.** `get_preflop_strategy` and `solve_current_spot` now run for real
+(`app/ask_coach/solver_tools.py`; `tools.py` dispatches to it).
+
+- **`get_preflop_strategy` reads the app's reference charts.** It covers three situations:
+  - Unopened: raise / fold, from the opening charts.
+  - Facing an open: 3-bet / call / fold, from `preflop_ranges.py`'s split ranges at 100bb. Where only
+    the combined defend chart exists, it's "Call or 3-bet" / fold.
+  - Facing a 3-bet: 4-bet / call / fold.
+
+  These charts were built from standard principles, not solved. So the preflop card carries a note
+  saying so, the Coach's explanation is noted "from the charts", and the prompt says "the charts",
+  never "the solver", for them.
+- **`solve_current_spot` runs the same chain as the Solve page:**
+  1. Both ranges from the preflop line (`ranges_for_preflop_line`).
+  2. Narrowed through each earlier street (`narrow_ranges`). A line either player takes less than 10%
+     of the time is flagged as rough, as `lib/chaining.ts` does.
+  3. A solve of the current street (`solve_spot`).
+  4. The user's exact combo is read from `combo_strategy` when the solve split it by suit, else from
+     its hand type. The hand notes' category and reasons come along (flop only).
+
+  It stores a `solving` card first, then a `result_card`.
+- **Statuses.** A solve keeps the conversation `working`, and touches its `updated_at` between steps,
+  so a long chain (two narrowings and a solve can take minutes on Render) isn't reset as a lost turn.
+  While another solve holds the solver, the status is `waiting_for_solver`. It retries every 5s for 3
+  minutes, then ends the turn with a `solver_busy` error, and the message is given back to the
+  user's limit.
+- **The explanation after a result** carries the spec's `note` ("The percentages come from the
+  solver..."), or the charts' note.
+
+**Choices.**
+- **Bet sizes are labeled with the hand's real amounts.** The solver plays the user's real bets
+  rounded onto its menu (a 3bb bet into 5.5bb plays as the 75% size, 4.12bb, disclosed in
+  `bucketed_actions`). Labels from that game would say "Call 4.12bb" to someone facing 3bb. So the
+  state machine's sizing rules are applied to the real contributions: "Call 3bb", "Raise to 5.88bb".
+- **When it's the opponent's turn**, the solve still runs (spec §4.3). The card and the model are both
+  told it's the opponent's strategy, and the user's hand isn't shown on it.
+- **When the user's hand isn't in their range** (narrowing removed it: the solver would have played
+  it differently earlier), the card shows the whole range's play, with a note. The prompt tells the
+  model to say why.
+- **The card adds fields beyond the spec's `result_card`:**
+  - `whose`
+  - `range_rows`: the whole range's mix, next to the hand's
+  - `narrowed`: which streets narrowed the ranges
+  - `notes`
+
+  The preflop card adds `source` and `note`.
+- **A pasted hand history's spot can't be solved yet.** It has no preflop betting to take ranges
+  from, so the tool says so and asks how the preflop went.
+- **Unsupported lines are reasons, not errors.** For example, 3-bet and 4-bet ranges exist only near
+  100bb. The model explains them in plain words.
+
+**Eval after Phase 3:** 76% (39 of 51), down from 84%. The prompt change only covers explaining
+results, which the eval doesn't reach, and the misses are the same kinds as before. So this looks like
+run-to-run variation, not a regression. One run can't measure a change this small: compare several.
+
+**Checked with real conversations** (`coach_try.py`, real Gemini, the real solver):
+- The mockup's AQ spot came back as "Bet medium (4.12bb)" 65% / "Bet large (6.88bb)" 34%. The
+  mockup's "bet small 55%" was always a placeholder.
+- A UTG A5s question got the chart's fold, credited to the charts.
+- A turn spot was narrowed by the flop check-back, then solved. That correctly found KhJh outside
+  the BTN's checking range.
+
+**Tests:**
+- `tests/test_ask_coach_solver.py`: no database, a fake solver except for one real flop solve
+  (about 1s locally).
+- New runner cases in `tests/test_ask_coach_turns.py`.
+
+---
+
+## 2026-11-05 — The Coach: what real conversations showed
+
+Status: **proposed**. `apps/api/scripts/coach_try.py` runs real Coach turns from a terminal (real
+Gemini, the local database only, no sign-in) and prints what's stored. The first real conversations
+broke spec rule 4 ("anything not from the solver is labeled") in ways the tests and the eval
+couldn't see:
+- **The model repeated its general advice as its own, unlabeled text.**
+- **It wrote advice as plain text with a fake label**, "[General advice box: ...]", copying how cards
+  were summarized in the history it's sent.
+- **Its replies included HTML** (a homemade "Not from the solver" box) **and Markdown.**
+- **It restated its opening sentences at the end**, and wrote follow-ups as a bullet list.
+
+The fixes are structural, in `runner.py`, so they don't depend on the model obeying the prompt:
+- Text becomes plain paragraphs (tags and emphasis removed).
+- A paragraph that repeats the advice shown this turn, or the Coach's own earlier text, is dropped.
+- A fake advice box becomes the real labeled card; any other imitated app note is dropped.
+- A bullet list of short questions becomes the tappable suggestions.
+- The history now describes cards as "(App note: ...)" and leaves out the advice's content, so
+  there's nothing to copy.
+- The prompt forbids strategy advice in the Coach's own text.
+- Assumptions are de-duplicated by meaning ("2.5bb open" and "a 2.5bb open" are one).
+
+**Still open:** while the solver tools answer "not connected", the model sometimes adds one sentence
+of unlabeled advice ("betting is a strong option"). Phase 3 gives it a real solver answer to explain
+instead; re-check with `coach_try.py` after it.
+
+---
+
 ## 2026-11-05 — Generated lessons, postflop lessons, squeezing, and "the baseline is not the rule"
 
 **Status:** proposed. The two hand-written lessons need a poker-literate review.
@@ -228,6 +506,138 @@ Ranked play will need its own tables.
 here against SQLite to check the logic before CI), `lib/progress.test.ts` (merge rules, per-account
 keys, every sync path), and the Train page tests (server copy appears on a device with none; signed
 out never calls the server; a failed upload keeps the result on the device).
+
+---
+
+## 2026-11-04 — The Coach page, Phase 2: Gemini, describe_spot, one client and one limit for the app
+
+Status: **proposed**. Spec: `docs/coach.md` §2-5 and §11.
+
+**What.** A Coach turn now runs Gemini with tools (`app/ask_coach/runner.py`): at most 4 rounds of
+tool calls, each card stored as it's made, then the model's text. `describe_spot` turns the user's
+description into a `Spot` (`spot_builder.py`); `give_general_advice` and `suggest_followups` store
+their cards. The two solver tools are declared, so the prompt is final, but answer "not connected
+yet" until Phase 3. Conversations are titled from their first spot card ("AQ on the button, Q-5-2
+flop") unless renamed. `scripts/coach_smoke.py` checks a key; `scripts/coach_eval.py` scores the
+model on `coach_eval/cases.jsonl` (51 messy descriptions).
+
+**The spec was written before the Train coach existed, so two things changed (the team's call).**
+- **One Gemini client.** Not the spec's `google-genai` SDK in its own `gemini.py`: the Coach uses
+  the Train coach's `GeminiProvider` (`app/coach.py`), which gained `generate_turn` (one
+  non-streamed function-calling turn). Same key, same comma-separated `GEMINI_MODEL` list tried in
+  order, same retry rounds. No new dependency. `ask_coach/gemini.py` is now the adapter: it builds
+  Gemini's contents from stored messages and is what tests replace with a fake.
+- **One limit.** The Coach page counts against the Train coach's `limiter` (`COACH_PER_HOUR` per user,
+  `COACH_PER_DAY_TOTAL` for everyone), once per message however many tool rounds it takes. Phase 1's
+  `COACH_DAILY_LIMIT` is gone. So `GET /coach/usage` and the 429 report *this hour*, not today, plus
+  `all_users_exhausted`. The spec's UI copy ("n of 25 messages left today", "resets at midnight UTC")
+  needs rewording in Phase 4. The limiter is in memory, so it resets when the server restarts.
+- **The Train coach's "Ask the coach" stays separate.** It doesn't open a Coach conversation.
+
+**Other choices.**
+- **No thinking setting is sent** on a Coach turn (the Train chat turns thinking down for speed).
+  Reading a messy description is where the model's reasoning helps, and a Coach turn isn't streamed.
+  This also keeps `generate_turn` independent of the thinking settings the `coach-on-train` branch
+  is changing.
+- **Busy means every attempt was rate limited, overloaded or unreachable.** That stores the
+  `gemini_busy` error and gives the message back to the user's limit. A bad key or a bad request is
+  an `internal` error and still counts. No key at all stores an error of a new kind,
+  `not_configured`, and doesn't count.
+- **`spot_builder.py` ports `handBuilder.ts`'s arithmetic** instead of trusting the model with pots.
+  `apps/web/src/lib/handBuilder.fixtures.json` (18 hands) is checked by both a Python and a TS test.
+  A spot is saved the way Solve saves a clicked-through hand, so "Open in Solve" (Phase 4) replays it.
+- **`describe_spot` takes three more preflop lines than the spec** for preflop questions:
+  `unopened`, `facing_open` and `facing_three_bet`. The spec's three lines all describe finished
+  preflop action, which leaves no way to ask "should I open A5s from UTG?".
+- **The model gets the backend's assumptions too.** Defaults the backend fills in (100bb, a 2.5bb
+  open, a 3x 3-bet, a 2.2x 4-bet) are added to the card's assumptions even if the model forgot to
+  list them.
+- **A pasted hand history** (`attached_spot`) is used as it is. Only the user's seat and cards come
+  from the model, and a card says "read from your hand history".
+- **The spot card's payload** carries `hero_position` and a one-line `summary` beyond the spec's
+  fields. The summary is how the card is shown to the model in later turns.
+
+**Evaluation (2026-11-04, `gemini-3-flash-preview`):** 65% exact on the first run, then **80%
+(41 of 51)** after these fixes, and **84%** after the suits check below. Still short of the 90% target, so the Coach isn't ready for anyone
+outside the team.
+- **Who raised preflop is worked out from the seats.** In a finished heads-up line the opener is
+  always the seat that acts first preflop, so `describe_spot` no longer takes `aggressor`. The model
+  often left it out.
+- **A street that is just two checks** is put in the right order if the model lists them backwards.
+- **The prompt and tool descriptions now say:**
+  - list every action, checks included ("checked to me", "check-raised");
+  - who acts first after the flop;
+  - when to use a preflop-decision line;
+  - include every stated fact (stack depth, turn and river cards);
+  - never invent suits for the user's hand.
+- **The scorer accepts a describe_spot call that comes back with a question** (`asks` cases).
+
+Remaining misses:
+- Suits: invented suits ("As2s" for "A2s"), and the opposite, dropping suits the user gave.
+- Facts left out: a turn card, the stack depth, the hand.
+- A missed check before a check-raise.
+- An action that never happened.
+- Guessing a position instead of asking.
+- Two genuinely ambiguous texts.
+
+**Then the suits check: 84% (43 of 51).** `spot_builder.keep_only_written_suits` keeps the two
+exact cards of the user's hand only if the user wrote both, in any form ("Ah", "A♥", "ace of
+hearts", "AsAd"), in any message of the conversation. Otherwise the hand becomes its type
+("As2s" becomes "A2s"), and `describe_spot` tells the model so. Invented suits can no longer
+reach the solver. `normalize_card` also reads suit symbols now ("Q♠").
+
+Two of that run's misses were the model sending a string where an object belongs. `spot_builder`
+had crashed on that, which the user would have seen as a broken tool. It's now a question for the
+user.
+
+Left:
+- An action that never happened (twice).
+- A board card misread ("7d" as "Id") or left out (twice).
+- Guessing a position instead of asking.
+- One ambiguous text.
+
+Runs vary from one to the next, so judge a prompt change on more than one run. The default model in
+`app/coach.py` on `main` (`gemini-2.5-flash`) answers 404 for new keys. The eval used
+`coach-on-train`'s model list via `GEMINI_MODEL`.
+
+---
+
+## 2026-11-04 — The Coach page (Ask mode), Phase 1: conversations, the daily limit, no Gemini yet
+
+Status: **proposed**. Spec: `docs/coach.md` (design in `docs/coach/mockup/`).
+
+**What.** A new Coach page where a user describes a spot in plain words and gets the solver's
+answer, explained. Phase 1 is the backend foundation only: the `coach_conversations` and
+`coach_messages` tables (migration `0004`), the `/coach/conversations` and `/coach/usage`
+endpoints, the daily message limit, and a background runner that stores a fixed placeholder reply.
+No Gemini, no tools, no UI yet.
+
+**The LLM exception.** `docs/plan.md` says "rule-based parser first, not LLM-first", and the Train
+coach above only explains facts the app already computed. The Coach goes further: Gemini reads the
+user's own description of a spot. That's a deliberate exception, made safe by the spec's core rule
+(§1): **the solver decides and the Coach explains.** Gemini turns words into a spot through a tool,
+the backend builds every card and every number from tool results, and anything the solver can't
+answer goes into a box labeled "General advice · not from the solver". The structure enforces that
+labeling; it doesn't rely on the model's prose.
+
+**Choices in Phase 1 that depart from or add to the spec.**
+- **The package is `app/ask_coach/`, not the spec's `app/coach/`.** `app/coach.py` is already the
+  Train coach, and the unmerged `coach-on-train` branch is still editing it, so renaming it now
+  would conflict. The URLs are the spec's (`/coach/conversations`, `/coach/usage`); they share the
+  `/coach` prefix with the Train coach's `POST /coach` and `/coach/chat`, without overlapping.
+- **Migration number.** Built as `0003`, renumbered `0004` when `lesson_progress` (`0003`) reached
+  `main` first.
+- **429 body.** The spec's `{ used, limit }` is the whole response body, not FastAPI's usual
+  `{"detail": ...}`, so the frontend can read it directly. 409 and 404 keep `{"detail": ...}`.
+- **`GET /coach/conversations/{id}` also returns `id` and `title`.** The phone's top bar shows the
+  title (§9), so a direct link doesn't need a second request.
+- **`attached_spot` is checked against the `Spot` schema now and kept in the `user_text` payload**,
+  ready for Phase 2 to use instead of the model's reading of a pasted hand history (§4.1).
+- **A turn lost to a restart** is reset to `error` (with an `error` message, so the UI can offer
+  Try again) when the conversation is read, listed, or sent to, if it has been busy and untouched
+  for 5 minutes.
+- **The limit** was a separate `COACH_DAILY_LIMIT` counted from stored messages. Phase 2 replaced
+  it with the Train coach's limit (see the Phase 2 entry above).
 
 ---
 

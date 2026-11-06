@@ -1,15 +1,23 @@
 /**
- * The app's four destinations (docs/desktop-redesign.md §3), in nav order.
- * Both the phone header and the desktop sidebar render from this list.
+ * The app's five destinations (docs/desktop-redesign.md §3, docs/coach.md §7
+ * and §9), in nav order. Both the phone tab bar and the desktop sidebar
+ * render from this list.
  */
 export const NAV_ITEMS = [
   { id: "solve", to: "/solve", label: "Solve", subtitle: "Best play after the flop" },
   { id: "ranges", to: "/ranges", label: "Ranges", subtitle: "Which hands to play preflop" },
-  { id: "library", to: "/library", label: "Library", subtitle: "Your saved spots" },
+  { id: "coach", to: "/coach", label: "Coach", subtitle: "Ask about a spot" },
+  { id: "library", to: "/library", label: "Library", subtitle: "Saved spots and chats" },
   { id: "train", to: "/train", label: "Train", subtitle: "Lessons and practice" },
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];
+
+/** The page header for a path. A conversation (/coach/:id) shares /coach's. */
+export function pageHeaderFor(pathname: string) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  return PAGE_HEADERS[path.startsWith("/coach/") ? "/coach" : path];
+}
 
 /** The desktop page header's title and one-line description, by route.
  * `workspace` pages lay themselves out edge to edge (rail + canvas); the
@@ -35,9 +43,16 @@ export const PAGE_HEADERS: Record<
       "Standard preflop charts: which hands to play from each seat. Edit one and save it as your own.",
     workspace: true,
   },
+  "/coach": {
+    title: "Coach",
+    description:
+      "Describe a spot in your own words. The solver works out the play, and the Coach explains it.",
+    workspace: true,
+    ownHeader: true,
+  },
   "/library": {
     title: "Library",
-    description: "Spots you've saved. Only you can see them.",
+    description: "Spots you've saved and your Coach conversations. Only you can see them.",
     workspace: true,
     ownHeader: true,
   },
