@@ -16,9 +16,10 @@ import {
   TopBarTitleContext,
   type TopBarTitleOverride,
 } from "./lib/mobileShell";
-import { NAV_ITEMS, PAGE_HEADERS, type NavId } from "./lib/navigation";
+import { NAV_ITEMS, pageHeaderFor, type NavId } from "./lib/navigation";
 import { readSavedSpot, readSolvePrefill, type SolvePrefill } from "./lib/solvePrefill";
 import { useIsDesktop } from "./lib/useIsDesktop";
+import { CoachPage } from "./pages/coach/CoachPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { RangesPage } from "./pages/RangesPage";
 import { TrainPage } from "./pages/TrainPage";
@@ -32,13 +33,14 @@ import "./App.css";
  * ("/solve/") is the same page, as it is to the router. */
 function tabFor(pathname: string): NavId | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
+  if (path.startsWith("/coach/")) return "coach";
   return NAV_ITEMS.find((item) => item.to === path)?.id;
 }
 
 /** Desktop: the bar at the top of the content area (docs/desktop-redesign.md
  * §4), unless the page renders its own to hold page actions. */
 function ShellPageHeader() {
-  const header = PAGE_HEADERS[useLocation().pathname];
+  const header = pageHeaderFor(useLocation().pathname);
   if (!header || header.ownHeader) return null;
   return <PageHeader title={header.title} description={header.description} />;
 }
@@ -153,7 +155,7 @@ function Shell() {
   const [solveBadge, setSolveBadge] = useState<string | null>(null);
   const [titleOverride, setTitleOverride] = useState<TopBarTitleOverride | null>(null);
 
-  const workspace = PAGE_HEADERS[pathname]?.workspace === true;
+  const workspace = pageHeaderFor(pathname)?.workspace === true;
   const tab = tabFor(pathname);
   const title = NAV_ITEMS.find((item) => item.id === tab)?.label ?? "Poker Solver";
   const mainClass = !isDesktop
@@ -187,6 +189,8 @@ function Shell() {
                   {/* Rendered by SolveKeepAlive below, so it can outlive a tab switch. */}
                   <Route path="/solve" element={null} />
                   <Route path="/ranges" element={<RangesPage />} />
+                  <Route path="/coach" element={<CoachPage />} />
+                  <Route path="/coach/:conversationId" element={<CoachPage />} />
                   <Route path="/library" element={<LibraryPage />} />
                   <Route path="/train" element={<TrainPage />} />
                   {/* The Drill renders outside the shell (App, below). */}

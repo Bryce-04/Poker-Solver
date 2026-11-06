@@ -180,9 +180,9 @@ play the reference charts and every decision is graded against them (data in
 a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
 (generated lessons, postflop practice, ranked play, opponent types).
 
-**Coach page, Ask mode (spec agreed 2026-11-04; Phases 1-3 of 6 done)**: `docs/coach.md` is the
+**Coach page, Ask mode (spec agreed 2026-11-04; Phases 1-4 of 6 done)**: `docs/coach.md` is the
 spec, with the design as clickable HTML plus screenshots in `docs/coach/mockup/`. Read both before
-working on it, and `docs/decisions.md`'s Phase 1, 2 and 3 entries: the spec predates the Train coach, so
+working on it, and `docs/decisions.md`'s Phase 1-4 entries: the spec predates the Train coach, so
 some of it was changed. It's a Coach page where a user describes a spot in plain words, and the
 solver decides while Gemini only explains (spec §1). It's separate from the Train coach's "Ask the
 coach" (below), which doesn't open a Coach conversation, but the two **share one Gemini client and
@@ -239,11 +239,18 @@ one usage limit**. One PR per phase.
   `--check-cases` validates the cases without a key. **Last results: 84%, then 76% after Phase 3
   (same kinds of misses; runs vary by several points), below the 90% target**; the misses are listed in `docs/decisions.md`. That run used the Gemini 3 model list
   that's now `app/coach.py`'s default.
-- **Next is Phase 4**, the desktop UI (spec §7-8). It must word the limit as per hour, not per day.
-  It renders the cards' extra fields:
-  - `result_card`'s `whose` / `range_rows` / `narrowed` / `notes`;
-  - `preflop_card`'s `source` / `note`;
-  - `coach_text`'s `note`.
+- **The desktop UI (Phase 4)** is `apps/web/src/pages/coach/`:
+  - `CoachPage` is the page, `CoachCards` has one component per message kind, `Composer` is the
+    message box, `useCoach` holds the data and polls every 1.5s while a turn runs, and `coachText`
+    has the helpers.
+  - The routes are `/coach` (most recent) and `/coach/:id`. `/coach/new` is the empty state, and a
+    conversation is created on its first message.
+  - `lib/api.ts` has the seven Coach calls.
+  - The usage line says "this hour".
+  - Navigation: `NAV_ITEMS`' Coach entry is `desktopOnly`, and the phone tab bar renders
+    `PHONE_NAV_ITEMS`. `pageHeaderFor()` maps `/coach/:id` to `/coach`'s header.
+  - **The root class is `.coach-page`, never `.coach`**: `DrillPage.css` owns a global `.coach`.
+- **Next is Phase 5**, the phone UI (spec §9): Coach becomes a phone tab.
 
 **Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
 `done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own

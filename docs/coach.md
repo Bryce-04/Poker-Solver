@@ -1,6 +1,6 @@
 # Coach — spec
 
-Status: agreed with the team on 2026-11-04. Phases 1-3 done, in `app/ask_coach/`, not `app/coach/`.
+Status: agreed with the team on 2026-11-04. Phases 1-4 done (backend in `app/ask_coach/`, not `app/coach/`; desktop UI in `apps/web/src/pages/coach/`).
 **This spec predates the Train coach (`app/coach.py`)**, so read `docs/decisions.md`'s Phase 1 and 2
 entries (and Phase 3's) alongside it. Agreed changes: the Coach uses the Train coach's Gemini client (not
 `google-genai`) and its usage limit (per hour, not `COACH_DAILY_LIMIT` per day).

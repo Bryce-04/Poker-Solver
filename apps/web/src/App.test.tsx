@@ -205,7 +205,15 @@ describe('<App />', () => {
         'aria-current',
         'page',
       )
-      expect(within(nav).getAllByRole('link')).toHaveLength(4)
+      // The phone's four destinations plus the Coach, which is desktop-only until
+      // its phone layout ships (docs/coach.md §9).
+      expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual([
+        expect.stringMatching(/^Solve/),
+        expect.stringMatching(/^Ranges/),
+        expect.stringMatching(/^Coach/),
+        expect.stringMatching(/^Library/),
+        expect.stringMatching(/^Train/),
+      ])
       expect(screen.getByRole('heading', { level: 1, name: 'Solve' })).toBeInTheDocument()
       // The phone header (and its tagline) isn't rendered at all.
       expect(screen.queryByText(/manual hand builder/i)).not.toBeInTheDocument()

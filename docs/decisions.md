@@ -6,6 +6,75 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-06 — The Coach page, Phase 4: the desktop UI
+
+Status: **proposed**. Spec: `docs/coach.md` §7-8, design in `docs/coach/mockup/desktop.html`.
+
+**What.** `/coach` (the most recent conversation, or an empty one) and `/coach/:id`, in
+`apps/web/src/pages/coach/`:
+- `CoachPage.tsx`: the page header with "New conversation", the conversation list with search, and
+  the conversation.
+- `CoachCards.tsx`: one component per message kind.
+- `Composer.tsx`: the message box.
+- `useCoach.ts`: the data and the polling.
+- `coachText.ts`: plain helpers.
+
+`lib/api.ts` gains the seven Coach calls, in the never-throws pattern. 409 and 429 are their own
+result kinds.
+
+**Choices.**
+- **Desktop-only navigation** (the team's call). Coach sits between Ranges and Library in the
+  sidebar. `NAV_ITEMS` marks it `desktopOnly`, and the phone tab bar renders `PHONE_NAV_ITEMS`, so
+  phones keep their four tabs until Phase 5. A phone that opens `/coach` directly still gets the page,
+  in the narrow column. The Library's subtitle stays "Your saved spots" until Phase 6 lists
+  conversations.
+- **The usage line says "this hour"**: "N of 20 messages left this hour", with the amber warning at
+  3 or fewer. Phase 2 made the limit the Train coach's hourly one. When everyone's daily total is
+  used up, it says so instead.
+- **A new conversation is created on its first message**, not by "New conversation", so empty
+  conversations never pile up. `/coach/new` is the empty state.
+- **Polling:**
+  - every 1.5s while the status is `working` or `waiting_for_solver`, from the last message seen;
+  - paused while the browser tab is hidden, resumed on focus;
+  - the list and the usage line refresh when a turn ends.
+
+  Each piece of per-conversation state is tagged with its conversation's id. A conversation just
+  created by sending isn't reloaded, which would race the message and could read "idle" and never
+  poll.
+- **The cards render the fields Phases 2-3 added:**
+  - the result card's `whose` (titled "BB's play (it's their turn)"), `range_rows` (a collapsed
+    "How your whole range plays here"), `narrowed` and `notes`;
+  - the preflop card's charts note ("The charts' play...", a "Reference chart" pill);
+  - `coach_text`'s source `note`.
+
+  A solving card shows only while its solve runs, and says "Waiting for the solver..." in
+  `waiting_for_solver`.
+- **"Open in Solve"** passes the spot card's `spot` as route state, the way the Library opens a saved
+  setup. The spot is encoded as Solve saves a clicked-through hand, so Solve replays it and loads the
+  ranges itself.
+- **Pasting a hand history:** the existing parser (`parseHandHistoryToPostflopSetup`) reads it, and
+  the result goes as `attached_spot`. The history text goes along too, so the model can read the
+  user's seat and cards. If the parser can't read the format, it says so, and the user can send the
+  text instead.
+- **The root class is `.coach-page`, never `.coach`.** `DrillPage.css` owns a global `.coach` (and
+  `.coach__*`) for the Drill's coach box. It padded and bordered this page until the screenshots
+  showed it.
+
+**Checked against the mockup:** the built page, served with the API mocked and a fake session (in
+the scratchpad, never shipped), screenshotted in headless Chrome at 1440×1000 in all four states. It
+matches on layout and values, with the app's tokens (light and dark). The placeholder numbers
+differ, as the mockup says they should.
+
+**Tests:**
+- `pages/coach/CoachPage.test.tsx`: signed out, opening the most recent conversation, the starters,
+  the hourly usage line, send then poll (fake timers), Shift+Enter, every card, the
+  solving/opponent/chart variants, Edit and Open in Solve, suggestions and Try again, 409/429, an
+  attached hand history, and search.
+- `coachText.test.ts`.
+- `App.test.tsx`: the desktop sidebar has Coach, and the phone tab bar still has four tabs.
+
+---
+
 ## 2026-11-05 — The Coach page, Phase 3: the solver tools
 
 Status: **proposed**. Spec: `docs/coach.md` §4.2-4.3.

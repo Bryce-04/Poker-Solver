@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { NAV_ITEMS, type NavId } from "../../lib/navigation";
+import { PHONE_NAV_ITEMS, type NavId } from "../../lib/navigation";
 import { NavIcon } from "../NavIcon/NavIcon";
 import "./TabBar.css";
 
@@ -20,7 +20,7 @@ export function TabBar({
   return (
     <nav className="tab-bar" aria-label="Main">
       <div className="tab-bar__inner">
-        {NAV_ITEMS.map((item) => (
+        {PHONE_NAV_ITEMS.map((item) => (
           <NavLink key={item.id} to={paths[item.id] ?? item.to} className="tab-bar__item">
             <span className="tab-bar__icon">
               <NavIcon id={item.id} size={22} />

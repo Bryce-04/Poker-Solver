@@ -692,3 +692,188 @@ export async function putProgress(
   if (res.status === 401) return { kind: "signed-out" };
   return { kind: "error", status: res.status };
 }
+
+// ---------------------------------------------------------------------------
+// The Coach page (docs/coach.md §3.3, apps/api/app/ask_coach/routes.py). All
+// signed-in; someone else's conversation is the same 404 as a missing one.
+
+export type CoachStatus = "idle" | "working" | "waiting_for_solver" | "error";
+
+export interface CoachConversationSummary {
+  id: string;
+  title: string | null;
+  /** The start of the latest Coach text. */
+  preview: string | null;
+  updated_at: string;
+  status: CoachStatus;
+}
+
+/** One stored item; `kind` says which card renders `payload` (spec §3.1). */
+export interface CoachMessage {
+  seq: number;
+  kind: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface CoachConversation {
+  id: string;
+  title: string | null;
+  status: CoachStatus;
+  messages: CoachMessage[];
+}
+
+/** The shared Gemini limit: `used` of `limit` this hour (it's per hour, not per day). */
+export interface CoachUsage {
+  used: number;
+  limit: number;
+  resets_at: string;
+  all_users_exhausted: boolean;
+}
+
+async function coachRequest(
+  path: string,
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  data?: unknown,
+): Promise<{ status: number; data: unknown } | null> {
+  try {
+    return await CapacitorHttp.request({
+      url: `${API_BASE_URL}${path}`,
+      method,
+      headers: {
+        ...(data === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(await authHeaders()),
+      },
+      ...(data === undefined ? {} : { data }),
+    });
+  } catch {
+    return null;
+  }
+}
+
+const ok = (status: number) => status >= 200 && status < 300;
+
+export type CreateConversationResult =
+  | { kind: "created"; id: string }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Starts an empty conversation. Never throws. */
+export async function createConversation(): Promise<CreateConversationResult> {
+  const res = await coachRequest("/coach/conversations", "POST", {});
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "created", id: (asJson(res.data) as { id: string }).id };
+  return { kind: "error", status: res.status };
+}
+
+export type ListConversationsResult =
+  | { kind: "ok"; conversations: CoachConversationSummary[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** The signed-in user's conversations, newest first. Never throws. */
+export async function listConversations(): Promise<ListConversationsResult> {
+  const res = await coachRequest("/coach/conversations", "GET");
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "ok", conversations: asJson(res.data) as CoachConversationSummary[] };
+  return { kind: "error", status: res.status };
+}
+
+export type GetConversationResult =
+  | { kind: "ok"; conversation: CoachConversation }
+  | { kind: "not-found" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** A conversation's status and its messages after `after` (0 = all). The
+ * page polls this while a turn runs. Never throws. */
+export async function getConversation(id: string, after = 0): Promise<GetConversationResult> {
+  const res = await coachRequest(`/coach/conversations/${encodeURIComponent(id)}?after=${after}`, "GET");
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "ok", conversation: asJson(res.data) as CoachConversation };
+  if (res.status === 404) return { kind: "not-found" };
+  return { kind: "error", status: res.status };
+}
+
+export type SendCoachMessageResult =
+  | { kind: "sent"; lastSeq: number }
+  /** 409: the Coach is still answering the previous message. */
+  | { kind: "busy" }
+  /** 429: over the shared hourly limit, or everyone's daily total is used up. */
+  | { kind: "limit"; used: number; limit: number; allUsersExhausted: boolean }
+  | { kind: "not-found" }
+  | { kind: "invalid"; issues: SpotValidationIssue[] }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Sends the user's message; the answer arrives by polling getConversation.
+ * `attachedSpot` is a pasted hand history the app already parsed, which the
+ * backend uses instead of the model's reading of the text (spec §4.1). */
+export async function sendCoachMessage(
+  id: string,
+  text: string,
+  attachedSpot?: Spot,
+): Promise<SendCoachMessageResult> {
+  const res = await coachRequest(`/coach/conversations/${encodeURIComponent(id)}/messages`, "POST", {
+    text,
+    ...(attachedSpot ? { attached_spot: attachedSpot } : {}),
+  });
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "sent", lastSeq: (asJson(res.data) as { last_seq: number }).last_seq };
+  if (res.status === 409) return { kind: "busy" };
+  if (res.status === 429) {
+    const body = (asJson(res.data) ?? {}) as { used?: number; limit?: number; all_users_exhausted?: boolean };
+    return {
+      kind: "limit",
+      used: body.used ?? 0,
+      limit: body.limit ?? 0,
+      allUsersExhausted: body.all_users_exhausted === true,
+    };
+  }
+  if (res.status === 404) return { kind: "not-found" };
+  if (res.status === 422) return { kind: "invalid", issues: parseValidationIssues(asJson(res.data)) };
+  return { kind: "error", status: res.status };
+}
+
+export type RenameConversationResult =
+  | { kind: "renamed"; conversation: CoachConversationSummary }
+  | { kind: "not-found" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Renames a conversation. Never throws. */
+export async function renameConversation(id: string, title: string): Promise<RenameConversationResult> {
+  const res = await coachRequest(`/coach/conversations/${encodeURIComponent(id)}`, "PATCH", { title });
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "renamed", conversation: asJson(res.data) as CoachConversationSummary };
+  if (res.status === 404) return { kind: "not-found" };
+  return { kind: "error", status: res.status };
+}
+
+export type DeleteConversationResult =
+  | { kind: "deleted" }
+  | { kind: "not-found" }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** Deletes a conversation and its messages. Never throws. */
+export async function deleteConversation(id: string): Promise<DeleteConversationResult> {
+  const res = await coachRequest(`/coach/conversations/${encodeURIComponent(id)}`, "DELETE");
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "deleted" };
+  if (res.status === 404) return { kind: "not-found" };
+  return { kind: "error", status: res.status };
+}
+
+export type CoachUsageResult =
+  | { kind: "ok"; usage: CoachUsage }
+  | { kind: "network-error" }
+  | { kind: "error"; status: number };
+
+/** How much of the shared hourly limit the user has used. Never throws. */
+export async function getCoachUsage(): Promise<CoachUsageResult> {
+  const res = await coachRequest("/coach/usage", "GET");
+  if (!res) return { kind: "network-error" };
+  if (ok(res.status)) return { kind: "ok", usage: asJson(res.data) as CoachUsage };
+  return { kind: "error", status: res.status };
+}
