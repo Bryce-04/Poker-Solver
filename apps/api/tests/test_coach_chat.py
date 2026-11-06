@@ -72,11 +72,11 @@ def test_it_streams_the_answer_then_says_done(monkeypatch):
     assert events(res) == [{"delta": "Bet because "}, {"delta": "you have top pair."}, {"done": True}]
 
 
-def test_the_first_message_is_the_grounded_facts_and_uses_the_lessons_system_prompt(monkeypatch):
+def test_the_first_message_is_the_grounded_facts_and_the_chat_asks_for_a_short_answer(monkeypatch):
     fake = use(monkeypatch, FakeStream())
     chat()
     system, messages = fake.calls[0]
-    assert system == coach.SYSTEM_PROMPT
+    assert system.startswith(coach.SYSTEM_PROMPT) and "two or three short sentences" in system
     assert len(messages) == 1 and messages[0]["role"] == "user"
     text = messages[0]["content"]
     assert "Learner chose: Check" in text and "Correct answer: Bet 1.8bb (33%)" in text
@@ -179,10 +179,10 @@ def sse(*texts, extra=()):
     return "".join(f"data: {json.dumps(c)}\r\n\r\n" for c in [*chunks, *extra]).encode()
 
 
-def provider(handler, model="big,small", thinking_budget=0):
+def provider(handler, model="big,small", thinking_level="minimal", **kw):
     return coach.GeminiProvider(
         "key", model, client=httpx.Client(transport=httpx.MockTransport(handler)),
-        thinking_budget=thinking_budget, sleep=lambda s: None,
+        thinking_level=thinking_level, sleep=lambda s: None, **kw,
     )
 
 
@@ -202,7 +202,8 @@ def test_gemini_streams_text_with_the_right_request():
     body = json.loads(req.content)
     assert body["systemInstruction"]["parts"][0]["text"] == "SYS"
     assert [c["role"] for c in body["contents"]] == ["user", "model"]  # Gemini's word for the coach
-    assert body["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert body["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "minimal"}
+    assert req.extensions["timeout"]["read"] == coach.GeminiProvider.read_timeout_s  # a stuck model is dropped fast
 
 
 def test_a_model_that_rejects_the_thinking_setting_is_retried_without_it():
@@ -269,24 +270,72 @@ def test_a_stream_that_breaks_after_text_is_not_restarted():
     assert got == ["half"] and len(calls) == 1
 
 
-def test_the_lessons_one_shot_uses_the_first_model_of_a_list():
+def test_the_lessons_one_shot_starts_with_the_first_model_and_streams_like_the_chat():
     seen = []
 
     def handler(request):
         seen.append(request.url.path)
-        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "hi"}]}}]})
+        return httpx.Response(200, content=sse("hi"))
 
     assert provider(handler).generate("s", "u") == "hi"
-    assert seen[0].endswith("/models/big:generateContent")
+    assert seen == ["/v1beta/models/big:streamGenerateContent"]
 
 
-def test_thinking_is_off_by_default_and_the_environment_can_change_it(monkeypatch):
+def test_the_lessons_one_shot_falls_through_the_model_list_like_the_chat():
+    # It used to stop at the first model, so one busy or retired model meant "couldn't be reached"
+    # for every lesson question even when the next model on the list was fine.
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path.split("/")[-1].split(":")[0])
+        if "/models/big:" in request.url.path:
+            return httpx.Response(503, json={"error": {"message": "high demand"}})
+        return httpx.Response(200, content=sse("from the second model"))
+
+    assert provider(handler).generate("s", "u") == "from the second model"
+    assert seen == ["big", "small"]
+
+
+def test_thinking_is_minimal_by_default_and_the_environment_can_change_it(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
-    monkeypatch.delenv("GEMINI_THINKING_BUDGET", raising=False)
-    assert coach.get_provider()._thinking_budget == 0
-    monkeypatch.setenv("GEMINI_THINKING_BUDGET", "default")
-    assert coach.get_provider()._thinking_budget is None
-    monkeypatch.setenv("GEMINI_THINKING_BUDGET", "256")
-    assert coach.get_provider()._thinking_budget == 256
-    monkeypatch.setenv("GEMINI_THINKING_BUDGET", "garbage")
-    assert coach.get_provider()._thinking_budget == 0
+    monkeypatch.delenv("GEMINI_THINKING_LEVEL", raising=False)
+    assert coach.get_provider()._thinking_level == "minimal"
+    monkeypatch.setenv("GEMINI_THINKING_LEVEL", "default")
+    assert coach.get_provider()._thinking_level is None
+    monkeypatch.setenv("GEMINI_THINKING_LEVEL", "LOW")
+    assert coach.get_provider()._thinking_level == "low"
+
+
+def test_it_stops_trying_models_after_the_time_budget_and_says_so(monkeypatch):
+    now = [0.0]
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        now[0] += 30  # each stuck model eats 30s
+        return httpx.Response(503, text="high demand")
+
+    p = provider(handler, model="a,b,c", clock=lambda: now[0])
+    with pytest.raises(coach.CoachUnavailable, match="gave up after 25s"):
+        list(p.stream("s", [{"role": "user", "content": "u"}]))
+    assert len(calls) == 1  # no second model once the budget is gone: the learner shouldn't wait
+
+
+def test_the_default_models_are_ones_a_new_key_can_use():
+    assert "gemini-2.5-flash" not in coach.DEFAULT_MODEL.split(",")  # 404: no longer available to new users
+    assert len(coach.DEFAULT_MODEL.split(",")) >= 3
+
+
+def test_details_reach_the_model_but_are_never_the_fallback(monkeypatch):
+    ctx = {**CONTEXT, "details": "The solver's mix: Check 57%, Bet 23%."}
+    fake = use(monkeypatch, FakeStream())
+    chat(context=ctx)
+    assert "More facts from the solver: The solver's mix: Check 57%, Bet 23%." in fake.calls[0][1][0]["content"]
+    use(monkeypatch, None)
+    got = events(chat(context=ctx))
+    assert got[1] == {"delta": CONTEXT["explanation"]} and "Check 57%" not in got[1]["delta"]
+
+
+def test_the_lessons_one_shot_prompt_is_unchanged_without_details():
+    prompt = coach.build_user_prompt(coach.CoachRequest(question="q", context=CONTEXT))
+    assert "More facts" not in prompt

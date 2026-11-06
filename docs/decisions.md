@@ -34,6 +34,231 @@ instead; re-check with `coach_try.py` after it.
 
 ---
 
+## 2026-11-05 — Generated lessons, postflop lessons, squeezing, and "the baseline is not the rule"
+
+**Status:** proposed. The two hand-written lessons need a poker-literate review.
+
+**What.** The course grew from 4 lessons to 18, grouped on the Train hub (Basics, Opening, Defending,
+Against re-raises, After the flop, Beyond the baseline). "Up next" walks them in that order.
+
+- **Generated from the data (10 lessons).** One per first-in seat (UTG, HJ, CO, BTN, SB), one per
+  defending seat (BB, SB, BTN), "Facing a 3-bet" and "Facing a 4-bet". `lib/generatedLessons.ts`
+  builds them at load, seeded by the lesson id (the same every time). The right answers and
+  explanations come from the practice table's own grading (`practiceTable.nodeFor`, so a lesson and the
+  table can never disagree) and the percentages quoted are computed from the ranges. What is typed is
+  only the framing. Hands are chosen to be instructive: at the edge of a range (what a seat adds over
+  the tighter one, what the looser one adds), and only hands you could really hold at the spot (you
+  can only face a 3-bet with a hand you opened, a 4-bet with one you 3-bet).
+- **Postflop (2 lessons), from the Drill's solved deck.** "Out of position on the flop" (check or bet)
+  and "Facing a bet on the flop" (fold, call or raise), for the one matchup we have solved (BB vs BTN,
+  single-raised, 100bb). Same rule as the continuation-bet lesson: only hands the solver plays one way at
+  least 60% of the time are asked (a near-50/50 hand has no one right answer); the explanation quotes the
+  solver's shares for that exact hand.
+- **Two hand-written lessons**: "The squeeze" and "Playing against tendencies". They are principles, not solver
+  output, and say so on their first card (the app has no solver-built squeeze ranges and no
+  opponent-modelling yet). **They were written by the assistant and are unreviewed**: a team member who plays
+  should read them, especially the squeeze sizing guide (about 4x the open in position, more out of
+  position, one more open-size per extra caller) and the tendencies adjustments.
+
+**The baseline is not the rule.** The solver's play is the best play against a *balanced* opponent;
+against a real player with a leak, another play wins more. Every generated lesson says its numbers are
+a baseline and points at "Playing against tendencies", and the postflop lessons spell out the adjustment
+for players who never fold or who fold too much. What the app cannot do yet is *compute* an exploitative
+play: that needs the solver to fix an opponent's tendency and solve for the best response (the
+best-response pass exists; the "node-locking" does not). Until then the exploitative advice is taught as
+principle and clearly not graded.
+
+**Also.** The coach panel now says "AI-written from the facts above. The solver and the charts, not the
+AI, decide what is right." under any answer the model wrote (not under the app's own explanation).
+`explainOpen` moved to `lib/openRanges.ts` (with the data it explains) so lessons and the table don't
+import each other.
+
+**Not done.** The practice table still stops at "you see a flop": continuing the *same* hand postflop would
+need a live solve of that exact hand on a random flop (13 s warm, 52 s cold on Render), so the flop is
+practised in the Drill and in these lessons instead. No solver-graded squeeze ranges. Hands asked are
+random within the instructive pool, not adaptive to what a learner keeps missing.
+
+**Tests.** `lib/generatedLessons.test.ts` (17: answers come from the data, only holdable hands, no repeats,
+quoted percentages recomputed independently, the same every time, flop answers are clear majorities, every
+generated lesson carries the baseline note; five deliberate breaks of the generator are caught) and the hub
+tests in `TrainPage.test.tsx` (grouping, playing a generated lesson through to its drill).
+
+---
+
+## 2026-11-05 — The lessons' coach retries across the model list, and `/coach/status` says why a call failed
+
+**Why.** With the key set on Render, a lesson question still answered "The AI coach couldn't be
+reached just now" (the app's own explanation, reason `unavailable`). `/coach/status` said
+`configured: true, models: ["gemini-flash-latest"]`, so the server was set up and the call to
+Gemini was failing, and nothing outside Render's logs said how. Two gaps, both fixed:
+
+- **The lessons' one-shot answer used only the first model and tried it once.** The Drill's chat
+  already tried every model on `GEMINI_MODEL`, twice, and retried a model that rejected the thinking
+  setting. `GeminiProvider.generate` is now the chat's `stream` joined into one string, so a busy
+  (503), rate-limited (429) or retired (404) first model no longer ends a lesson question when the
+  next model would answer. A blank answer is still an error.
+- **No way to see why.** `GET /coach/status` now also returns `last_failure` (`{"reason": "gemini-flash-latest:
+  HTTP 503", "at": <epoch>}`) and `last_ok_at`, kept in memory for this server process. The reason is the
+  model and the HTTP status only: Google's response body stays in the server log, not on a public
+  page. Ask a question, then open `/coach/status`: that is the check that needs no log access.
+  (`None` until a call happens after a deploy or restart.)
+
+**Reading the reason.** `HTTP 404`: that model name isn't available to this key, so change
+`GEMINI_MODEL`. `HTTP 403` or `400`: the key is wrong or restricted. `HTTP 429`: free-tier quota or
+rate limit. `HTTP 503`: the model is overloaded, so list more than one in `GEMINI_MODEL`
+(for example `gemini-flash-latest, gemini-2.5-flash`). `request failed` / a network error name: the
+server can't reach Google.
+
+**Tests.** The Gemini transport tests now describe the streaming request both paths share; a lessons
+question falls through to the second model when the first returns 503; the status reason carries no
+response body.
+
+---
+
+## 2026-11-05 — CI guard: a failed web run must show up before the push, not after
+
+**Status:** proposed.
+
+**What happened.** PR #40's CI web job failed with every test passing: three "Unhandled errors" (the
+Train hub's background progress sync ran against a mocked API function that returned `undefined`
+after its test had ended). Locally the same errors were in the output, but the run was already
+non-zero from an unrelated flaky test, and checking only the pass count hid them.
+
+**Fixes.**
+- The flaky test (`RangesPhone` "follows the seat, a raise and the stack...") raced a 250ms
+  debounce: it asserted the last fetch right after a heading that appears *before* the fetch for the
+  new stack. It now waits for the call. A failing exit code now means something.
+- `pnpm check:web` runs exactly CI's web steps (lint, test, build). `pnpm hooks` (opt-in, once)
+  makes git run it before every push (`.githooks/pre-push`; `--no-verify` skips it).
+- `CLAUDE.md` says to read the exit code and what a test that mocks an API module must provide.
+
+**Not done.** The api and solver jobs aren't in the hook (they need a Python environment; the API
+tests need Postgres). The hook is opt-in, so it protects only whoever runs `pnpm hooks`; CI remains
+the backstop.
+
+---
+
+## 2026-11-05 — The 6-max practice table (preflop-first)
+
+**Status:** proposed.
+
+**Why.** The Train tab taught and graded, but there was nowhere to *apply* a lesson at a table. Ranked
+play (planned) tests skill; this is where you practice it first.
+
+**Decision (agreed with the team lead): preflop-first, bots from the charts, honest about the limit.**
+Our solver handles two players on one street, so a solver-driven 6-max table is not possible, and
+pretending otherwise would break the rule that the solver decides what is right. So the table
+(`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`, reached from Train as "6-max
+practice table", `/train?practice=<mixed|open|defend>`):
+
+- Six seats, you at the bottom, 100bb. A hand is dealt; the bots in front of you act from the
+  reference charts (the first seat whose hand is in its opening range raises, the seats behind it
+  fold), you decide, the bots answer from the same charts, and **every decision of yours is graded
+  against the charts** with an explanation worked out from them.
+- It plays the whole preflop chain the data supports: open or fold; facing an open (fold / call /
+  3-bet) in the nine charted (opener, defender) pairs; facing a 3-bet after your open (fold / call /
+  4-bet); facing a 4-bet after your 3-bet (fold / call). It stops where the charts run out (a call,
+  a fold, or a 4-bet answered). 5-bets are not covered.
+- Spots the charts can't grade (a seat with no chart against that opener; the big blind when nobody
+  raised) are simply dealt again, so every hand has exactly one right answer at every decision.
+- **No solver, no postflop, no chips.** Bet sizes (2.5 / 9 / 22bb) are for display; grading is
+  range-based. Bots never cold-call or 3-bet before you act (a simplification). The pot and the
+  stacks are illustrative. Each question has the same "Ask the coach" panel as the lessons
+  (`pages/train/CoachPanel.tsx`, extracted from the Train page, unchanged).
+- Lessons link in: "Which hands to open" ends with "Practice this at the table" (`Lesson.practice`).
+
+**Wording** (found by playing it on the phone): a first-in prompt must not describe a table that isn't
+there (UTG acts first, so "everyone has folded to you" was wrong for it). `lib/seats.ts` is the one
+place seats are spoken of ("under the gun (UTG)", "on the button (BTN)"...) and the first-in prompt is
+built there for both the lessons and the table. In the log your own moves read "You raise / 3-bet /
+call", a bot's "BTN raises / 3-bets / calls" (a bot's name stands without an article, a sentence
+about it takes "The"), a call shows what it adds (the big blind facing 2.5bb calls **1.5bb**, not
+2.5bb), and the outcomes read as sentences. Tests pin each of these, and three deliberate breaks of
+them are caught.
+
+**Data.** `apps/web/src/data/preflop-pairs.json`, written by `apps/api/scripts/make_preflop_pairs.py`
+from `preflop_ranges.py` (the same pattern as the opening ranges and the Drill deck, so the table
+works offline). `apps/api/tests/test_preflop_pairs_data.py` fails if it drifts from the charts, and
+checks the invariants the engine relies on: at each node the ranges are disjoint (one action per
+hand) and you can only hold hands you could have reached the node with. Rerun the script after
+changing the charts. The ranges are the app's approximate reference charts, and the table says so.
+
+**Tests.** `lib/practiceTable.test.ts` (23: labelling, how the bots act, every grading node, every
+chart pair played through, seeded dealing; three deliberate breaks of the engine are caught) and
+`pages/train/PracticeTable.test.tsx` (the table, answering, scoring, the coach, filters, the Train
+tab hand-off, the lesson link).
+
+**Next (agreed): more lessons, generated from the data.** One lesson per seat and per spot type
+(opening, defending the blinds, 3-bet, facing a 3-bet), with the practice questions drawn from the
+ranges and the explanation cards drafted by the AI for the team to review and edit, never
+written live (nothing would check them). Then postflop practice for the one matchup we have solved
+(BB vs BTN, the Drill deck), then ranked play.
+
+---
+
+## 2026-11-05 — `GET /coach/status`: is the coach switched on in this deployment?
+
+**Why.** The lessons' coach and the Drill's coach only work where `GEMINI_API_KEY` is set. It was set
+in a teammate's local `.env`, not on Render, so in the deployed app every "Ask the coach" quietly
+fell back to the app's own explanation, and nothing from outside said why. Setting a host's
+environment variable cannot be done from the repo, so what the code can do is make the state
+checkable.
+
+**What.** `GET /coach/status` (no sign-in, no model call, so it costs no quota) returns
+`{"configured": bool, "models": [...]}`: whether a non-blank key is set and which model names are
+listed, never the key. After adding the key in Render's Environment tab (it redeploys), open
+`https://<api>/coach/status`: `configured: true` means the key is live. A real answer still needs a
+model name Google serves (see the model-name caveat in the coach entry), which only an actual
+question proves.
+
+**Fix for "the AI isn't on in the lessons":** set `GEMINI_API_KEY` (and, if needed, `GEMINI_MODEL`,
+e.g. `gemini-flash-latest`) on the Render service, then check `/coach/status`. No code change makes
+a key appear on the host.
+
+---
+
+## 2026-11-05 — Lesson progress follows the account
+
+**Status:** proposed.
+
+**Why.** Train-tab progress lived in one browser's `localStorage`, so the "Up next" guide forgot you
+on another phone, and ranked play (planned) needs a per-account record anyway.
+
+**What.** A new table, `lesson_progress` (Alembic `0003`; model `LessonProgressRow` in `app/db.py`),
+one row per (user, lesson): `done`, `correct`, `total`, and `updated_at`. Two endpoints, both
+sign-in-only and each user sees only their own rows (`app/routes/progress.py`):
+`GET /progress` and `PUT /progress/{lesson_id}`. The lessons themselves stay in the web app; the
+server stores a slug (`^[a-z0-9][a-z0-9-]{0,63}$`) and a score and never interprets either.
+
+**Merging: newest attempt wins, per lesson.** A `PUT` carries `at`, the attempt's time on the
+client's clock (ms). The server applies it only if it is not older than what it holds, and returns
+what is stored afterwards. So a late upload from an offline device cannot undo a newer attempt,
+repeating a request is harmless, and no device needs to be "the" source of truth. Impossible input
+is a 422 (more right than questions, a time more than a day ahead of the server: one bad clock must
+not pin a row forever; and more than 100 lessons per account).
+
+**On the device (`lib/progress.ts`).** Progress is still written to `localStorage` first, so a lesson
+works offline and signed out, but the key is now **per account** (the email), so two people on one
+device no longer share it. When signed in, finishing a lesson also `PUT`s it (fire and forget; if it
+fails the device copy is newer and the next sync uploads it), and the Train hub syncs on open: fetch
+the server's copy, keep the newer attempt per lesson, store the result, upload whatever the server
+lacks or has older. If the server can't be reached the device copy is used as is.
+
+**Guest progress.** What was played signed out is claimed by the first account that syncs on that
+device, and the guest copy is cleared only after the upload succeeded. On a shared device the first
+account to sign in therefore gets the guest's progress; that was judged better than losing it.
+
+**Not done.** Only Train progress is stored per account (not the Drill's scores). No history of
+attempts, only the latest per lesson (a "best score" rule would hide a lesson you've since forgotten).
+Ranked play will need its own tables.
+
+**Tests.** `apps/api/tests/test_progress.py` (Postgres, like the other persistence tests; also run
+here against SQLite to check the logic before CI), `lib/progress.test.ts` (merge rules, per-account
+keys, every sync path), and the Train page tests (server copy appears on a device with none; signed
+out never calls the server; a failed upload keeps the result on the device).
+
+---
+
 ## 2026-11-04 — The Coach page, Phase 2: Gemini, describe_spot, one client and one limit for the app
 
 Status: **proposed**. Spec: `docs/coach.md` §2-5 and §11.
@@ -133,7 +358,7 @@ Status: **proposed**. Spec: `docs/coach.md` (design in `docs/coach/mockup/`).
 
 **What.** A new Coach page where a user describes a spot in plain words and gets the solver's
 answer, explained. Phase 1 is the backend foundation only: the `coach_conversations` and
-`coach_messages` tables (migration `0003`), the `/coach/conversations` and `/coach/usage`
+`coach_messages` tables (migration `0004`), the `/coach/conversations` and `/coach/usage`
 endpoints, the daily message limit, and a background runner that stores a fixed placeholder reply.
 No Gemini, no tools, no UI yet.
 
@@ -150,9 +375,8 @@ labeling; it doesn't rely on the model's prose.
   Train coach, and the unmerged `coach-on-train` branch is still editing it, so renaming it now
   would conflict. The URLs are the spec's (`/coach/conversations`, `/coach/usage`); they share the
   `/coach` prefix with the Train coach's `POST /coach` and `/coach/chat`, without overlapping.
-- **Migration number.** The unmerged `account-progress` branch also adds a `0003`
-  (`lesson_progress`). Whichever merges second renumbers its migration to `0004` and points
-  `down_revision` at the other.
+- **Migration number.** Built as `0003`, renumbered `0004` when `lesson_progress` (`0003`) reached
+  `main` first.
 - **429 body.** The spec's `{ used, limit }` is the whole response body, not FastAPI's usual
   `{"detail": ...}`, so the frontend can read it directly. 409 and 404 keep `{"detail": ...}`.
 - **`GET /coach/conversations/{id}` also returns `id` and `title`.** The phone's top bar shows the
@@ -191,16 +415,21 @@ message counts against the hourly and daily limits, so a conversation uses sever
 
 **Speed and reliability on the free tier** (found by running it against the real service, which the
 entry below says hadn't happened yet):
-- Most of the wait was Gemini 2.5's silent "thinking", not the answer. `GEMINI_THINKING_BUDGET`
-  defaults to `0` (off); `default` leaves the model's behaviour alone. A model that rejects the
-  setting (HTTP 400) is retried without it. Streaming shows the first words in about a second.
-- Free-tier models are often "high demand" (HTTP 503). `GEMINI_MODEL` may be a comma-separated list;
-  each is tried in order, and the whole list a second time after a 2 s pause, until the first word
-  arrives. 404 (a retired name) and 429 also move on to the next; a bad key (401/403) does not.
-- Model names go stale. `gemini-2.5-flash` answered 404 for the project this was tried with, while
-  the alias `gemini-flash-latest` existed (it was merely busy). The default is left as it was; set
-  `GEMINI_MODEL=gemini-flash-latest,gemini-flash-lite-latest` (or what AI Studio lists) and read the
-  server log: every failed call logs the provider's own reason.
+- Measured against a real free key (not guessed): the wait was Gemini's queueing and silent "thinking",
+  not the answer. `gemini-3-flash-preview` with `thinkingLevel: "minimal"` returned its first word in
+  1.3s (2.3s with default thinking); the `-latest` aliases took 17-59s or failed "high demand".
+  `GEMINI_THINKING_LEVEL` defaults to `minimal` (`default` leaves the model alone); a model that
+  rejects it (HTTP 400, e.g. `flash-lite-latest`) is retried without. Streaming then shows words as
+  they come.
+- Model names go stale, and the old default died: `gemini-2.5-flash` and `-flash-lite` now answer
+  404 "no longer available to new users". `DEFAULT_MODEL` is now a list, fastest first:
+  `gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-3.5-flash-lite, gemini-flash-lite-latest`.
+  Preview models can be retired too: if the log shows 404s, set `GEMINI_MODEL` from AI Studio's list
+  (`GET /v1beta/models` with your key lists what it can use).
+- Free-tier models are often "high demand" (503) or just slow. `GEMINI_MODEL` is a comma-separated
+  list tried in order; a stuck model is dropped after 10s of silence, and after 25s in all the app's
+  own explanation is shown instead (the learner never waits longer). 404 and 429 also move on to the
+  next model; a bad key does not. Every failed attempt is logged with the provider's reason.
 - Local-dev traps that look like coach bugs: the API needs `SUPABASE_URL` (the same project URL as
   the web app's `VITE_SUPABASE_URL`) or every sign-in check crashes into a 500 the browser reports as
   "couldn't reach the server"; and a python.org Python with no root certificates fails the sign-in
@@ -257,8 +486,8 @@ response shape against a fake server) and the panel's states in `TrainPage.test.
 finished lesson under 80% right (shown with your score), else sends you to the Drill. Choosing from
 the fixed course by plain rules means it can't invent a lesson or misreport a score, needs no key or
 network, and is fully testable. The model could later phrase the message, but the choice stays
-rule-based. It reads progress from this browser only; moving progress to the account (so the guide
-follows you across devices) is the next step and needs a table, so it is not done.
+rule-based. It read progress from this browser only at first; it now follows the account (see "Lesson
+progress follows the account", above).
 
 **Not done.** Streaming answers, account-level progress, and a live check against Google: it needs a
 key, so the coach has not run against the real service. Also: Render deploys `main`, so the coach
@@ -282,7 +511,7 @@ dropping the old "the Drill is not a remembered tab" special cases.
 explanation per choice, so adding a lesson needs no UI code. Two exist: "Positions and the button"
 and "Pot odds and equity" (content checked against the formulas by `lessons.test.ts`). A lesson is
 played at `/train?lesson=<id>`; the query string is what makes the tab bar's "last place in each
-tab" return to it. Progress (done, score) is in `localStorage` only for now.
+tab" return to it. Progress (done, score) started in `localStorage` only; see "Lesson progress follows the account".
 
 **Lesson 3, "Which hands to open" (solver-backed grading).** Ten "folded to you in seat X with hand
 Y: raise or fold?" questions (five from UTG, five from the BTN), graded against the repo's reference

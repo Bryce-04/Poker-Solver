@@ -1,1 +1,4 @@
 *.sh text eol=lf
+
+# Shell hooks must keep LF endings even on Windows checkouts (CRLF breaks the shebang line).
+.githooks/* text eol=lf

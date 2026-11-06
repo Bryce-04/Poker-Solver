@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
@@ -92,13 +92,17 @@ describe("phone Ranges -- Pick", () => {
     await user.click(group("Stack").getByRole("button", { name: "40bb" }));
 
     expect(await screen.findByRole("heading", { name: "BB vs a CO raise" })).toBeInTheDocument();
-    expect(mockFetch).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        // A chart spot names only your own seat; the raiser is in the actions.
-        positions_in_hand: ["BB"],
-        effective_stack_bb: 40,
-        actions: [{ position: "CO", street: "preflop", action: "raise" }],
-      }),
+    // The chart is fetched after a short debounce, so wait for the call for the new stack
+    // (the heading above is already there from the raiser change).
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          // A chart spot names only your own seat; the raiser is in the actions.
+          positions_in_hand: ["BB"],
+          effective_stack_bb: 40,
+          actions: [{ position: "CO", street: "preflop", action: "raise" }],
+        }),
+      ),
     );
     // The URL keeps the choice, not what BB forces it to, so going back to a
     // seat that can open restores "Nobody raised", as on desktop.

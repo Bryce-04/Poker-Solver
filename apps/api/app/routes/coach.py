@@ -14,6 +14,14 @@ from ..auth import current_user_id
 router = APIRouter(prefix="/coach", tags=["coach"])
 
 
+@router.get("/status")
+def coach_status() -> dict:
+    """Is the AI coach switched on in this deployment? Open to anyone and free (no model
+    call, no quota): it only says whether GEMINI_API_KEY is set and which models are listed,
+    never the key. Handy right after setting the key on the host."""
+    return coach.status()
+
+
 @router.post("")
 def ask_coach(req: coach.CoachRequest, user: UUID = Depends(current_user_id)) -> coach.CoachResponse:
     return coach.answer(req, user, coach.get_provider())

@@ -1,4 +1,4 @@
-import { LESSONS, REVISIT_BELOW, explainOpen, questionFor, quizCount, readProgress, recommendNext, writeProgress } from "./lessons";
+import { LESSONS, REVISIT_BELOW, explainOpen, questionFor, quizCount, recommendNext } from "./lessons";
 import { betFrequency, CLEAR_MAJORITY, CBET_CANDIDATES, explainCbet, favoriteSize, pickCbetSpots } from "./cbetLesson";
 import { gradeAction } from "./drill";
 import { cardsFor, comboCount, earliestOpeningSeat, inOpenRange, openPercent } from "./openRanges";
@@ -40,6 +40,15 @@ describe("opening-hands lesson", () => {
       expect(q.choices[0].correct).toBe(inOpenRange(step.seat, step.hand)); // Raise
       expect(q.choices[1].correct).toBe(!inOpenRange(step.seat, step.hand)); // Fold
     }
+  });
+
+  it("never says everyone folded to the first seat to act, and says it for the others", () => {
+    const promptFor = (seat: string) => {
+      const step = lesson.steps.find((s) => s.kind === "open" && s.seat === seat)!;
+      return questionFor(step)!.prompt;
+    };
+    expect(promptFor("UTG")).toBe("You're under the gun (UTG) with 100bb, so you act first. Open or fold?");
+    expect(promptFor("BTN")).toBe("You're on the button (BTN) with 100bb and everyone has folded to you. Open or fold?");
   });
 
   it("teaches what it says: the hands folded from UTG are opened on the button", () => {
@@ -161,28 +170,5 @@ describe("opening range helpers", () => {
     expect(cardsFor("AKo")).toEqual(["As", "Kh"]);
     expect(cardsFor("T9s")).toEqual(["Ts", "9s"]);
     expect(cardsFor("55")).toEqual(["5s", "5h"]);
-  });
-});
-
-describe("progress storage", () => {
-  beforeEach(() => window.localStorage.clear());
-
-  it("round-trips and keeps other lessons", () => {
-    writeProgress("a", { done: true, correct: 2, total: 3 });
-    writeProgress("b", { done: false, correct: 0, total: 3 });
-    expect(readProgress()).toEqual({
-      a: { done: true, correct: 2, total: 3 },
-      b: { done: false, correct: 0, total: 3 },
-    });
-  });
-
-  it("survives corrupt or blocked storage", () => {
-    window.localStorage.setItem("poker-solver.train.progress.v1", "{not json");
-    expect(readProgress()).toEqual({});
-    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("blocked");
-    });
-    expect(() => writeProgress("a", { done: true, correct: 1, total: 1 })).not.toThrow();
-    spy.mockRestore();
   });
 });

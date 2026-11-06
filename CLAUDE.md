@@ -33,7 +33,7 @@ dependency, checked against the project's public JWKS keys -- only
 only ever touches the caller's own spots (`SpotRow.created_by`). A spot
 that's missing, someone else's, or ownerless is the same 404 to
 PATCH/DELETE. Rows saved before auth have no owner and are deliberately
-left in place, listed for no one. The `spots` table is managed by Alembic
+left in place, listed for no one. The `spots` and `lesson_progress` tables are managed by Alembic
 (`apps/api/migrations`), not `create_all`. `apps/api` is deployed on
 Render, `DATABASE_URL` points at Supabase; an Android build (Capacitor,
 `apps/web/android/`) has a real app icon/splash and runs end-to-end
@@ -163,11 +163,22 @@ sizes and roughly doubles per extra raise. No UI sets it yet.
 **Train tab (2026-11-04)**: the fourth tab is Train (`/train`), a lessons hub with the
 Drill reachable from it (the Drill itself is unchanged, still full screen at `/drill`). Lessons are
 plain data in `lib/lessons.ts` (reading cards + graded questions), played at `/train?lesson=<id>`,
-progress in localStorage. "Which hands to open" is graded against the reference opening ranges, shipped as
+progress kept per account on the device (`lib/progress.ts`) and, signed in, on the server
+(`GET`/`PUT /progress`, table `lesson_progress`; newest attempt wins per lesson; see `docs/decisions.md`).
+"Which hands to open" is graded against the reference opening ranges, shipped as
 `apps/web/src/data/open-ranges.json` (regenerate with `python apps/api/scripts/make_open_ranges.py`;
 a test fails if it drifts). "The continuation bet" is graded by the Drill deck's solver frequencies
-(`lib/cbetLesson.ts`). See `docs/decisions.md` for what's planned next (an AI coach, a lesson guide,
-ranked play, opponent types).
+(`lib/cbetLesson.ts`). The course is 18 lessons in groups (`GROUP_ORDER` in `lib/lessons.ts`): ten are
+**generated from the data** (`lib/generatedLessons.ts`: opening per seat, defending per seat, facing a
+3-/4-bet, two postflop lessons from the Drill deck), graded by the same code as the practice table
+(`practiceTable.nodeFor`); two are hand-written principles, not graded (`lib/conceptLessons.ts`: the squeeze,
+playing against tendencies, **unreviewed**). The solver's play is a baseline against a balanced opponent, not
+a rule against real players: every generated lesson says so. "Up next" is rule-based (`recommendNext`). The Train hub also has a **6-max
+practice table** (`pages/train/PracticeTable.tsx`, engine `lib/practiceTable.ts`): preflop-first, the bots
+play the reference charts and every decision is graded against them (data in
+`apps/web/src/data/preflop-pairs.json`, regenerate with `python apps/api/scripts/make_preflop_pairs.py`;
+a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
+(generated lessons, postflop practice, ranked play, opponent types).
 
 **Coach page, Ask mode (spec agreed 2026-11-04; Phases 1-2 of 6 done)**: `docs/coach.md` is the
 spec, with the design as clickable HTML plus screenshots in `docs/coach/mockup/`. Read both before
@@ -182,7 +193,7 @@ one usage limit**. One PR per phase.
   - `runner.py`: one turn in the background. `prompt.py`: the system prompt. `tools.py`: tool
     declarations and executors. `spot_builder.py`: `describe_spot`'s arguments to a `Spot`.
     `gemini.py`: stored messages to Gemini contents.
-- **Data**: tables `coach_conversations` / `coach_messages` (`app/db.py`, migration `0003`). A
+- **Data**: tables `coach_conversations` / `coach_messages` (`app/db.py`, migration `0004`). A
   message is `{seq, kind, payload}`; spec §3.1 lists the kinds. Spot cards also carry
   `hero_position` and a `summary`, and errors can be `not_configured`.
 - **Endpoints**, all signed-in and owner-only (anyone else's conversation is a 404):
@@ -215,10 +226,8 @@ one usage limit**. One PR per phase.
   and `python scripts/coach_eval.py` scores the model on
   `coach_eval/cases.jsonl`. Run the eval before and after any prompt change; the target is 90%.
   `--check-cases` validates the cases without a key. **Last result: 84% (43 of 51), below the 90%
-  target**; the misses are listed in `docs/decisions.md`. `main`'s default `gemini-2.5-flash` is a 404
-  for new keys: until `coach-on-train` merges, set `GEMINI_MODEL` (that branch's list works).
-- **Migration clash to watch:** the unmerged `account-progress` branch also adds a `0003`. Whichever
-  merges second renumbers to `0004`.
+  target**; the misses are listed in `docs/decisions.md`. That run used the Gemini 3 model list
+  that's now `app/coach.py`'s default.
 - **Next is Phase 3**: the solver tools. No UI exists until Phase 4, which must word the limit as
   per hour, not per day.
 
@@ -227,14 +236,16 @@ one usage limit**. One PR per phase.
 explanation, never an error) and takes the conversation so far, so the learner can ask follow-ups.
 The Drill's answer screen uses it (`components/CoachChat`, `lib/coach.ts` builds the context); the
 lessons still use the one-shot `POST /coach`. `GEMINI_MODEL` may be a comma-separated list and
-`GEMINI_THINKING_BUDGET` defaults to 0 (see docs/decisions.md for why, and for local-dev traps:
+`GEMINI_THINKING_LEVEL` defaults to `minimal` (see docs/decisions.md for why, and for local-dev traps:
 `SUPABASE_URL` and root certificates).
 
 **AI coach (2026-11-05)**: each answered Train question has "Ask the coach", backed by
 `apps/api`'s `POST /coach` (`app/coach.py`): a model (Gemini free tier, `GEMINI_API_KEY` /
 `GEMINI_MODEL` env vars, unset = off) explains from the facts the lesson computed and never decides
 what's right; any failure, no key, or a rate limit falls back to the app's own explanation. Sign-in
-required. See `docs/decisions.md` (including the unverified-model-name caveat).
+required. `GET /coach/status` (open, free) says whether a key is set on the deployment and why the last call failed
+(`last_failure`, model + HTTP status only); the lessons' coach and the Drill's chat share one retrying, multi-model path. See
+`docs/decisions.md` (including the unverified-model-name caveat).
 
 **Poker Drill (2026-10-19)**: all of it is on `main`. That's the first
 "Swipe Drill" (PR #27), then tap-only actions, the settings cog, table
@@ -577,7 +588,14 @@ pnpm dev:web                 # dev server
 pnpm --filter web build      # production build (tsc -b && vite build)
 pnpm --filter web lint       # oxlint
 pnpm --filter web test       # vitest
+pnpm check:web               # what CI's web job runs: lint, tests, build (run before every push)
+pnpm hooks                   # once: run pnpm check:web automatically before every git push
 ```
+**Read the exit code, not just "N passed".** Vitest fails the run for errors that happen in the
+background after a test has finished ("Unhandled errors", e.g. an awaited function from a mocked
+module that returns `undefined`) even when every test passes; that is how a red CI run got through
+once. A test that mocks `lib/api` or `lib/auth` must give every function the component under test
+awaits a resolved value (see `TrainPage.test.tsx`'s `beforeEach`).
 
 ### Schema (`packages/schema`) — the shared source of truth
 Python (Pydantic, in `src/poker_solver_schema/models.py`) is authoritative;
@@ -601,6 +619,7 @@ cd apps/api && uvicorn app.main:app --reload                 # GET /health
 cd services/solver && python -m poker_solver.kuhn_spike      # Stage 1 toy CFR spike demo
 cd apps/api && python scripts/make_drill_deck.py             # regenerate the Poker Drill deck (~1 min)
 cd apps/api && python scripts/make_open_ranges.py            # regenerate the Train tab's opening-range data
+cd apps/api && python scripts/make_preflop_pairs.py          # regenerate the practice table's preflop data
 pytest services/solver                                       # from repo root, or `pytest` from within services/solver
 pytest services/solver/tests/test_range_cfr.py                # the live solver's theory + regression tests
 pytest services/solver/tests/test_range_cfr_matches_reference.py  # the trainer vs its frozen pre-speed-up copy
@@ -629,8 +648,8 @@ access. `db.py` loads `.env` itself via `python-dotenv` for bare
 `uvicorn --reload` runs; docker-compose and Render set the real env var
 directly, so that's a no-op there.
 
-Schema changes to the `spots` table go through Alembic, from `apps/api`:
-edit `SpotRow` in `app/db.py`, then `alembic revision --autogenerate -m
+Schema changes to a table (`spots`, `lesson_progress`) go through Alembic, from `apps/api`:
+edit its model (`SpotRow`, `LessonProgressRow`) in `app/db.py`, then `alembic revision --autogenerate -m
 "..."`, review the generated file, and `alembic upgrade head`. `alembic
 check` confirms models and migrations agree. Deploys (the Dockerfile's
 CMD, docker-compose) run `alembic upgrade head` before starting uvicorn.

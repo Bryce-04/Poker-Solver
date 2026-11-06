@@ -2,9 +2,23 @@
 // plain data -- short reading cards and multiple-choice questions -- so adding
 // one needs no new UI code. Progress is kept in this browser only for now.
 
-import { betFrequency, CLEAR_MAJORITY, explainCbet, pickCbetSpots } from "./cbetLesson";
+import {
+  betFrequency,
+  CLEAR_MAJORITY,
+  clearFacingAnswer,
+  explainCbet,
+  explainFacingBet,
+  pickCbetSpots,
+  villainBetText,
+} from "./cbetLesson";
 import type { DrillSpot } from "./drill";
-import { cardsFor as cardsForHand, earliestOpeningSeat, inOpenRange, openPercent, type OpenSeat } from "./openRanges";
+import { CONCEPT_LESSONS } from "./conceptLessons";
+import { GENERATED_LESSONS } from "./generatedLessons";
+import { actionLabel, describeNode, nodeFor, type PracticeFilter, type SpotRef } from "./practiceTable";
+import { openPrompt } from "./seats";
+import { cardsFor as cardsForHand, explainOpen, inOpenRange, openPercent, type OpenSeat } from "./openRanges";
+
+export { explainOpen };
 
 export interface Choice {
   label: string;
@@ -23,7 +37,13 @@ export type LessonStep =
   /** "The BB checks to you on this flop: bet or check?" Graded against the
    * Drill's pre-solved spots (lib/cbetLesson.ts): the answer is the solver's
    * own frequency for that exact hand. */
-  | { kind: "cbet"; spot: DrillSpot };
+  | { kind: "cbet"; spot: DrillSpot }
+  /** A decision at the practice table's spots (open, defend, face a 3-bet or 4-bet) for a given hand,
+   * graded by exactly the code the table grades with (practiceTable.nodeFor). */
+  | { kind: "spot"; spot: SpotRef }
+  /** A solved flop decision from the Drill's deck for the hero's exact hand: out of position (check or bet) or
+   * facing a bet (fold, call or raise). The answer is the solver's own frequency (lib/cbetLesson.ts). */
+  | { kind: "flop"; spot: DrillSpot };
 
 /** What a graded step shows: the prompt, any cards, and the choices. */
 export interface Question {
@@ -36,17 +56,22 @@ export interface Question {
 
 export interface Lesson {
   id: string;
+  /** The hub's heading this lesson sits under; the order is GROUP_ORDER. */
+  group: string;
   title: string;
   summary: string;
   minutes: number;
+  /** The practice-table drill that goes with this lesson, offered when it ends. */
+  practice?: PracticeFilter;
   steps: LessonStep[];
 }
 
 const opens = (seat: OpenSeat, hands: string[]): LessonStep[] => hands.map((hand) => ({ kind: "open", seat, hand }));
 
-export const LESSONS: Lesson[] = [
+const HAND_WRITTEN: Lesson[] = [
   {
     id: "positions",
+    group: "Basics",
     title: "Positions and the button",
     summary: "Who acts when, and why sitting last is such an edge.",
     minutes: 4,
@@ -108,6 +133,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "pot-odds",
+    group: "Basics",
     title: "Pot odds and equity",
     summary: "Work out whether a call pays off, using a number instead of a feeling.",
     minutes: 6,
@@ -160,9 +186,11 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "opening-hands",
+    group: "Opening",
     title: "Which hands to open",
     summary: "When it's folded to you, which hands are worth a raise from each seat.",
     minutes: 6,
+    practice: "open",
     steps: [
       {
         kind: "read",
@@ -187,6 +215,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "continuation-bets",
+    group: "After the flop",
     title: "The continuation bet",
     summary: "You raised before the flop and the big blind checked to you. When do you bet?",
     minutes: 6,
@@ -205,16 +234,13 @@ export const LESSONS: Lesson[] = [
   },
 ];
 
-/** The open-or-fold explanation, from the range data. */
-export function explainOpen(seat: OpenSeat, hand: string): string {
-  const pct = openPercent(seat);
-  if (inOpenRange(seat, hand)) {
-    return `${hand} is in the ${seat} opening range, so it's a raise. The ${seat} opens about ${pct}% of hands.`;
-  }
-  const first = earliestOpeningSeat(hand);
-  const later = first ? ` It becomes an open from the ${first} onward, where the range is wider.` : " It's too weak to open from any seat.";
-  return `${hand} is not in the ${seat} opening range, so it's a fold. The ${seat} opens only about ${pct}% of hands.${later}`;
-}
+/** The hub's headings, in the order a learner meets them. */
+export const GROUP_ORDER = ["Basics", "Opening", "Defending", "Against re-raises", "After the flop", "Beyond the baseline"];
+
+/** Every lesson, grouped, in course order (the order "Up next" walks). Hand-written lessons first within a group. */
+export const LESSONS: Lesson[] = [...HAND_WRITTEN, ...GENERATED_LESSONS, ...CONCEPT_LESSONS].sort(
+  (a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group),
+);
 
 /** The step as something to answer, or null for a reading card. */
 export function questionFor(step: LessonStep): Question | null {
@@ -232,11 +258,51 @@ export function questionFor(step: LessonStep): Question | null {
       ],
     };
   }
+  if (step.kind === "flop") {
+    const spot = step.spot;
+    if (spot.situation === "facing_bet") {
+      const right = clearFacingAnswer(spot);
+      const why = explainFacingBet(spot);
+      return {
+        prompt: `You raised from the BTN and the BB called. On the flop ${villainBetText(spot)} into you. Fold, call or raise?`,
+        cards: spot.hand,
+        board: spot.board,
+        choices: [
+          { label: "Fold", correct: right === "fold", why },
+          { label: "Call", correct: right === "call", why },
+          { label: "Raise", correct: right === "raise", why },
+        ],
+      };
+    }
+    const bet = betFrequency(spot) >= CLEAR_MAJORITY;
+    const why = explainCbet(spot);
+    return {
+      prompt: `You called a BTN raise from the big blind, so you act first on the flop. The pot is ${spot.potBb}bb. Bet or check?`,
+      cards: spot.hand,
+      board: spot.board,
+      choices: [
+        { label: "Bet", correct: bet, why },
+        { label: "Check", correct: !bet, why },
+      ],
+    };
+  }
+  if (step.kind === "spot") {
+    const node = nodeFor(step.spot);
+    return {
+      prompt: describeNode(node),
+      cards: cardsForHand(step.spot.hand),
+      choices: node.options.map((action) => ({
+        label: actionLabel(node, action),
+        correct: action === node.correct,
+        why: node.explanation,
+      })),
+    };
+  }
   if (step.kind !== "open") return null;
   const raise = inOpenRange(step.seat, step.hand);
   const why = explainOpen(step.seat, step.hand);
   return {
-    prompt: `You're in the ${step.seat} at 100bb and everyone folds to you. Open or fold?`,
+    prompt: openPrompt(step.seat),
     cards: cardsForHand(step.hand),
     choices: [
       { label: "Raise to 2.5bb", correct: raise, why },
@@ -245,31 +311,14 @@ export function questionFor(step: LessonStep): Question | null {
   };
 }
 
+/** A finished (or started) lesson: the latest attempt's score, and when it
+ * finished (ms since the epoch; the newest attempt wins when devices merge).
+ * Storage and syncing live in lib/progress.ts. */
 export interface LessonProgress {
   done: boolean;
   correct: number;
   total: number;
-}
-
-const KEY = "poker-solver.train.progress.v1";
-
-export function readProgress(): Record<string, LessonProgress> {
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, LessonProgress>) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function writeProgress(id: string, progress: LessonProgress): void {
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify({ ...readProgress(), [id]: progress }));
-  } catch {
-    // Storage blocked or full: progress just isn't remembered.
-  }
+  at?: number;
 }
 
 /** Below this share right, a finished lesson is worth another go. */

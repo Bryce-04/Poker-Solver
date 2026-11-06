@@ -1,19 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
+  GROUP_ORDER,
   LESSONS,
   questionFor,
   recommendNext,
   quizCount,
-  readProgress,
-  writeProgress,
   type Lesson,
   type LessonProgress,
 } from "../lib/lessons";
 import { PlayingCard } from "../components/PlayingCard/PlayingCard";
-import { askCoach, type CoachContext } from "../lib/api";
+import { putProgress } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { useOpenAccountSheet } from "../lib/mobileShell";
+import { isPracticeFilter, type PracticeFilter } from "../lib/practiceTable";
+import { readProgress, syncProgress, writeProgress } from "../lib/progress";
+import { CoachPanel } from "./train/CoachPanel";
+import { PracticeTable } from "./train/PracticeTable";
 import "./TrainPage.css";
 
 /**
@@ -24,16 +26,64 @@ import "./TrainPage.css";
  */
 export function TrainPage() {
   const [params, setParams] = useSearchParams();
+  const auth = useAuth();
+  // Progress is kept per account on this device and, when signed in, on the
+  // server too (lib/progress.ts). Keyed by account so a sign-in or an account
+  // switch starts the screen fresh.
+  const account = auth.status === "signed-in" ? (auth.email ?? "account") : null;
+  const practice = params.get("practice");
+  if (isPracticeFilter(practice)) {
+    return (
+      <PracticeTable
+        filter={practice}
+        onFilter={(f) => setParams({ practice: f }, { replace: true })}
+        onExit={() => setParams({}, { replace: false })}
+      />
+    );
+  }
   const lesson = LESSONS.find((l) => l.id === params.get("lesson"));
   if (lesson) {
-    return <LessonPlayer key={lesson.id} lesson={lesson} onExit={() => setParams({}, { replace: false })} />;
+    return (
+      <LessonPlayer
+        key={`${account}:${lesson.id}`}
+        lesson={lesson}
+        account={account}
+        onExit={() => setParams({}, { replace: false })}
+        onPractice={(f) => setParams({ practice: f })}
+      />
+    );
   }
-  return <TrainHub onOpen={(id) => setParams({ lesson: id })} />;
+  return (
+    <TrainHub
+      key={account ?? "guest"}
+      account={account}
+      onOpen={(id) => setParams({ lesson: id })}
+      onPractice={() => setParams({ practice: "all" })}
+    />
+  );
 }
 
-function TrainHub({ onOpen }: { onOpen: (id: string) => void }) {
-  // Read once per visit to the hub: finishing a lesson remounts it.
-  const [progress] = useState(readProgress);
+function TrainHub({
+  account,
+  onOpen,
+  onPractice,
+}: {
+  account: string | null;
+  onOpen: (id: string) => void;
+  onPractice: () => void;
+}) {
+  // This device's copy now; the account's server copy replaces it once synced.
+  const [progress, setProgress] = useState(() => readProgress(account));
+  useEffect(() => {
+    if (account === null) return;
+    let cancelled = false;
+    void syncProgress(account).then((merged) => {
+      if (!cancelled) setProgress(merged);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
   const next = recommendNext(progress);
   return (
     <div className="train">
@@ -58,34 +108,54 @@ function TrainHub({ onOpen }: { onOpen: (id: string) => void }) {
           Lessons
         </h2>
         <p className="train__hint">Start here if you know the hand rankings. Each lesson is a few short cards and some questions.</p>
-        <ul className="train__list">
-          {LESSONS.map((lesson) => {
-            const p = progress[lesson.id];
-            return (
-              <li key={lesson.id}>
-                <button type="button" className="train__card" onClick={() => onOpen(lesson.id)}>
-                  <span className="train__card-main">
-                    <span className="train__card-title">{lesson.title}</span>
-                    <span className="train__card-sub">{lesson.summary}</span>
-                    <span className="train__card-meta">
-                      {lesson.minutes} min
-                      {p?.done ? ` · done, ${p.correct}/${p.total} right` : ""}
-                    </span>
-                  </span>
-                  <span className="train__chevron" aria-hidden="true">
-                    {p?.done ? "✓" : "›"}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        {GROUP_ORDER.map((group) => {
+          const inGroup = LESSONS.filter((l) => l.group === group);
+          if (inGroup.length === 0) return null;
+          return (
+            <div key={group} className="train__group">
+              <h3 className="train__group-title">{group}</h3>
+              <ul className="train__list">
+                {inGroup.map((lesson) => {
+                  const p = progress[lesson.id];
+                  return (
+                    <li key={lesson.id}>
+                      <button type="button" className="train__card" onClick={() => onOpen(lesson.id)}>
+                        <span className="train__card-main">
+                          <span className="train__card-title">{lesson.title}</span>
+                          <span className="train__card-sub">{lesson.summary}</span>
+                          <span className="train__card-meta">
+                            {lesson.minutes} min
+                            {p?.done ? ` · done, ${p.correct}/${p.total} right` : ""}
+                          </span>
+                        </span>
+                        <span className="train__chevron" aria-hidden="true">
+                          {p?.done ? "✓" : "›"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </section>
 
       <section aria-labelledby="train-practice">
         <h2 id="train-practice" className="train__heading">
           Practice
         </h2>
+        <button type="button" className="train__card" onClick={onPractice}>
+          <span className="train__card-main">
+            <span className="train__card-title">6-max practice table</span>
+            <span className="train__card-sub">
+              Play preflop hands at a full table: the bots follow the charts and every decision of yours is graded.
+            </span>
+          </span>
+          <span className="train__chevron" aria-hidden="true">
+            ›
+          </span>
+        </button>
         <Link to="/drill" className="train__card">
           <span className="train__card-main">
             <span className="train__card-title">Drill</span>
@@ -122,7 +192,17 @@ function TrainHub({ onOpen }: { onOpen: (id: string) => void }) {
 
 type Result = LessonProgress;
 
-function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }) {
+function LessonPlayer({
+  lesson,
+  account,
+  onExit,
+  onPractice,
+}: {
+  lesson: Lesson;
+  account: string | null;
+  onExit: () => void;
+  onPractice: (filter: PracticeFilter) => void;
+}) {
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
@@ -136,7 +216,10 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
   function next(nowCorrect: number) {
     if (last) {
       const finished = { done: true, correct: nowCorrect, total };
-      writeProgress(lesson.id, finished);
+      const stored = writeProgress(lesson.id, finished, account);
+      // Signed in: also send it to the account. Fire and forget; if it fails
+      // (offline) the next sync uploads it, because the device copy is newer.
+      if (account !== null) void putProgress(lesson.id, stored);
       setResult(finished);
       return;
     }
@@ -163,7 +246,12 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
             : "Worth another go if any of those felt shaky. The explanations stay the same, and so does the rule."}
         </p>
         <div className="train__actions">
-          <button type="button" className="train__primary" onClick={onExit}>
+          {lesson.practice && (
+            <button type="button" className="train__primary" onClick={() => onPractice(lesson.practice!)}>
+              Practice this at the table
+            </button>
+          )}
+          <button type="button" className={lesson.practice ? "train__chip" : "train__primary"} onClick={onExit}>
             Back to lessons
           </button>
         </div>
@@ -265,112 +353,6 @@ function LessonPlayer({ lesson, onExit }: { lesson: Lesson; onExit: () => void }
         </article>
         )
       )}
-    </div>
-  );
-}
-
-const QUICK_QUESTIONS = [
-  "Explain this in simpler words.",
-  "Why isn't the other choice better?",
-  "What should I look for next time?",
-];
-
-const FALLBACK_NOTE: Record<string, string> = {
-  not_configured: "The AI coach isn't switched on yet, so this is the app's own explanation.",
-  rate_limited: "You've asked a lot of questions this hour, so this is the app's own explanation. Try again later.",
-  unavailable: "The AI coach couldn't be reached just now, so this is the app's own explanation.",
-};
-
-type CoachState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "answer"; text: string; note: string | null }
-  | { kind: "error"; message: string };
-
-/**
- * "Ask the coach" under an answered question. The coach (apps/api's /coach)
- * explains from the facts this question already computed from the solver or
- * range data; it never decides what's right. Needs sign-in, which spends the
- * shared free-tier quota only on real accounts.
- */
-function CoachPanel({ context }: { context: CoachContext }) {
-  const auth = useAuth();
-  const openAccountSheet = useOpenAccountSheet();
-  const [text, setText] = useState("");
-  const [state, setState] = useState<CoachState>({ kind: "idle" });
-
-  async function ask(question: string) {
-    const q = question.trim();
-    if (!q) return;
-    setState({ kind: "loading" });
-    const result = await askCoach(q, context);
-    if (result.kind === "answer") {
-      const { answer, source, reason } = result.data;
-      setState({ kind: "answer", text: answer, note: source === "fallback" && reason ? (FALLBACK_NOTE[reason] ?? null) : null });
-    } else if (result.kind === "signed-out") {
-      setState({ kind: "error", message: "Sign in to ask the coach." });
-    } else if (result.kind === "network-error") {
-      setState({ kind: "error", message: "Couldn't reach the server. Check your connection and try again." });
-    } else {
-      setState({ kind: "error", message: "The coach hit a problem. Try again in a moment." });
-    }
-  }
-
-  if (auth.status !== "signed-in") {
-    return (
-      <div className="train__coach">
-        <p className="train__coach-title">Ask the coach</p>
-        <p className="train__text">
-          {auth.status === "loading" ? "Checking your sign-in…" : "Sign in to ask the AI coach follow-up questions about this answer."}
-        </p>
-        {auth.status === "signed-out" && openAccountSheet && (
-          <button type="button" className="train__link" onClick={openAccountSheet}>
-            Sign in
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="train__coach">
-      <p className="train__coach-title">Ask the coach</p>
-      <div className="train__chips">
-        {QUICK_QUESTIONS.map((q) => (
-          <button key={q} type="button" className="train__chip" disabled={state.kind === "loading"} onClick={() => ask(q)}>
-            {q}
-          </button>
-        ))}
-      </div>
-      <form
-        className="train__ask"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask(text);
-        }}
-      >
-        <input
-          className="train__input"
-          value={text}
-          maxLength={300}
-          placeholder="Ask your own question"
-          aria-label="Your question for the coach"
-          onChange={(e) => setText(e.target.value)}
-        />
-        <button type="submit" className="train__chip" disabled={state.kind === "loading" || text.trim() === ""}>
-          Ask
-        </button>
-      </form>
-      <div role="status" aria-live="polite">
-        {state.kind === "loading" && <p className="train__hint">The coach is thinking…</p>}
-        {state.kind === "answer" && (
-          <>
-            <p className="train__text train__coach-answer">{state.text}</p>
-            {state.note && <p className="train__hint">{state.note}</p>}
-          </>
-        )}
-        {state.kind === "error" && <p className="train__hint">{state.message}</p>}
-      </div>
     </div>
   );
 }

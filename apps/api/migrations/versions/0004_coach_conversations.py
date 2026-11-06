@@ -1,20 +1,18 @@
 """Add coach_conversations and coach_messages: the Coach's saved conversations
 (docs/coach.md §3.1).
 
-Numbered 0003 against main. The account-progress branch also adds a 0003
-(lesson_progress); whichever of the two merges second renumbers its migration
-to 0004 and points down_revision at the other.
+Comes after 0003 (lesson_progress), which reached main first.
 
-Revision ID: 0003
-Revises: 0002
+Revision ID: 0004
+Revises: 0003
 """
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-revision = "0003"
-down_revision = "0002"
+revision = "0004"
+down_revision = "0003"
 branch_labels = None
 depends_on = None
 

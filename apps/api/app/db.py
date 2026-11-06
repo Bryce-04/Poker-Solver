@@ -8,7 +8,7 @@ no-op there). It never overrides an already-set env var.
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, UniqueConstraint, create_engine
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -50,6 +50,25 @@ class SpotRow(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     created_by = Column(UUID(as_uuid=True), nullable=True, index=True)
     data = Column(JSONB, nullable=False)
+
+
+class LessonProgressRow(Base):
+    """One user's result on one Train-tab lesson: finished or not, and the
+    score of their latest attempt. The lessons themselves live in the web app
+    (apps/web/src/lib/lessons.ts), so `lesson_id` is just a slug the server
+    stores without knowing what it means. `updated_at` is the client's clock in
+    milliseconds, kept so that two devices' offline attempts merge by "newest
+    wins" instead of by whichever reached the server last (routes/progress.py
+    rejects times in the future so one bad clock can't pin a row)."""
+
+    __tablename__ = "lesson_progress"
+
+    user_id = Column(UUID(as_uuid=True), primary_key=True)
+    lesson_id = Column(String(64), primary_key=True)
+    done = Column(Boolean, nullable=False)
+    correct = Column(Integer, nullable=False)
+    total = Column(Integer, nullable=False)
+    updated_at = Column(BigInteger, nullable=False)
 
 
 class CoachConversationRow(Base):
