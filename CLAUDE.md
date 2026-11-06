@@ -236,8 +236,8 @@ one usage limit**. One PR per phase.
   (no sign-in, no UI needed) and prints the cards, `python scripts/coach_smoke.py` checks the key,
   and `python scripts/coach_eval.py` scores the model on
   `coach_eval/cases.jsonl`. Run the eval before and after any prompt change; the target is 90%.
-  `--check-cases` validates the cases without a key. **Last result: 84% (43 of 51), below the 90%
-  target**; the misses are listed in `docs/decisions.md`. That run used the Gemini 3 model list
+  `--check-cases` validates the cases without a key. **Last results: 84%, then 76% after Phase 3
+  (same kinds of misses; runs vary by several points), below the 90% target**; the misses are listed in `docs/decisions.md`. That run used the Gemini 3 model list
   that's now `app/coach.py`'s default.
 - **Next is Phase 4**, the desktop UI (spec §7-8). It must word the limit as per hour, not per day.
   It renders the cards' extra fields:

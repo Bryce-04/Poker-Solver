@@ -61,6 +61,10 @@ Status: **proposed**. Spec: `docs/coach.md` §4.2-4.3.
 - **Unsupported lines are reasons, not errors.** For example, 3-bet and 4-bet ranges exist only near
   100bb. The model explains them in plain words.
 
+**Eval after Phase 3:** 76% (39 of 51), down from 84%. The prompt change only covers explaining
+results, which the eval doesn't reach, and the misses are the same kinds as before. So this looks like
+run-to-run variation, not a regression. One run can't measure a change this small: compare several.
+
 **Checked with real conversations** (`coach_try.py`, real Gemini, the real solver):
 - The mockup's AQ spot came back as "Bet medium (4.12bb)" 65% / "Bet large (6.88bb)" 34%. The
   mockup's "bet small 55%" was always a placeholder.
