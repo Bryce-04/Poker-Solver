@@ -8,7 +8,8 @@ import { PlayingCard } from "../../components/PlayingCard/PlayingCard";
 import { PAGE_HEADERS } from "../../lib/navigation";
 import { indexRange, totalCombos } from "../../lib/rangeCombos";
 import { boardText, displayName, shortSavedAt, spotKind } from "../../lib/spotText";
-import { LIBRARY_FILTERS as FILTERS, useLibrary } from "./useLibrary";
+import type { CoachConversationSummary } from "../../lib/api";
+import { LIBRARY_FILTERS as FILTERS, itemKind, itemName, useLibrary, type ItemKind, type LibraryItem } from "./useLibrary";
 import "../../components/SpotBuilder/SpotBuilder.css";
 import "./LibraryWorkspace.css";
 
@@ -17,26 +18,32 @@ type PanelMode = { kind: "view" } | { kind: "rename"; draft: string } | { kind: 
 const TOTAL_COMBOS = 1326;
 
 /**
- * Desktop Library (docs/desktop-redesign.md §6.4): the signed-in user's saved
- * spots as a searchable, filterable table, a preview of the selected one, and
- * open / rename / duplicate / delete. Opening hands the spot to Ranges (a
- * preflop chart) or Solve (a setup with a board) as route state. The data and
- * actions are useLibrary's, shared with the phone page (LibraryPhone).
+ * Desktop Library (docs/desktop-redesign.md §6.4, docs/coach.md §10): the
+ * signed-in user's saved spots and Coach conversations as a searchable,
+ * filterable table, a preview of the selected one, and open / rename /
+ * duplicate / delete. Opening hands a spot to Ranges (a preflop chart) or Solve
+ * (a setup with a board) as route state; a conversation opens in the Coach.
+ * The data and actions are useLibrary's, shared with the phone page.
  */
 export function LibraryWorkspace() {
   const library = useLibrary();
-  const { auth, state, spots, visible, query, setQuery, filter, setFilter, busy, open } = library;
+  const { auth, state, spots, conversations, conversationsState, items, query, setQuery, filter, setFilter, busy, open } =
+    library;
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelMode>({ kind: "view" });
   const [notice, setNotice] = useState<string | null>(null);
 
-  const selected = visible.find((s) => s.id === selectedId) ?? visible[0];
+  const selected = items.find((i) => i.key === selectedKey) ?? items[0];
 
-  function select(spot: Spot, mode: PanelMode = { kind: "view" }) {
-    setSelectedId(spot.id ?? null);
+  function selectItem(item: LibraryItem, mode: PanelMode = { kind: "view" }) {
+    setSelectedKey(item.key);
     setPanel(mode);
     setNotice(null);
+  }
+
+  function select(spot: Spot, mode: PanelMode = { kind: "view" }) {
+    selectItem({ type: "spot", key: `spot:${spot.id ?? displayName(spot)}`, date: null, spot }, mode);
   }
 
   async function rename(spot: Spot, name: string) {
@@ -49,7 +56,23 @@ export function LibraryWorkspace() {
     const result = await library.remove(spot);
     if (result.ok) {
       setPanel({ kind: "view" });
-      setSelectedId(null);
+      setSelectedKey(null);
+    } else {
+      setNotice(result.notice);
+    }
+  }
+
+  async function renameConversation(c: CoachConversationSummary, title: string) {
+    const result = await library.renameConversation(c, title);
+    if (result.ok) setPanel({ kind: "view" });
+    else setNotice(result.notice);
+  }
+
+  async function removeConversation(c: CoachConversationSummary) {
+    const result = await library.removeConversation(c);
+    if (result.ok) {
+      setPanel({ kind: "view" });
+      setSelectedKey(null);
     } else {
       setNotice(result.notice);
     }
@@ -110,10 +133,13 @@ export function LibraryWorkspace() {
             <p className="spot-builder__status-title">Something went wrong.</p>
             <p>The request failed with HTTP {state.status}.</p>
           </div>
-        ) : spots.length === 0 ? (
+        ) : spots.length === 0 && conversations.length === 0 ? (
           <div className="library__message">
-            <p className="library__message-title">No saved spots yet.</p>
-            <p>Save a chart from Ranges or a setup from Solve and it&rsquo;ll show up here.</p>
+            <p className="library__message-title">Nothing saved yet.</p>
+            <p>
+              Save a chart from Ranges or a setup from Solve, or ask the Coach about a spot, and it&rsquo;ll
+              show up here.
+            </p>
           </div>
         ) : (
           <div className="library__columns">
@@ -146,79 +172,249 @@ export function LibraryWorkspace() {
                     </tr>
                   </thead>
                   <tbody>
-                    {visible.map((spot) => {
-                      const name = displayName(spot);
-                      const kind = spotKind(spot);
+                    {items.map((item) => {
+                      const name = itemName(item);
+                      const kind = itemKind(item);
+                      const isSelected = item.key === selected?.key || undefined;
+                      if (item.type === "conversation") {
+                        const c = item.conversation;
+                        return (
+                          <tr key={item.key} data-selected={isSelected}>
+                            <td>
+                              <button type="button" className="library__name" onClick={() => selectItem(item)}>
+                                {name}
+                              </button>
+                            </td>
+                            <td>
+                              <KindPill kind={kind} />
+                            </td>
+                            <td>—</td>
+                            <td>—</td>
+                            <td>—</td>
+                            <td className="tabular-nums">{shortDate(c.updated_at)}</td>
+                            <td>
+                              <RowActions
+                                name={name}
+                                onOpen={() => library.openConversation(c)}
+                                onRename={() => selectItem(item, { kind: "rename", draft: name })}
+                                onDelete={() => selectItem(item, { kind: "confirm-delete" })}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      }
+                      const spot = item.spot;
                       return (
-                        <tr key={spot.id ?? name} data-selected={spot === selected || undefined}>
+                        <tr key={item.key} data-selected={isSelected}>
                           <td>
-                            <button type="button" className="library__name" onClick={() => select(spot)}>
+                            <button type="button" className="library__name" onClick={() => selectItem(item)}>
                               {name}
                             </button>
                           </td>
                           <td>
-                            <span className="library__pill" data-kind={kind}>
-                              {kind === "preflop" ? "Preflop" : "Postflop"}
-                            </span>
+                            <KindPill kind={kind} />
                           </td>
                           <td>{spot.positions_in_hand.join(" vs ")}</td>
                           <td className="tabular-nums">{spot.effective_stack_bb}bb</td>
                           <td>{kind === "postflop" ? boardText(spot.board ?? []) : "—"}</td>
                           <td className="tabular-nums">{shortSavedAt(spot) ?? "—"}</td>
                           <td>
-                            <span className="library__row-actions">
-                              <button type="button" className="library__open" onClick={() => open(spot)}>
-                                Open
-                              </button>
-                              <button
-                                type="button"
-                                className="library__icon"
-                                aria-label={`Rename ${name}`}
-                                onClick={() => select(spot, { kind: "rename", draft: name })}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-                                  <path d="M4 20h4L19 9l-4-4L4 16v4z" />
-                                </svg>
-                              </button>
-                              <button
-                                type="button"
-                                className="library__icon"
-                                aria-label={`Delete ${name}`}
-                                onClick={() => select(spot, { kind: "confirm-delete" })}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-                                  <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
-                                </svg>
-                              </button>
-                            </span>
+                            <RowActions
+                              name={name}
+                              onOpen={() => open(spot)}
+                              onRename={() => selectItem(item, { kind: "rename", draft: name })}
+                              onDelete={() => selectItem(item, { kind: "confirm-delete" })}
+                            />
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-                {visible.length === 0 && <p className="library__no-results">No spots match that search.</p>}
+                {items.length === 0 && <p className="library__no-results">Nothing matches that search.</p>}
               </div>
-              <p className="library__tip">Tip: save a chart from Ranges or a setup from Solve, and it shows up here.</p>
+              {conversationsState.kind === "error" && (
+                <p className="library__tip">Couldn&rsquo;t load your Coach conversations. Your spots are all here.</p>
+              )}
+              <p className="library__tip">
+                Tip: save a chart from Ranges or a setup from Solve, and it shows up here. So do your Coach
+                conversations.
+              </p>
             </div>
 
-            {selected && (
+            {selected?.type === "spot" && (
               <SpotPreview
-                spot={selected}
+                spot={selected.spot}
                 panel={panel}
                 busy={busy}
                 notice={notice}
                 onPanel={setPanel}
-                onOpen={() => open(selected)}
-                onRename={(name) => void rename(selected, name)}
-                onDelete={() => void remove(selected)}
-                onDuplicate={() => void duplicate(selected)}
+                onOpen={() => open(selected.spot)}
+                onRename={(name) => void rename(selected.spot, name)}
+                onDelete={() => void remove(selected.spot)}
+                onDuplicate={() => void duplicate(selected.spot)}
+              />
+            )}
+            {selected?.type === "conversation" && (
+              <ConversationPreview
+                conversation={selected.conversation}
+                panel={panel}
+                busy={busy}
+                notice={notice}
+                onPanel={setPanel}
+                onOpen={() => library.openConversation(selected.conversation)}
+                onRename={(title) => void renameConversation(selected.conversation, title)}
+                onDelete={() => void removeConversation(selected.conversation)}
               />
             )}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+const KIND_LABEL: Record<ItemKind, string> = { preflop: "Preflop", postflop: "Postflop", conversation: "Conversation" };
+
+function KindPill({ kind, start = false }: { kind: ItemKind; start?: boolean }) {
+  return (
+    <span className={`library__pill${start ? " library__pill--start" : ""}`} data-kind={kind}>
+      {KIND_LABEL[kind]}
+    </span>
+  );
+}
+
+/** "Nov 5, 9:41 AM": a conversation's last update. */
+function shortDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "—"
+    : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function RowActions({
+  name,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  name: string;
+  onOpen: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <span className="library__row-actions">
+      <button type="button" className="library__open" onClick={onOpen}>
+        Open
+      </button>
+      <button type="button" className="library__icon" aria-label={`Rename ${name}`} onClick={onRename}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 20h4L19 9l-4-4L4 16v4z" />
+        </svg>
+      </button>
+      <button type="button" className="library__icon" aria-label={`Delete ${name}`} onClick={onDelete}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+        </svg>
+      </button>
+    </span>
+  );
+}
+
+/** A Coach conversation (docs/coach.md §10): its title, latest Coach text,
+ * Open in Coach, and Rename / Delete (no duplicate). */
+function ConversationPreview({
+  conversation,
+  panel,
+  busy,
+  notice,
+  onPanel,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  conversation: CoachConversationSummary;
+  panel: PanelMode;
+  busy: boolean;
+  notice: string | null;
+  onPanel: (panel: PanelMode) => void;
+  onOpen: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+}) {
+  const name = conversation.title ?? "New conversation";
+  return (
+    <aside className="library__preview" aria-label="Selected conversation">
+      <KindPill kind="conversation" start />
+      {panel.kind === "rename" ? (
+        <form
+          className="library__rename"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onRename(panel.draft);
+          }}
+        >
+          <label className="section-label" htmlFor="library-rename">
+            Rename
+          </label>
+          <input
+            id="library-rename"
+            type="text"
+            maxLength={120}
+            autoFocus
+            value={panel.draft}
+            onChange={(e) => onPanel({ kind: "rename", draft: e.target.value })}
+          />
+          <span className="library__preview-actions">
+            <button type="submit" className="btn-secondary" disabled={busy || panel.draft.trim() === ""}>
+              Save name
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => onPanel({ kind: "view" })}>
+              Cancel
+            </button>
+          </span>
+        </form>
+      ) : (
+        <h2 className="library__preview-name">{name}</h2>
+      )}
+      <p className="library__preview-desc">Coach conversation · updated {shortDate(conversation.updated_at)}</p>
+      {conversation.preview && <p className="library__preview-quote">&ldquo;{conversation.preview}&rdquo;</p>}
+
+      <button type="button" className="btn-primary" onClick={onOpen}>
+        Open in Coach
+      </button>
+
+      {panel.kind === "confirm-delete" ? (
+        <div className="library__confirm" role="alertdialog" aria-label={`Delete ${name}?`}>
+          <p>
+            Delete &ldquo;{name}&rdquo; and all its messages? This can&rsquo;t be undone.
+          </p>
+          <span className="library__preview-actions">
+            <button type="button" className="btn-danger" disabled={busy} onClick={onDelete}>
+              Delete
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => onPanel({ kind: "view" })}>
+              Cancel
+            </button>
+          </span>
+        </div>
+      ) : (
+        <span className="library__preview-actions library__preview-actions--spread">
+          <button type="button" className="btn-ghost" onClick={() => onPanel({ kind: "rename", draft: name })}>
+            Rename
+          </button>
+          <button type="button" className="btn-danger" onClick={() => onPanel({ kind: "confirm-delete" })}>
+            Delete
+          </button>
+        </span>
+      )}
+      {notice && (
+        <p className="spot-builder__field-error" role="alert">
+          {notice}
+        </p>
+      )}
+    </aside>
   );
 }
 
@@ -256,9 +452,7 @@ function SpotPreview({
 
   return (
     <aside className="library__preview" aria-label="Selected spot">
-      <span className="library__pill library__pill--start" data-kind={kind}>
-        {kind === "preflop" ? "Preflop" : "Postflop"}
-      </span>
+      <KindPill kind={kind} start />
 
       {panel.kind === "rename" ? (
         <form

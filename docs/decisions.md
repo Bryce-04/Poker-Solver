@@ -6,6 +6,48 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-06 — The Coach page, Phase 6: conversations in the Library
+
+Status: **proposed**. Spec: `docs/coach.md` §10.
+
+**What.** The Library lists Coach conversations beside the saved spots, on both layouts.
+- **The data:** `pages/library/useLibrary.ts` fetches them (`listConversations`) and gives both
+  layouts one `items` list of spots and conversations.
+- **The filter:** All shows both; Preflop and Postflop show spots; the new **Conversations** shows
+  conversations only. On phones that filter is labeled **"Chats"**, since four labels share the
+  phone's width and "Conversations" ran off the edge in the screenshot.
+- **Rows** get a violet "Conversation" pill and their updated date. Open goes to `/coach/:id`.
+  Rename and Delete use the Coach endpoints (`PATCH` / `DELETE /coach/conversations/{id}`).
+  Deleting confirms first and says it removes all the conversation's messages.
+- **No duplicate for conversations.** The spec doesn't ask for it, and a copied conversation has no
+  clear meaning.
+- **The sidebar subtitle is now "Saved spots and chats"**, held back from Phase 4 until the Library
+  actually listed conversations. The page description mentions them too.
+
+**Choices.**
+- **Order:** the spots keep the server's order (newest saved first), and each conversation goes in
+  before the first spot older than it. Sorting everything by date would have reordered the spots
+  whenever their dates disagree with the server's order, which the existing tests caught.
+- **If the conversations fail to load**, the Library still shows the spots, with a short note.
+- **Wording:** "Nothing saved yet" and "Nothing matches that search" replace the spot-only wording,
+  and the empty state mentions the Coach.
+
+**Checked:**
+- Desktop and phone screenshots against the mock API, with spots and conversations mixed.
+- `LibraryWorkspace.test.tsx` and `LibraryPhone.test.tsx` add conversation cases: the merged order
+  and pill, the filter, Open, Rename, delete after confirming, and a failed load.
+- The existing tests' `lib/api` mocks give the conversation calls resolved defaults, so nothing
+  resolves to `undefined` (CLAUDE.md's warning).
+- `pnpm check:web` exits 0.
+
+**This finishes the spec's six phases.** Still to do before anyone outside the team uses it:
+- **The evaluation:** it's under 90% (84%, then 76%).
+- **Not deployed:** Render needs migration `0004` and the new code.
+- **No real-device check:** the phone keyboard over the message bar, and Android back closing the
+  Coach's sheets.
+
+---
+
 ## 2026-11-06 — The Coach page, Phase 5: phones
 
 Status: **proposed**. Spec: `docs/coach.md` §9, design in `docs/coach/mockup/phone-*.html`.

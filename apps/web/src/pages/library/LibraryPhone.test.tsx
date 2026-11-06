@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
 import { LibraryPage } from "../LibraryPage";
-import { deleteSpot, listSpots, renameSpot, saveSpot } from "../../lib/api";
+import { deleteConversation, deleteSpot, listConversations, listSpots, renameSpot, saveSpot } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { AccountSheetContext } from "../../lib/mobileShell";
 
@@ -17,6 +17,10 @@ vi.mock("../../lib/api", () => ({
   renameSpot: vi.fn(),
   deleteSpot: vi.fn(),
   saveSpot: vi.fn(),
+  // The Coach's conversations (docs/coach.md §10): none, unless a test says otherwise.
+  listConversations: vi.fn(async () => ({ kind: "ok", conversations: [] })),
+  renameConversation: vi.fn(),
+  deleteConversation: vi.fn(),
 }));
 const mockList = vi.mocked(listSpots);
 const mockRename = vi.mocked(renameSpot);
@@ -59,6 +63,7 @@ const setup = {
 
 beforeEach(() => {
   mockList.mockReset();
+  vi.mocked(listConversations).mockResolvedValue({ kind: "ok", conversations: [] });
   mockRename.mockReset();
   mockDelete.mockReset();
   mockSave.mockReset();
@@ -98,7 +103,7 @@ describe("phone Library -- the list", () => {
     expect(await screen.findByRole("button", { name: /BTN open · standard/ })).toHaveTextContent("PreflopBTN · 100bb · Oct 7");
     expect(card(/BB.*40bb, facing a raise from CO/)).toBeInTheDocument();
     expect(card(/BB vs BTN on Q/)).toHaveTextContent("PostflopBB vs BTN · 97.5bb · Oct 19");
-    expect(screen.getByText("Only you can see your saved spots.")).toBeInTheDocument();
+    expect(screen.getByText("Only you can see your saved spots and conversations.")).toBeInTheDocument();
   });
 
   it("searches and filters", async () => {
@@ -116,14 +121,14 @@ describe("phone Library -- the list", () => {
 
     await user.clear(screen.getByLabelText(/search by name/i));
     await user.type(screen.getByLabelText(/search by name/i), "zzz");
-    expect(screen.getByText("No spots match that search.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing matches that search.")).toBeInTheDocument();
   });
 
   it("shows a specific empty state, not a blank list", async () => {
     mockList.mockResolvedValue({ kind: "ok", spots: [] });
     render(<Page />);
-    expect(await screen.findByRole("heading", { name: "No saved spots yet" })).toBeInTheDocument();
-    expect(screen.getByText("Save a chart from Ranges or a setup from Solve.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Nothing saved yet" })).toBeInTheDocument();
+    expect(screen.getByText(/Save a chart from Ranges or a setup from Solve, or ask the Coach/)).toBeInTheDocument();
   });
 
   it("distinguishes an unreachable server from an unexpected response", async () => {
@@ -247,5 +252,54 @@ describe("phone Library -- a spot's sheet", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
     expect(within(screen.getByRole("dialog")).getByRole("alert")).toHaveTextContent(/couldn.t delete it/i);
+  });
+});
+
+// --- Coach conversations in the Library (docs/coach.md §10) ---------------------
+
+describe("phone Library -- Coach conversations", () => {
+  const conversation = {
+    id: "conv-1",
+    title: "KK in a three-way pot",
+    preview: "I can't solve this one exactly",
+    updated_at: "2026-10-30T09:41:00Z",
+    status: "idle",
+  } as const;
+
+  beforeEach(() => {
+    vi.mocked(listConversations).mockResolvedValue({ kind: "ok", conversations: [{ ...conversation }] });
+  });
+
+  it("shows a conversation card, and its sheet opens it in the Coach", async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    await user.click(await screen.findByRole("button", { name: /KK in a three-way pot.*Conversation/ }));
+    const sheet = screen.getByRole("dialog");
+    expect(sheet).toHaveTextContent("I can't solve this one exactly");
+    expect(within(sheet).queryByRole("button", { name: "Duplicate" })).not.toBeInTheDocument();
+    await user.click(within(sheet).getByRole("button", { name: "Open in Coach" }));
+    expect(where.pathname).toBe("/coach/conv-1");
+  });
+
+  it("the Chats filter (Conversations, shortened for a phone) shows only conversations", async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    await screen.findByRole("button", { name: /KK in a three-way pot/ });
+    await user.click(screen.getByRole("button", { name: "Chats" }));
+    expect(screen.queryByRole("button", { name: /BTN open · standard/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /KK in a three-way pot/ })).toBeInTheDocument();
+  });
+
+  it("deletes a conversation only after confirming", async () => {
+    const user = userEvent.setup();
+    vi.mocked(deleteConversation).mockResolvedValue({ kind: "deleted" });
+    render(<Page />);
+    await user.click(await screen.findByRole("button", { name: /KK in a three-way pot/ }));
+    const sheet = screen.getByRole("dialog");
+    await user.click(within(sheet).getByRole("button", { name: "Delete" }));
+    expect(deleteConversation).not.toHaveBeenCalled();
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    expect(deleteConversation).toHaveBeenCalledWith("conv-1");
+    expect(screen.queryByRole("button", { name: /KK in a three-way pot/ })).not.toBeInTheDocument();
   });
 });

@@ -180,9 +180,9 @@ play the reference charts and every decision is graded against them (data in
 a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
 (generated lessons, postflop practice, ranked play, opponent types).
 
-**Coach page, Ask mode (spec agreed 2026-11-04; Phases 1-5 of 6 done)**: `docs/coach.md` is the
+**Coach page, Ask mode (spec agreed 2026-11-04; all six phases done)**: `docs/coach.md` is the
 spec, with the design as clickable HTML plus screenshots in `docs/coach/mockup/`. Read both before
-working on it, and `docs/decisions.md`'s Phase 1-5 entries: the spec predates the Train coach, so
+working on it, and `docs/decisions.md`'s Phase 1-6 entries: the spec predates the Train coach, so
 some of it was changed. It's a Coach page where a user describes a spot in plain words, and the
 solver decides while Gemini only explains (spec §1). It's separate from the Train coach's "Ask the
 coach" (below), which doesn't open a Coach conversation, but the two **share one Gemini client and
@@ -264,7 +264,16 @@ one usage limit**. One PR per phase.
 - **The root classes are `.coach-page` / `.m-coach`, never `.coach`**: `DrillPage.css` owns a
   global `.coach`. On phones the desktop button roles do nothing, so give the Coach's buttons phone
   styles (`CoachPhone.css`).
-- **Next is Phase 6**, the Library: a Conversations filter, rename and delete.
+- **The Library lists conversations** (Phase 6, `pages/library/useLibrary.ts`'s `items`):
+  - a Conversations filter ("Chats" on phones);
+  - a violet pill, and Open to `/coach/:id`;
+  - Rename and Delete through the Coach endpoints, and no duplicate.
+
+  Spots keep the server's order, with conversations slotted in by date.
+- **Before anyone outside the team uses it:**
+  - the eval reaching 90%;
+  - deploying (Render needs migration `0004`);
+  - a real-device check.
 
 **Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
 `done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own

@@ -3,7 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { Spot } from "@poker-solver/schema";
 import { LibraryPage } from "../LibraryPage";
-import { deleteSpot, listSpots, renameSpot, saveSpot } from "../../lib/api";
+import {
+  deleteConversation,
+  deleteSpot,
+  listConversations,
+  listSpots,
+  renameConversation,
+  renameSpot,
+  saveSpot,
+} from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 
 vi.mock("../../lib/api", () => ({
@@ -11,6 +19,10 @@ vi.mock("../../lib/api", () => ({
   renameSpot: vi.fn(),
   deleteSpot: vi.fn(),
   saveSpot: vi.fn(),
+  // The Coach's conversations (docs/coach.md §10): none, unless a test says otherwise.
+  listConversations: vi.fn(async () => ({ kind: "ok", conversations: [] })),
+  renameConversation: vi.fn(),
+  deleteConversation: vi.fn(),
 }));
 const mockList = vi.mocked(listSpots);
 const mockRename = vi.mocked(renameSpot);
@@ -55,6 +67,7 @@ function renderLibrary() {
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/ranges" element={<Probe />} />
         <Route path="/solve" element={<Probe />} />
+        <Route path="/coach/:id" element={<Probe />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -68,6 +81,7 @@ beforeEach(() => {
     removeEventListener: () => {},
   }));
   mockList.mockReset();
+  vi.mocked(listConversations).mockResolvedValue({ kind: "ok", conversations: [] });
   mockList.mockResolvedValue({ kind: "ok", spots: [CHART, SETUP] });
   mockRename.mockReset();
   mockDelete.mockReset();
@@ -112,7 +126,7 @@ describe("LibraryWorkspace (desktop Library)", () => {
     expect(screen.getAllByRole("row")).toHaveLength(2);
     await user.clear(screen.getByRole("searchbox"));
     await user.type(screen.getByRole("searchbox"), "nothing like this");
-    expect(screen.getByText("No spots match that search.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing matches that search.")).toBeInTheDocument();
   });
 
   it("opens a chart in Ranges and a setup in Solve, carrying the spot", async () => {
@@ -179,12 +193,82 @@ describe("LibraryWorkspace (desktop Library)", () => {
   it("explains an empty Library and a signed-out one", async () => {
     mockList.mockResolvedValue({ kind: "ok", spots: [] });
     const { unmount } = renderLibrary();
-    expect(await screen.findByText("No saved spots yet.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing saved yet.")).toBeInTheDocument();
     unmount();
 
     mockUseAuth.mockReturnValue({ status: "signed-out", email: null });
     renderLibrary();
     expect(screen.getByText("Sign in to see your Library.")).toBeInTheDocument();
     expect(mockList).toHaveBeenCalledTimes(1);
+  });
+});
+
+// --- Coach conversations in the Library (docs/coach.md §10) ---------------------
+
+const CONVERSATION = {
+  id: "conv-1",
+  title: "AQ on the button, Q-5-2 flop",
+  preview: "Bet most of the time.",
+  updated_at: "2026-10-30T09:41:00Z",
+  status: "idle",
+} as const;
+
+describe("LibraryWorkspace: Coach conversations", () => {
+  beforeEach(() => {
+    vi.mocked(listConversations).mockResolvedValue({ kind: "ok", conversations: [{ ...CONVERSATION }] });
+  });
+
+  it("lists a conversation among the spots by date, with its own pill", async () => {
+    renderLibrary();
+    const table = await screen.findByRole("table");
+    await within(table).findByRole("button", { name: "AQ on the button, Q-5-2 flop" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    // The spots keep the server's order; the conversation (Oct 30) goes before the first older spot.
+    expect(rows.map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual(["Conversation", "Preflop", "Postflop"]);
+  });
+
+  it("the Conversations filter shows only conversations, and Open goes to the Coach", async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+    await screen.findByRole("button", { name: "AQ on the button, Q-5-2 flop" });
+    await user.click(screen.getByRole("button", { name: "Conversations" }));
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(1);
+    await user.click(within(rows[0]).getByRole("button", { name: "Open" }));
+    expect(screen.getByTestId("opened")).toHaveTextContent("/coach/conv-1");
+  });
+
+  it("previews a conversation, renames it, and deletes it after confirming", async () => {
+    const user = userEvent.setup();
+    vi.mocked(renameConversation).mockResolvedValue({
+      kind: "renamed",
+      conversation: { ...CONVERSATION, title: "My AQ hand" },
+    });
+    vi.mocked(deleteConversation).mockResolvedValue({ kind: "deleted" });
+    renderLibrary();
+    await user.click(await screen.findByRole("button", { name: "AQ on the button, Q-5-2 flop" }));
+    const panel = screen.getByRole("complementary", { name: "Selected conversation" });
+    expect(panel).toHaveTextContent("Bet most of the time.");
+    expect(within(panel).queryByRole("button", { name: "Duplicate" })).not.toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: "Rename" }));
+    const field = within(panel).getByLabelText("Rename");
+    await user.clear(field);
+    await user.type(field, "My AQ hand{Enter}");
+    expect(renameConversation).toHaveBeenCalledWith("conv-1", "My AQ hand");
+    expect(await within(panel).findByRole("heading", { name: "My AQ hand" })).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: "Delete" }));
+    expect(deleteConversation).not.toHaveBeenCalled();
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    expect(deleteConversation).toHaveBeenCalledWith("conv-1");
+    await waitFor(() => expect(screen.queryByText("My AQ hand")).not.toBeInTheDocument());
+  });
+
+  it("still shows the spots when the conversations can't load", async () => {
+    vi.mocked(listConversations).mockResolvedValue({ kind: "network-error" });
+    renderLibrary();
+    expect(await screen.findByText(/Couldn.t load your Coach conversations/)).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(3);
   });
 });

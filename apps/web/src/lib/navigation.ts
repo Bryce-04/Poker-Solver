@@ -7,7 +7,7 @@ export const NAV_ITEMS = [
   { id: "solve", to: "/solve", label: "Solve", subtitle: "Best play after the flop" },
   { id: "ranges", to: "/ranges", label: "Ranges", subtitle: "Which hands to play preflop" },
   { id: "coach", to: "/coach", label: "Coach", subtitle: "Ask about a spot" },
-  { id: "library", to: "/library", label: "Library", subtitle: "Your saved spots" },
+  { id: "library", to: "/library", label: "Library", subtitle: "Saved spots and chats" },
   { id: "train", to: "/train", label: "Train", subtitle: "Lessons and practice" },
 ] as const;
 
@@ -52,7 +52,7 @@ export const PAGE_HEADERS: Record<
   },
   "/library": {
     title: "Library",
-    description: "Spots you've saved. Only you can see them.",
+    description: "Spots you've saved and your Coach conversations. Only you can see them.",
     workspace: true,
     ownHeader: true,
   },
