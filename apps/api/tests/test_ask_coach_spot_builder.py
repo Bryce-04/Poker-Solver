@@ -351,3 +351,13 @@ def test_malformed_arguments_are_questions_not_crashes(change):
 def test_the_same_assumption_worded_differently_is_listed_once():
     d = sb.describe({**BTN_VS_BB_FLOP, "assumptions": ["2.5bb open", "100bb stacks", "standard ranges"]})
     assert d.assumptions == ["2.5bb open", "100bb stacks", "standard ranges"]
+
+
+def test_an_unopened_pot_has_no_opponent_or_call_on_its_card():
+    d = sb.describe({"hero_position": "UTG", "hero_hand": "A5s", "preflop": {"line": "unopened"}})
+    assert d.facts == [
+        {"k": "You", "v": "UTG"},
+        {"k": "Action", "v": "Folded to you"},
+        {"k": "Pot", "v": "1.5bb"},
+        {"k": "Stack", "v": "100bb"},
+    ]

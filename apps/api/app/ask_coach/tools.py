@@ -5,9 +5,10 @@ Executors store their cards as they go, through `ToolContext.store`, and
 return a small dict the model reads. Cards are built here from tool results,
 never from the model's text.
 
-Phase 2 runs describe_spot, give_general_advice and suggest_followups. The
-solver tools are declared already, so the prompt doesn't change in Phase 3, but
-for now they answer that the solver isn't connected yet.
+get_preflop_strategy and solve_current_spot run the charts and the solver
+(solver_tools.py, Phase 3). A solve that waits too long for the solver raises
+solver_tools.SolverStillBusy through execute(), so the runner can end the turn
+with a `solver_busy` error.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from uuid import UUID
 
 from poker_solver_schema import Spot
 
-from . import spot_builder
+from . import solver_tools, spot_builder
 
 log = logging.getLogger("ask_coach")
 
@@ -27,10 +28,6 @@ MAX_ADVICE_PARAS = 3
 MAX_ADVICE_CHARS = 700
 MAX_SUGGESTIONS = 3
 MAX_SUGGESTION_CHARS = 40
-SOLVER_NOT_CONNECTED = (
-    "The solver isn't connected to the Coach yet, so there's no solver answer for this spot. "
-    "That's coming in an update."
-)
 
 _SEATS = {"type": "STRING", "enum": spot_builder.SIX_MAX}
 
@@ -160,6 +157,11 @@ class ToolContext:
     # The general advice shown this turn, so the runner can drop the model
     # repeating it as its own (unlabeled) text.
     advice_paras: list[str] = field(default_factory=list)
+    # Sets the conversation's status (working / waiting_for_solver) during a solve.
+    set_status: Callable[[str], None] = lambda status: None
+    # Where this turn's numbers came from, shown under the Coach's explanation of
+    # them (spec §3.1's coach_text `note`). Set once a result or preflop card is stored.
+    answer_note: str | None = None
     called: list[str] = field(default_factory=list)
 
 
@@ -172,6 +174,8 @@ def execute(name: str, args: dict | None, ctx: ToolContext) -> dict:
         return {"ok": False, "reason": f"There is no tool called {name}."}
     try:
         result = handler(args or {}, ctx)
+    except solver_tools.SolverStillBusy:
+        raise  # the runner ends the turn with a solver_busy error
     except Exception as e:
         log.exception("ask_coach: tool %s failed conversation=%s (%s)", name, ctx.conversation_id, type(e).__name__)
         return {"ok": False, "reason": "That tool failed on our side."}
@@ -216,10 +220,23 @@ def _describe_spot(args: dict, ctx: ToolContext) -> dict:
     }
 
 
-def _solver_not_connected(args: dict, ctx: ToolContext) -> dict:
-    if ctx.current_spot is None:
-        return {"ok": False, "reason": "No spot yet: call describe_spot first."}
-    return {"ok": False, "reason": SOLVER_NOT_CONNECTED}
+def _get_preflop_strategy(args: dict, ctx: ToolContext) -> dict:
+    outcome = solver_tools.preflop_strategy(ctx.current_spot)
+    if outcome.card_kind:
+        ctx.store(outcome.card_kind, outcome.card, None)
+        ctx.answer_note = solver_tools.CHART_NOTE
+    return outcome.result
+
+
+def _solve_current_spot(args: dict, ctx: ToolContext) -> dict:
+    hooks = solver_tools.SolveHooks(
+        store_card=lambda kind, payload: ctx.store(kind, payload, None), set_status=ctx.set_status
+    )
+    outcome = solver_tools.solve_current(ctx.current_spot, hooks)
+    if outcome.card_kind:
+        ctx.store(outcome.card_kind, outcome.card, None)
+        ctx.answer_note = solver_tools.SOLVER_NOTE
+    return outcome.result
 
 
 def _clean(items, max_items: int, max_chars: int, *, drop_long: bool) -> list[str]:
@@ -258,8 +275,8 @@ def _suggest_followups(args: dict, ctx: ToolContext) -> dict:
 
 _HANDLERS = {
     "describe_spot": _describe_spot,
-    "get_preflop_strategy": _solver_not_connected,
-    "solve_current_spot": _solver_not_connected,
+    "get_preflop_strategy": _get_preflop_strategy,
+    "solve_current_spot": _solve_current_spot,
     "give_general_advice": _give_general_advice,
     "suggest_followups": _suggest_followups,
 }

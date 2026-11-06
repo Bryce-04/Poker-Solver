@@ -635,6 +635,14 @@ def _check_action(streets, street, oop, ip, starting_stack, act: Act, amount) ->
 
 
 def _facts(hero, villain, oop, street, acts: list[Act], state: StreetState) -> list[dict]:
+    if street == "preflop" and not acts:
+        # Folded to the user: there's no opponent yet, and the big blind isn't a bet to call.
+        return [
+            {"k": "You", "v": hero},
+            {"k": "Action", "v": "Folded to you"},
+            {"k": "Pot", "v": fmt_bb(state.pot_now_bb)},
+            {"k": "Stack", "v": fmt_bb(state.remaining_bb[hero])},
+        ]
     if street == "preflop":
         you = hero
     else:

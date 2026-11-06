@@ -180,9 +180,9 @@ play the reference charts and every decision is graded against them (data in
 a test fails if it drifts). Not a solver; see `docs/decisions.md`, which also lists what's planned next
 (generated lessons, postflop practice, ranked play, opponent types).
 
-**Coach page, Ask mode (spec agreed 2026-11-04; Phases 1-2 of 6 done)**: `docs/coach.md` is the
+**Coach page, Ask mode (spec agreed 2026-11-04; Phases 1-3 of 6 done)**: `docs/coach.md` is the
 spec, with the design as clickable HTML plus screenshots in `docs/coach/mockup/`. Read both before
-working on it, and `docs/decisions.md`'s Phase 1 and 2 entries: the spec predates the Train coach, so
+working on it, and `docs/decisions.md`'s Phase 1, 2 and 3 entries: the spec predates the Train coach, so
 some of it was changed. It's a Coach page where a user describes a spot in plain words, and the
 solver decides while Gemini only explains (spec §1). It's separate from the Train coach's "Ask the
 coach" (below), which doesn't open a Coach conversation, but the two **share one Gemini client and
@@ -192,7 +192,8 @@ one usage limit**. One PR per phase.
   - `routes.py`: the endpoints. `store.py`: database helpers. `limits.py`: the shared limit.
   - `runner.py`: one turn in the background. `prompt.py`: the system prompt. `tools.py`: tool
     declarations and executors. `spot_builder.py`: `describe_spot`'s arguments to a `Spot`.
-    `gemini.py`: stored messages to Gemini contents.
+    `gemini.py`: stored messages to Gemini contents. `solver_tools.py`: the preflop charts and
+    the live solver, behind `get_preflop_strategy` and `solve_current_spot`.
 - **Data**: tables `coach_conversations` / `coach_messages` (`app/db.py`, migration `0004`). A
   message is `{seq, kind, payload}`; spec §3.1 lists the kinds. Spot cards also carry
   `hero_position` and a `summary`, and errors can be `not_configured`.
@@ -211,7 +212,17 @@ one usage limit**. One PR per phase.
     (`keep_only_written_suits`); otherwise it uses the hand type.
   - `describe_spot` computes the pot itself: `spot_builder.py` ports `handBuilder.ts`, and the two
     are held together by `apps/web/src/lib/handBuilder.fixtures.json`. **Change both together.**
-  - The solver tools answer "not connected yet" until Phase 3.
+  - `solve_current_spot` runs the Solve page's chain:
+    - ranges from the preflop line, narrowed through each earlier street, then the current street's
+      solve;
+    - the user's exact combo when the solve split it by suit;
+    - labels with the hand's REAL bet amounts, not the menu-rounded ones.
+
+    A busy solver puts the conversation in `waiting_for_solver`, and after 3 minutes the turn ends
+    with a `solver_busy` error.
+  - `get_preflop_strategy` reads the reference charts (approximate, not solved), and the card and
+    the prompt say "the charts".
+  - Text after a result carries the spec's source `note`.
   - A conversation busy and untouched for 5 minutes is reset to `error` when it's next read.
 - **The limit** is the Train coach's `limiter` (`COACH_PER_HOUR` per user, `COACH_PER_DAY_TOTAL` for
   everyone, in memory). A Coach message counts once. If Gemini is busy or there's no key, the
@@ -228,8 +239,11 @@ one usage limit**. One PR per phase.
   `--check-cases` validates the cases without a key. **Last result: 84% (43 of 51), below the 90%
   target**; the misses are listed in `docs/decisions.md`. That run used the Gemini 3 model list
   that's now `app/coach.py`'s default.
-- **Next is Phase 3**: the solver tools. No UI exists until Phase 4, which must word the limit as
-  per hour, not per day.
+- **Next is Phase 4**, the desktop UI (spec §7-8). It must word the limit as per hour, not per day.
+  It renders the cards' extra fields:
+  - `result_card`'s `whose` / `range_rows` / `narrowed` / `notes`;
+  - `preflop_card`'s `source` / `note`;
+  - `coach_text`'s `note`.
 
 **Coach chat (2026-11-05)**: `POST /coach/chat` streams the same grounded coach (SSE `delta` /
 `done` / `fallback` / `error` events; on any failure before the first word the reply is the app's own

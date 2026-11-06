@@ -6,6 +6,75 @@ or a review approval is enough); flip to **accepted** then.
 
 ---
 
+## 2026-11-05 — The Coach page, Phase 3: the solver tools
+
+Status: **proposed**. Spec: `docs/coach.md` §4.2-4.3.
+
+**What.** `get_preflop_strategy` and `solve_current_spot` now run for real
+(`app/ask_coach/solver_tools.py`; `tools.py` dispatches to it).
+
+- **`get_preflop_strategy` reads the app's reference charts.** It covers three situations:
+  - Unopened: raise / fold, from the opening charts.
+  - Facing an open: 3-bet / call / fold, from `preflop_ranges.py`'s split ranges at 100bb. Where only
+    the combined defend chart exists, it's "Call or 3-bet" / fold.
+  - Facing a 3-bet: 4-bet / call / fold.
+
+  These charts were built from standard principles, not solved. So the preflop card carries a note
+  saying so, the Coach's explanation is noted "from the charts", and the prompt says "the charts",
+  never "the solver", for them.
+- **`solve_current_spot` runs the same chain as the Solve page:**
+  1. Both ranges from the preflop line (`ranges_for_preflop_line`).
+  2. Narrowed through each earlier street (`narrow_ranges`). A line either player takes less than 10%
+     of the time is flagged as rough, as `lib/chaining.ts` does.
+  3. A solve of the current street (`solve_spot`).
+  4. The user's exact combo is read from `combo_strategy` when the solve split it by suit, else from
+     its hand type. The hand notes' category and reasons come along (flop only).
+
+  It stores a `solving` card first, then a `result_card`.
+- **Statuses.** A solve keeps the conversation `working`, and touches its `updated_at` between steps,
+  so a long chain (two narrowings and a solve can take minutes on Render) isn't reset as a lost turn.
+  While another solve holds the solver, the status is `waiting_for_solver`. It retries every 5s for 3
+  minutes, then ends the turn with a `solver_busy` error, and the message is given back to the
+  user's limit.
+- **The explanation after a result** carries the spec's `note` ("The percentages come from the
+  solver..."), or the charts' note.
+
+**Choices.**
+- **Bet sizes are labeled with the hand's real amounts.** The solver plays the user's real bets
+  rounded onto its menu (a 3bb bet into 5.5bb plays as the 75% size, 4.12bb, disclosed in
+  `bucketed_actions`). Labels from that game would say "Call 4.12bb" to someone facing 3bb. So the
+  state machine's sizing rules are applied to the real contributions: "Call 3bb", "Raise to 5.88bb".
+- **When it's the opponent's turn**, the solve still runs (spec §4.3). The card and the model are both
+  told it's the opponent's strategy, and the user's hand isn't shown on it.
+- **When the user's hand isn't in their range** (narrowing removed it: the solver would have played
+  it differently earlier), the card shows the whole range's play, with a note. The prompt tells the
+  model to say why.
+- **The card adds fields beyond the spec's `result_card`:**
+  - `whose`
+  - `range_rows`: the whole range's mix, next to the hand's
+  - `narrowed`: which streets narrowed the ranges
+  - `notes`
+
+  The preflop card adds `source` and `note`.
+- **A pasted hand history's spot can't be solved yet.** It has no preflop betting to take ranges
+  from, so the tool says so and asks how the preflop went.
+- **Unsupported lines are reasons, not errors.** For example, 3-bet and 4-bet ranges exist only near
+  100bb. The model explains them in plain words.
+
+**Checked with real conversations** (`coach_try.py`, real Gemini, the real solver):
+- The mockup's AQ spot came back as "Bet medium (4.12bb)" 65% / "Bet large (6.88bb)" 34%. The
+  mockup's "bet small 55%" was always a placeholder.
+- A UTG A5s question got the chart's fold, credited to the charts.
+- A turn spot was narrowed by the flop check-back, then solved. That correctly found KhJh outside
+  the BTN's checking range.
+
+**Tests:**
+- `tests/test_ask_coach_solver.py`: no database, a fake solver except for one real flop solve
+  (about 1s locally).
+- New runner cases in `tests/test_ask_coach_turns.py`.
+
+---
+
 ## 2026-11-05 — The Coach: what real conversations showed
 
 Status: **proposed**. `apps/api/scripts/coach_try.py` runs real Coach turns from a terminal (real

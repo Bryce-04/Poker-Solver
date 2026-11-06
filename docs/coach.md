@@ -1,8 +1,8 @@
 # Coach — spec
 
-Status: agreed with the team on 2026-11-04. Phases 1-2 done, in `app/ask_coach/`, not `app/coach/`.
+Status: agreed with the team on 2026-11-04. Phases 1-3 done, in `app/ask_coach/`, not `app/coach/`.
 **This spec predates the Train coach (`app/coach.py`)**, so read `docs/decisions.md`'s Phase 1 and 2
-entries alongside it. Agreed changes: the Coach uses the Train coach's Gemini client (not
+entries (and Phase 3's) alongside it. Agreed changes: the Coach uses the Train coach's Gemini client (not
 `google-genai`) and its usage limit (per hour, not `COACH_DAILY_LIMIT` per day).
 Scope: **version 1, Ask mode.** A new "Coach" page where a user describes a
 poker spot in plain words and gets the solver's answer, explained. Desktop and

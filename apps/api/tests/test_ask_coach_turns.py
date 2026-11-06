@@ -9,12 +9,25 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text as sql
 
 from app import coach as train_coach
-from app.ask_coach import gemini, runner, tools
+from app.ask_coach import gemini, runner, solver_tools, tools
 from app.db import engine
 from app.main import app
 from ask_coach_fakes import FakeModel, call, text
 
 client = TestClient(app)
+
+# What solve_spot returns for BTN AQ facing a check on Qs5c2c, cut down (the real
+# solver runs in test_ask_coach_solver.py).
+CANNED_SOLVE = {
+    "position": "BTN",
+    "strategy": {"AQo": {"check": 0.3, "bet_small": 0.55, "bet_medium": 0.15, "bet_large": 0.0, "all_in": 0.0}},
+    "combo_strategy": {},
+    "exploitability_pct": 0.31,
+    "converged": True,
+    "bucketed_actions": [],
+    "hand_categories": {"AQo": "Top pair, top kicker"},
+    "hand_reasons": {"AQo": ["Value: worse queens and draws call."]},
+}
 
 BTN_AQ = dict(
     hero_position="BTN",
@@ -66,28 +79,34 @@ def responses(request):
     return {p["functionResponse"]["name"]: p["functionResponse"]["response"] for p in request["contents"][-1]["parts"]}
 
 
-def test_a_full_turn_stores_cards_in_order(auth_headers, model):
+def test_a_full_turn_stores_cards_in_order(auth_headers, model, monkeypatch):
+    monkeypatch.setattr(solver_tools, "solve_spot", lambda spot: CANNED_SOLVE)
     model.turns += [
         [text("I'm assuming 100bb stacks and a 2.5bb open."), call("describe_spot", **BTN_AQ)],
         [call("solve_current_spot")],
-        [text("Once the solver is connected I'll have its play."), call("suggest_followups", items=["What if he bets?", "Turn ideas"])],
+        [text("Bet small most of the time."), call("suggest_followups", items=["What if he bets?", "Turn ideas"])],
         [],
     ]
     cid, body = ask(auth_headers)
 
     assert body["status"] == "idle"
-    assert kinds(body) == ["user_text", "coach_text", "spot_card", "coach_text", "suggestions"]
+    assert kinds(body) == [
+        "user_text", "coach_text", "spot_card", "solving", "result_card", "coach_text", "suggestions",
+    ]
+    # The explanation after the result says where its numbers came from; the text before doesn't.
+    assert "note" not in body["messages"][1]["payload"]
+    assert body["messages"][5]["payload"] == {"paras": ["Bet small most of the time."], "note": solver_tools.SOLVER_NOTE}
     card = body["messages"][2]["payload"]
     assert card["hero_hand"] == "AhQd" and card["hero_position"] == "BTN"
     assert card["spot"]["pot_bb"] == 5.5
     assert {"k": "Pot", "v": "5.5bb"} in card["facts"]
-    assert body["messages"][4]["payload"] == {"items": ["What if he bets?", "Turn ideas"]}
+    assert body["messages"][6]["payload"] == {"items": ["What if he bets?", "Turn ideas"]}
     assert body["title"] == "AQ on the button, Q-5-2 flop"
 
     # What the model was told after each tool.
     assert responses(model.requests[1])["describe_spot"]["ok"] is True
     assert responses(model.requests[1])["describe_spot"]["to_act"] == "hero"
-    assert responses(model.requests[2])["solve_current_spot"] == {"ok": False, "reason": tools.SOLVER_NOT_CONNECTED}
+    assert responses(model.requests[2])["solve_current_spot"]["ok"] is True
     # From the second request on, the system prompt carries the spot.
     assert "CURRENT SPOT: none" in model.requests[0]["system"]
     assert "pot 5.5bb" in model.requests[1]["system"]
@@ -201,6 +220,34 @@ def test_a_bullet_list_of_long_points_stays_text(auth_headers, model):
     model.turns += [[text(long_point)]]
     _, body = ask(auth_headers)
     assert [m["kind"] for m in body["messages"]] == ["user_text", "coach_text"]
+
+
+def test_a_solver_busy_too_long_ends_the_turn_and_gives_the_message_back(auth_headers, model, monkeypatch):
+    def always_busy(spot):
+        raise solver_tools.SolverBusy("busy")
+
+    now = [0.0]
+    monkeypatch.setattr(solver_tools, "solve_spot", always_busy)
+    monkeypatch.setattr(solver_tools, "_sleep", lambda s: now.__setitem__(0, now[0] + s))
+    monkeypatch.setattr(solver_tools, "_clock", lambda: now[0])
+    model.turns += [[call("describe_spot", **BTN_AQ)], [call("solve_current_spot")]]
+    _, body = ask(auth_headers)
+    assert body["status"] == "error"
+    assert body["messages"][-1]["payload"] == {"kind": "solver_busy", "text": runner.SOLVER_BUSY_TEXT}
+    assert "solving" in kinds(body)
+    assert client.get("/coach/usage", headers=auth_headers).json()["used"] == 0
+
+
+def test_a_preflop_question_gets_a_chart_card_with_its_source(auth_headers, model):
+    model.turns += [
+        [call("describe_spot", hero_position="BTN", hero_hand="AQo", preflop={"line": "unopened"})],
+        [call("get_preflop_strategy")],
+        [text("Open it.")],
+    ]
+    _, body = ask(auth_headers, "Should I open AQo on the button?")
+    assert kinds(body) == ["user_text", "spot_card", "preflop_card", "coach_text"]
+    assert body["messages"][2]["payload"]["rows"] == [{"action": "raise", "label": "Raise", "freq": 1.0}]
+    assert body["messages"][3]["payload"]["note"] == solver_tools.CHART_NOTE
 
 
 def test_long_suggestions_are_dropped(auth_headers, model):

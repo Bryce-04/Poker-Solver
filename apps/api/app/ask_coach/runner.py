@@ -33,7 +33,7 @@ from sqlalchemy import select
 
 from .. import coach as train_coach
 from ..db import CoachConversationRow, CoachMessageRow, SessionLocal
-from . import gemini, limits, store, tools
+from . import gemini, limits, solver_tools, store, tools
 from .prompt import system_instruction
 
 log = logging.getLogger("ask_coach")
@@ -50,6 +50,7 @@ MAX_REPLY_CHARS = 2000
 INTERNAL_ERROR_TEXT = "Something went wrong on our side. Try again."
 BUSY_TEXT = "The Coach is busy right now. Try again in a minute."
 NOT_CONFIGURED_TEXT = "The Coach isn't switched on for this server yet."
+SOLVER_BUSY_TEXT = "The solver is busy with other spots right now. Try again in a few minutes."
 NO_ANSWER_TEXT = "Sorry, I couldn't put an answer together for that. Could you say it another way?"
 
 
@@ -59,6 +60,12 @@ class _Refunded(Exception):
     def __init__(self, kind: str, text: str, owner: UUID) -> None:
         super().__init__(kind)
         self.kind, self.text, self.owner = kind, text, owner
+
+
+class _SolverStillBusy(Exception):
+    def __init__(self, owner: UUID) -> None:
+        super().__init__("solver busy")
+        self.owner = owner
 
 
 def submit(conversation_id: UUID) -> Future:
@@ -72,6 +79,10 @@ def run_turn(conversation_id: UUID) -> None:
     owner: UUID | None = None
     try:
         owner = _run(conversation_id)
+    except _SolverStillBusy as e:
+        log.warning("ask_coach: solver busy too long conversation=%s", conversation_id)
+        limits.give_back(e.owner)
+        _finish_with_error(conversation_id, "solver_busy", SOLVER_BUSY_TEXT)
     except _Refunded as e:
         log.warning("ask_coach: turn not answered conversation=%s (%s)", conversation_id, e.kind)
         limits.give_back(e.owner)
@@ -115,6 +126,7 @@ def _run(conversation_id: UUID) -> UUID | None:
         attached_spot=Spot.model_validate(attached) if attached else None,
         current_spot=current,
         user_texts=[(m.payload or {}).get("text", "") for m in messages if m.kind == "user_text"],
+        set_status=lambda status: _set_status(conversation_id, status),
     )
     contents = gemini.build_contents(messages)
     stored_text = False
@@ -140,7 +152,9 @@ def _run(conversation_id: UUID) -> UUID | None:
         said += paras
         if paras:
             # Text that comes with tool calls ("I'm assuming...") goes before their cards.
-            _store(conversation_id, "coach_text", {"paras": paras}, None)
+            # Text after a result card explains its numbers, so it says where they came from.
+            payload = {"paras": paras, **({"note": ctx.answer_note} if ctx.answer_note else {})}
+            _store(conversation_id, "coach_text", payload, None)
             stored_text = True
         if imitated_advice:
             # Advice the model wrote as text dressed up as the box becomes the real,
@@ -151,16 +165,17 @@ def _run(conversation_id: UUID) -> UUID | None:
             tools.execute("suggest_followups", {"items": bulleted}, ctx)
         if not calls:
             break
+        # The calls run after their text is stored, so "I'm assuming..." shows
+        # above the cards they make.
+        try:
+            responses = [
+                {"functionResponse": {"name": c.get("name", ""), "response": tools.execute(c.get("name", ""), c.get("args"), ctx)}}
+                for c in calls
+            ]
+        except solver_tools.SolverStillBusy as e:
+            raise _SolverStillBusy(owner) from e
         contents.append({"role": "model", "parts": parts})
-        contents.append(
-            {
-                "role": "user",
-                "parts": [
-                    {"functionResponse": {"name": c.get("name", ""), "response": tools.execute(c.get("name", ""), c.get("args"), ctx)}}
-                    for c in calls
-                ],
-            }
-        )
+        contents.append({"role": "user", "parts": responses})
 
     if not stored_text and not ctx.called:
         _store(conversation_id, "coach_text", {"paras": [NO_ANSWER_TEXT]}, None)
@@ -253,10 +268,13 @@ def _store(conversation_id: UUID, kind: str, payload: dict, title: str | None) -
 
 
 def _set_status(conversation_id: UUID, status: str) -> None:
+    """Also touches updated_at, so a solve that runs for minutes isn't mistaken
+    for a turn lost to a restart (store.STALE_AFTER)."""
     with SessionLocal() as db:
         conversation = store.locked_conversation(db, conversation_id)
         if conversation is not None:
             conversation.status = status
+            conversation.updated_at = store.now()
             db.commit()
 
 
